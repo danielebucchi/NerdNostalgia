@@ -12,6 +12,8 @@ from src.utils.config import Config
 from src.utils.logger import setup_logger
 from src.parsers.csv_parser import CSVParser
 from src.platforms.ebay.client import eBayClient
+from src.database.manager import DatabaseManager
+from src.database.models import ListingStatus
 
 
 @click.group()
@@ -216,6 +218,139 @@ def get_item(ctx, item_id, platform):
         logger.info(f"  Condizione: {item.condition}")
     else:
         logger.error(f"Articolo {item_id} non trovato")
+
+
+# ==================== DATABASE COMMANDS ====================
+
+@cli.group()
+def db():
+    """Comandi per gestione database."""
+    pass
+
+
+@db.command()
+@click.option('--db-url', default='sqlite:///data/nerdnostalgia.db', help='Database URL')
+def init(db_url):
+    """Inizializza il database e crea le tabelle."""
+    logger = get_logger(__name__)
+    logger.info(f"Inizializzazione database: {db_url}")
+
+    db_manager = DatabaseManager(db_url)
+    db_manager.create_tables()
+
+    logger.info("Database inizializzato con successo!")
+    logger.info(f"Path: {db_url}")
+
+
+@db.command()
+@click.option('--db-url', default='sqlite:///data/nerdnostalgia.db', help='Database URL')
+@click.option('--username', prompt=True, help='Username utente')
+@click.option('--email', prompt=True, help='Email utente')
+@click.option('--full-name', help='Nome completo')
+def create_user(db_url, username, email, full_name):
+    """Crea un nuovo utente."""
+    logger = get_logger(__name__)
+
+    db_manager = DatabaseManager(db_url)
+    user = db_manager.create_user(username=username, email=email, full_name=full_name)
+
+    if user:
+        logger.info(f"Utente creato: {user.username} (ID: {user.id})")
+    else:
+        logger.error("Errore nella creazione dell'utente")
+
+
+@db.command()
+@click.option('--db-url', default='sqlite:///data/nerdnostalgia.db', help='Database URL')
+@click.option('--user-id', type=int, help='Filtra per user ID')
+def list_items(db_url, user_id):
+    """Lista tutti gli articoli nel database."""
+    logger = get_logger(__name__)
+
+    db_manager = DatabaseManager(db_url)
+    items = db_manager.list_items(user_id=user_id)
+
+    if not items:
+        logger.info("Nessun articolo trovato")
+        return
+
+    logger.info(f"Trovati {len(items)} articoli:")
+    for item in items:
+        logger.info(f"  [{item.id}] {item.title} - €{item.price} (SKU: {item.sku})")
+
+
+@db.command()
+@click.option('--db-url', default='sqlite:///data/nerdnostalgia.db', help='Database URL')
+@click.option('--user-id', type=int, help='Filtra per user ID')
+@click.option('--platform', help='Filtra per piattaforma')
+@click.option('--status', help='Filtra per status (active, sold, ended)')
+def list_listings(db_url, user_id, platform, status):
+    """Lista tutti i listing nel database."""
+    logger = get_logger(__name__)
+
+    db_manager = DatabaseManager(db_url)
+
+    status_enum = None
+    if status:
+        try:
+            status_enum = ListingStatus(status)
+        except ValueError:
+            logger.error(f"Status non valido: {status}")
+            return
+
+    listings = db_manager.list_listings(
+        user_id=user_id,
+        platform_name=platform,
+        status=status_enum
+    )
+
+    if not listings:
+        logger.info("Nessun listing trovato")
+        return
+
+    logger.info(f"Trovati {len(listings)} listing:")
+    for listing in listings:
+        logger.info(
+            f"  [{listing.id}] {listing.platform.name} - "
+            f"{listing.platform_item_id} - €{listing.listed_price} - "
+            f"{listing.status.value}"
+        )
+
+
+@db.command()
+@click.option('--db-url', default='sqlite:///data/nerdnostalgia.db', help='Database URL')
+@click.option('--user-id', type=int, required=True, help='User ID')
+def stats(db_url, user_id):
+    """Mostra statistiche utente."""
+    logger = get_logger(__name__)
+
+    db_manager = DatabaseManager(db_url)
+    stats = db_manager.get_user_stats(user_id)
+
+    logger.info(f"Statistiche utente {user_id}:")
+    logger.info(f"  Articoli totali: {stats['total_items']}")
+    logger.info(f"  Listing totali: {stats['total_listings']}")
+    logger.info(f"  Listing attivi: {stats['active_listings']}")
+    logger.info(f"  Listing venduti: {stats['sold_listings']}")
+
+
+@db.command()
+@click.confirmation_option(prompt='Sei sicuro di voler eliminare TUTTE le tabelle?')
+@click.option('--db-url', default='sqlite:///data/nerdnostalgia.db', help='Database URL')
+def reset(db_url):
+    """ATTENZIONE: Elimina tutte le tabelle e i dati!"""
+    logger = get_logger(__name__)
+
+    db_manager = DatabaseManager(db_url)
+    db_manager.drop_tables()
+    logger.warning("Database resettato!")
+
+
+# Helper function
+def get_logger(name):
+    """Ottiene logger senza contesto click."""
+    from src.utils.logger import get_logger as _get_logger
+    return _get_logger(name)
 
 
 if __name__ == '__main__':

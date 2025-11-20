@@ -12,8 +12,12 @@ requests>=2.31.0
 # Logging
 colorlog>=6.7.0
 
-# CLI (future use)
+# CLI
 click>=8.1.0
+
+# Database
+sqlalchemy>=2.0.0
+alembic>=1.13.0
 
 # GUI (future use - uncomment when needed)
 # tkinter is included in Python standard library
