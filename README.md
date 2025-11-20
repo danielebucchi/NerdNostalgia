@@ -201,6 +201,53 @@ poetry show --tree
 poetry export -f requirements.txt --output requirements.txt --without-hashes
 ```
 
+## Database
+
+NerdNostalgia include un sistema database completo per tracciare:
+- **Utenti** e permessi
+- **Articoli** (inventario)
+- **Listing** (pubblicazioni su piattaforme)
+- **Storico** modifiche e statistiche
+
+### Setup Database
+
+```bash
+# Inizializza database
+python main.py db init
+
+# Crea primo utente
+python main.py db create-user
+
+# Con Poetry
+poetry run python main.py db init
+poetry run python main.py db create-user
+```
+
+### Comandi Database
+
+```bash
+# Lista articoli
+python main.py db list-items
+
+# Lista listing attivi
+python main.py db list-listings --status active
+
+# Statistiche utente
+python main.py db stats --user-id 1
+
+# Help completo
+python main.py db --help
+```
+
+### Tecnologie
+
+- **SQLAlchemy 2.0**: ORM moderno e performante
+- **Alembic**: Migrations per schema evolution
+- **SQLite**: Default (zero configurazione)
+- **PostgreSQL**: Supportato per produzione
+
+Per dettagli completi, vedi [DATABASE.md](DATABASE.md)
+
 ## Docker
 
 ### Caratteristiche
