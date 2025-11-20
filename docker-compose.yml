@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  nerdnostalgia:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nerdnostalgia:latest
+    container_name: nerdnostalgia
+
+    # Volumi per persistenza dati
+    volumes:
+      # Monta la directory data locale
+      - ./data:/app/data
+      # Monta la directory config locale
+      - ./config:/app/config
+      # Monta la directory logs locale
+      - ./logs:/app/logs
+
+    # Variabili d'ambiente (opzionale - preferibile usare config.yaml)
+    environment:
+      - PYTHONUNBUFFERED=1
+
+    # Se usi file .env
+    env_file:
+      - .env
+
+    # Network mode (host per accedere a servizi locali se necessario)
+    # network_mode: "host"
+
+    # Restart policy
+    restart: "no"
+
+    # Per eseguire comandi interattivi
+    stdin_open: true
+    tty: true
+
+  # Servizio per sviluppo con hot-reload (opzionale)
+  nerdnostalgia-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nerdnostalgia:dev
+    container_name: nerdnostalgia-dev
+
+    volumes:
+      # Monta l'intero codice sorgente per sviluppo
+      - .:/app
+      - /app/__pycache__
+      - /app/.pytest_cache
+
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+
+    command: --help
+
+    stdin_open: true
+    tty: true
+
+    # Profilo per separare dev da production
+    profiles:
+      - dev
+
+# Volumi named (opzionale - per dati persistenti separati dal host)
+volumes:
+  nerdnostalgia_data:
+  nerdnostalgia_config:
+  nerdnostalgia_logs:
