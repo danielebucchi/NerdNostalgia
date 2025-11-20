@@ -1,69 +1,39 @@
-version: '3.8'
+version: "3.9"
 
 services:
-  nerdnostalgia:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: nerdnostalgia:latest
-    container_name: nerdnostalgia
-
-    # Volumi per persistenza dati
-    volumes:
-      # Monta la directory data locale
-      - ./data:/app/data
-      # Monta la directory config locale
-      - ./config:/app/config
-      # Monta la directory logs locale
-      - ./logs:/app/logs
-
-    # Variabili d'ambiente (opzionale - preferibile usare config.yaml)
+  db:
+    image: postgres:15
+    container_name: nerdnostalgia_db
+    restart: always
     environment:
-      - PYTHONUNBUFFERED=1
-
-    # Se usi file .env
-    env_file:
-      - .env
-
-    # Network mode (host per accedere a servizi locali se necessario)
-    # network_mode: "host"
-
-    # Restart policy
-    restart: "no"
-
-    # Per eseguire comandi interattivi
-    stdin_open: true
-    tty: true
-
-  # Servizio per sviluppo con hot-reload (opzionale)
-  nerdnostalgia-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: nerdnostalgia:dev
-    container_name: nerdnostalgia-dev
-
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: nerdnostalgia
+    ports:
+      - "5432:5432"
     volumes:
-      # Monta l'intero codice sorgente per sviluppo
-      - .:/app
-      - /app/__pycache__
-      - /app/.pytest_cache
+      - db_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d nerdnostalgia"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  backend:
+    build: ./backend
+    container_name: nerdnostalgia-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "7373:7373"
+    volumes:
+      - ./tmp:/tmp/nerdnostalgia
+      - ./backend:/app
     environment:
-      - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://user:password@db:5432/nerdnostalgia
+      - APP_TMP_DIR=/tmp/nerdnostalgia
 
-    command: --help
-
-    stdin_open: true
-    tty: true
-
-    # Profilo per separare dev da production
-    profiles:
-      - dev
-
-# Volumi named (opzionale - per dati persistenti separati dal host)
 volumes:
-  nerdnostalgia_data:
-  nerdnostalgia_config:
-  nerdnostalgia_logs:
+  db_data:
