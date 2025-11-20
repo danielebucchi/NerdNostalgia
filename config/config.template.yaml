@@ -1,0 +1,48 @@
+# Template di configurazione - Copia questo file come config.yaml e inserisci le tue credenziali
+
+# eBay API Configuration
+ebay:
+  # Per ottenere le credenziali: https://developer.ebay.com/
+  sandbox: true  # Usa sandbox per testing
+  app_id: "YOUR_APP_ID_HERE"
+  dev_id: "YOUR_DEV_ID_HERE"
+  cert_id: "YOUR_CERT_ID_HERE"
+  token: "YOUR_USER_TOKEN_HERE"
+
+  # eBay site configuration
+  site_id: 101  # 101 = eBay Italy, 0 = eBay US
+
+  # Default settings
+  defaults:
+    currency: "EUR"
+    country: "IT"
+    postal_code: "00000"
+    listing_type: "FixedPriceItem"  # or "Chinese" for auction
+    duration: "GTC"  # Good 'Til Cancelled
+
+# Amazon API Configuration (future)
+amazon:
+  enabled: false
+  marketplace_id: ""
+  seller_id: ""
+  access_key: ""
+  secret_key: ""
+
+# Application settings
+app:
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_file: "logs/nerdnostalgia.log"
+
+  # Image settings
+  images:
+    max_size_mb: 5
+    allowed_formats: ["jpg", "jpeg", "png"]
+    resize: true
+    max_width: 1600
+    max_height: 1600
+
+# Database (future - for tracking listings)
+database:
+  enabled: false
+  type: "sqlite"
+  path: "data/nerdnostalgia.db"
