@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
+from helpers.user import get_user_helper, UserHelper
 from models.db import User
 from models.entities.user import UserResponse, UserCreate, UserUpdate
 from utils.session import get_db
@@ -12,13 +13,13 @@ from utils.session import get_db
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
+def create_user(user_data: UserCreate, user_helper: UserHelper = Depends(get_user_helper)):
     """
     Crea un nuovo utente.
 
     Args:
         user_data: Dati del nuovo utente
-        db: Sessione database
+        user_helper: Helper per l'utente
 
     Returns:
         UserResponse: Utente creato
@@ -27,7 +28,7 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
         HTTPException: Se username o email gia' esistono
     """
     # Check if username already exists
-    existing_user = db.query(User).filter(User.username == user_data.username).first()
+    existing_user = user_helper.get("username", user_data.username)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -35,7 +36,7 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
         )
 
     # Check if email already exists
-    existing_email = db.query(User).filter(User.email == user_data.email).first()
+    existing_email = user_helper.get("email", user_data.email)
     if existing_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -50,10 +51,9 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
         full_name=user_data.full_name,
         role=user_data.role,
     )
+    user_helper.save(new_user)
 
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+
 
     return UserResponse(
         id=new_user.id,
@@ -73,7 +73,7 @@ def list_users(
     skip: int = 0,
     limit: int = 100,
     is_active: Optional[bool] = None,
-    db: Session = Depends(get_db)
+    user_helper: UserHelper = Depends(get_user_helper)
 ):
     """
     Lista tutti gli utenti con paginazione e filtri.
@@ -82,18 +82,12 @@ def list_users(
         skip: Numero di record da saltare
         limit: Numero massimo di record
         is_active: Filtra per utenti attivi/inattivi
-        db: Sessione database
+        user_helper: Helper per l'utente
 
     Returns:
         List[UserResponse]: Lista di utenti
     """
-    query = db.query(User)
-
-    # Apply filters
-    if is_active is not None:
-        query = query.filter(User.is_active == is_active)
-
-    users = query.offset(skip).limit(limit).all()
+    users = user_helper.gets(is_active=is_active, skip=skip, limit=limit)
 
     return [
         UserResponse(
@@ -112,13 +106,13 @@ def list_users(
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(user_id: int, user_helper: UserHelper = Depends(get_user_helper)):
     """
     Ottieni un utente per ID.
 
     Args:
         user_id: ID dell'utente
-        db: Sessione database
+        user_helper: Helper per l'utente
 
     Returns:
         UserResponse: Utente trovato
@@ -126,7 +120,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     Raises:
         HTTPException: Se utente non trovato
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    user = user_helper.get("id", user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -147,14 +141,16 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
-def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db)):
+def update_user(user_id: int,
+                user_data: UserUpdate,
+                user_helper: UserHelper = Depends(get_user_helper)):
     """
     Aggiorna un utente.
 
     Args:
         user_id: ID dell'utente
         user_data: Dati da aggiornare
-        db: Sessione database
+        user_helper: Helper per l'utente
 
     Returns:
         UserResponse: Utente aggiornato
@@ -162,22 +158,14 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
     Raises:
         HTTPException: Se utente non trovato
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    user = user_helper.get("id", user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Utente con ID {user_id} non trovato"
         )
 
-    update_data = user_data.dict(exclude_unset=True)
-
-    for key, value in update_data.items():
-        setattr(user, key, value)
-
-    user.updated_at = dt.now(datetime.UTC)
-
-    db.commit()
-    db.refresh(user)
+    user_helper.update(user_data, user)
 
     return UserResponse(
         id=user.id,
@@ -193,37 +181,39 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(user_id: int,
+                user_helper: UserHelper = Depends(get_user_helper)):
     """
     Elimina un utente.
 
     Args:
         user_id: ID dell'utente da eliminare
-        db: Sessione database
+        user_helper: Helper per l'utente
 
     Raises:
         HTTPException: Se utente non trovato
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    user = user_helper.get("id", user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Utente con ID {user_id} non trovato"
         )
 
-    db.delete(user)
-    db.commit()
+    user_helper.delete(user)
+
     return None
 
 
 @router.get("/username/{username}", response_model=UserResponse)
-def get_user_by_username(username: str, db: Session = Depends(get_db)):
+def get_user_by_username(username: str,
+                user_helper: UserHelper = Depends(get_user_helper)):
     """
     Ottieni un utente per username.
 
     Args:
         username: Username dell'utente
-        db: Sessione database
+        user_helper: Helper per l'utente
 
     Returns:
         UserResponse: Utente trovato
@@ -231,7 +221,7 @@ def get_user_by_username(username: str, db: Session = Depends(get_db)):
     Raises:
         HTTPException: Se utente non trovato
     """
-    user = db.query(User).filter(User.username == username).first()
+    user=user_helper.get("username", username)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
