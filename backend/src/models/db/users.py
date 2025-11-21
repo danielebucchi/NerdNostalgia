@@ -2,31 +2,12 @@
 Modello User per SQLAlchemy.
 """
 from sqlalchemy import Column, String, Boolean
-import enum
 from sqlalchemy import Enum as PgEnum
-from .base import BaseModel
-
-
-class UserRole(enum.Enum):
-    """Ruoli utente."""
-    ADMIN = "ADMIN"
-    USER = "USER"
-    GUEST = "GUEST"
+from base import BaseModel
+from models.entities.user import UserRole
 
 
 class User(BaseModel):
-    """
-    Modello utente del sistema.
-
-    Attributes:
-        username: Username univoco dell'utente
-        email: Email univoca dell'utente
-        full_name: Nome completo
-        hashed_password: Password hashata
-        role: Ruolo dell'utente (ADMIN, USER, GUEST)
-        is_active: Se l'utente e' attivo
-        is_verified: Se l'email e' verificata
-    """
     __tablename__ = "users"
 
     username = Column(String(100), unique=True, nullable=False, index=True)
@@ -48,15 +29,6 @@ class User(BaseModel):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
 
     def to_dict(self, include_password=False):
-        """
-        Converte l'utente in dizionario.
-
-        Args:
-            include_password: Se includere l'hash della password (default: False)
-
-        Returns:
-            dict: Dizionario con i dati dell'utente
-        """
         data = {
             "id": self.id,
             "username": self.username,
