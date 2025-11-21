@@ -1,0 +1,2 @@
+class BaseHelper:
+    pass
