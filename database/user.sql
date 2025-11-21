@@ -2,7 +2,7 @@
 -- Database: PostgreSQL
 
 -- Creazione tipo ENUM per i ruoli utente
-CREATE TYPE user_role AS ENUM ('admin', 'user', 'guest');
+CREATE TYPE user_role AS ENUM ('ADMIN', 'USER', 'GUEST');
 
 -- Creazione tabella users
 CREATE TABLE IF NOT EXISTS users (
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     hashed_password VARCHAR(255) NOT NULL,
     full_name VARCHAR(255),
-    role user_role NOT NULL DEFAULT 'user',
+    role user_role NOT NULL DEFAULT 'USER',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -46,7 +46,7 @@ COMMENT ON COLUMN users.email IS 'Email univoca utente';
 COMMENT ON COLUMN users.hashed_password IS 'Password hashata (bcrypt/argon2)';
 COMMENT ON COLUMN users.full_name IS 'Nome completo utente';
 COMMENT ON COLUMN users.role IS 'Ruolo utente: admin, user, guest';
-COMMENT ON COLUMN users.is_active IS 'Indica se l''utente è attivo';
-COMMENT ON COLUMN users.is_verified IS 'Indica se l''email è stata verificata';
+COMMENT ON COLUMN users.is_active IS 'Indica se l''utente ï¿½ attivo';
+COMMENT ON COLUMN users.is_verified IS 'Indica se l''email ï¿½ stata verificata';
 COMMENT ON COLUMN users.created_at IS 'Data e ora di creazione';
 COMMENT ON COLUMN users.updated_at IS 'Data e ora ultimo aggiornamento';

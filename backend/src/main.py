@@ -5,6 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
+from api.users import router as users_router
+
 # Create FastAPI app
 app = FastAPI(
     title="NerdNostalgia API",
@@ -20,6 +22,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(users_router)
 
 
 @app.get("/")
