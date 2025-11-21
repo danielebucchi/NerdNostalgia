@@ -1,16 +1,17 @@
 """
 Modello User per SQLAlchemy.
 """
-from sqlalchemy import Column, String, Boolean, Enum
+from sqlalchemy import Column, String, Boolean
 import enum
+from sqlalchemy import Enum as PgEnum
 from .base import BaseModel
 
 
 class UserRole(enum.Enum):
     """Ruoli utente."""
-    ADMIN = "admin"
-    USER = "user"
-    GUEST = "guest"
+    ADMIN = "ADMIN"
+    USER = "USER"
+    GUEST = "GUEST"
 
 
 class User(BaseModel):
@@ -22,24 +23,24 @@ class User(BaseModel):
         email: Email univoca dell'utente
         full_name: Nome completo
         hashed_password: Password hashata
-        role: Ruolo dell'utente (admin, user, guest)
+        role: Ruolo dell'utente (ADMIN, USER, GUEST)
         is_active: Se l'utente e' attivo
         is_verified: Se l'email e' verificata
     """
     __tablename__ = "users"
 
-    # Campi di autenticazione
     username = Column(String(100), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
 
-    # Informazioni personali
     full_name = Column(String(255))
 
-    # Ruolo e permessi
-    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
+    role = Column(
+        PgEnum(UserRole, name="user_role", create_type=False),
+        nullable=False,
+        default=UserRole.USER
+    )
 
-    # Stati
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
 

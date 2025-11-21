@@ -2,10 +2,10 @@
 -- Database: PostgreSQL
 
 -- Creazione tipo ENUM per la condizione dell'articolo
-CREATE TYPE article_condition AS ENUM ('new', 'used', 'refurbished', 'for_parts');
+CREATE TYPE article_condition AS ENUM ('NEW', 'USED', 'REFURBISHED', 'FOR_PARTS');
 
 -- Creazione tipo ENUM per lo stato dell'articolo
-CREATE TYPE article_status AS ENUM ('draft', 'published', 'sold', 'archived');
+CREATE TYPE article_status AS ENUM ('DRAFT', 'PUBLISHED', 'SOLD', 'ARCHIVED');
 
 -- Creazione tabella articles
 CREATE TABLE IF NOT EXISTS articles (
@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS articles (
     price DECIMAL(10, 2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'EUR',
     category VARCHAR(100),
-    condition article_condition NOT NULL DEFAULT 'used',
-    status article_status NOT NULL DEFAULT 'draft',
+    condition article_condition NOT NULL DEFAULT 'USED',
+    status article_status NOT NULL DEFAULT 'DRAFT',
     quantity INTEGER NOT NULL DEFAULT 1,
     sku VARCHAR(100) UNIQUE,
     brand VARCHAR(100),
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS articles (
     weight_kg DECIMAL(8, 2),
     dimensions_cm VARCHAR(50),
     images JSONB DEFAULT '[]',
-    metadata JSONB DEFAULT '{}',
+    article_metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     published_at TIMESTAMP,
@@ -76,7 +76,7 @@ COMMENT ON COLUMN articles.model IS 'Modello del prodotto';
 COMMENT ON COLUMN articles.weight_kg IS 'Peso in chilogrammi';
 COMMENT ON COLUMN articles.dimensions_cm IS 'Dimensioni in cm (es: 10x20x30)';
 COMMENT ON COLUMN articles.images IS 'Array JSON di URL immagini';
-COMMENT ON COLUMN articles.metadata IS 'Metadati aggiuntivi in formato JSON';
+COMMENT ON COLUMN articles.article_metadata IS 'Metadati aggiuntivi in formato JSON';
 COMMENT ON COLUMN articles.created_at IS 'Data e ora di creazione';
 COMMENT ON COLUMN articles.updated_at IS 'Data e ora ultimo aggiornamento';
 COMMENT ON COLUMN articles.published_at IS 'Data e ora di pubblicazione';

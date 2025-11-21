@@ -2,7 +2,7 @@
 Database models package.
 """
 from .base import Base, BaseModel
-from .user import User, UserRole
+from .users import User, UserRole
 from .articles import Article, ArticleCondition, ArticleStatus
 
 __all__ = [

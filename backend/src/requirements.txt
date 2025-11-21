@@ -4,3 +4,4 @@ aiofiles==23.1.0
 SQLAlchemy>=2.0
 psycopg2-binary
 alembic
+email-validator>=2.0.0

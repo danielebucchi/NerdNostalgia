@@ -11,18 +11,18 @@ from .base import BaseModel
 
 class ArticleCondition(enum.Enum):
     """Condizioni articolo."""
-    NEW = "new"
-    USED = "used"
-    REFURBISHED = "refurbished"
-    FOR_PARTS = "for_parts"
+    NEW = "NEW"
+    USED = "USED"
+    REFURBISHED = "REFURBISHED"
+    FOR_PARTS = "FOR_PARTS"
 
 
 class ArticleStatus(enum.Enum):
     """Stati articolo."""
-    DRAFT = "draft"
-    PUBLISHED = "published"
-    SOLD = "sold"
-    ARCHIVED = "archived"
+    DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
+    SOLD = "SOLD"
+    ARCHIVED = "ARCHIVED"
 
 
 class Article(BaseModel):
@@ -45,7 +45,7 @@ class Article(BaseModel):
         weight_kg: Peso in chilogrammi
         dimensions_cm: Dimensioni in cm
         images: Array JSON di URL immagini
-        metadata: Metadati aggiuntivi
+        article_metadata: Metadati aggiuntivi
         published_at: Data e ora di pubblicazione
         sold_at: Data e ora di vendita
     """
@@ -79,7 +79,7 @@ class Article(BaseModel):
 
     # JSON fields
     images = Column(JSONB, default=list)
-    metadata = Column(JSONB, default=dict)
+    article_metadata = Column(JSONB, default=dict)
 
     # Timestamp aggiuntivi
     published_at = Column(DateTime)
