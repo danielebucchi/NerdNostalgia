@@ -1,0 +1,118 @@
+"use client";
+
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { AdminShell } from "@/components/admin/AdminShell";
+import { adminApi } from "@/lib/admin-api";
+import { formatMaxPrice } from "@/lib/api";
+import type { WantedItem, WantedListResponse, WantedStatus } from "@/lib/types";
+
+const STATUS_OPTIONS = ["", "ACTIVE", "FULFILLED", "CLOSED"] as const;
+
+const STATUS_CHIP: Record<WantedStatus, string> = {
+  ACTIVE: "chip-mint",
+  FULFILLED: "chip-pink",
+  CLOSED: "chip-sky",
+};
+
+function WantedListContent() {
+  const search = useSearchParams();
+  const [status, setStatus] = useState<string>(search.get("status") ?? "");
+  const [items, setItems] = useState<WantedItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const qs = new URLSearchParams({ limit: "100" });
+        if (status) qs.set("status", status);
+        const data = await adminApi.get<WantedListResponse>(`/api/wanted/?${qs}`);
+        if (!cancelled) {
+          setItems(data.items);
+          setTotal(data.total);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
+  return (
+    <AdminShell>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="display text-3xl text-ink">Cerco/Compro</h1>
+          <p className="text-ink-soft mt-1">{total} totali</p>
+        </div>
+        <Link href="/admin/wanted/new" className="btn btn-primary">
+          ➕ Nuovo
+        </Link>
+      </div>
+
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {STATUS_OPTIONS.map((s) => (
+          <button
+            key={s || "all"}
+            type="button"
+            onClick={() => setStatus(s)}
+            className={`chip cursor-pointer ${status === s ? "chip-pink" : ""}`}
+          >
+            {s || "Tutti"}
+          </button>
+        ))}
+      </div>
+
+      {error && <p className="text-pink-deep">⚠ {error}</p>}
+      {loading && <p className="text-ink-soft">Caricamento…</p>}
+      {!loading && items.length === 0 && (
+        <div className="card p-10 text-center">
+          <p className="text-ink-soft">Nessun wanted.</p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {items.map((w) => (
+          <Link
+            key={w.id}
+            href={`/admin/wanted/${w.id}`}
+            className="card card-clickable p-4 flex items-center gap-4"
+          >
+            <span className="display text-xl text-ink-soft w-10 text-right">
+              {w.priority}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="display text-base text-ink truncate">{w.title}</p>
+              <p className="text-xs text-ink-soft truncate">
+                #{w.id} · {w.category ?? "—"}
+                {w.preferred_condition ? ` · ${w.preferred_condition}` : ""}
+              </p>
+            </div>
+            <span className={`chip ${STATUS_CHIP[w.status]}`}>{w.status}</span>
+            <span className="display text-lg text-pink-deep w-32 text-right">
+              {formatMaxPrice(w) ?? "—"}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </AdminShell>
+  );
+}
+
+export default function AdminWantedListPage() {
+  return (
+    <Suspense fallback={<AdminShell><p className="text-ink-soft">Caricamento…</p></AdminShell>}>
+      <WantedListContent />
+    </Suspense>
+  );
+}

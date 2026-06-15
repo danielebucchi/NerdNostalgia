@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { Footer, Header, Topbar } from "@/components/Header";
 
 export const metadata: Metadata = {
   title: "NerdNostalgia — Videogiochi, Pokémon & nerderie",
@@ -15,12 +14,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="it">
-      <body>
-        <Topbar />
-        <Header />
-        <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
-        <Footer />
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
