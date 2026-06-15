@@ -83,6 +83,16 @@ export function ArticleForm({ initial, onSaved }: Props) {
     setPendingFiles((curr) => curr.filter((_, i) => i !== index));
   }
 
+  function setPendingCover(index: number) {
+    setPendingFiles((curr) => {
+      if (index <= 0 || index >= curr.length) return curr;
+      const next = [...curr];
+      const [file] = next.splice(index, 1);
+      next.unshift(file);
+      return next;
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -310,32 +320,64 @@ export function ArticleForm({ initial, onSaved }: Props) {
           {pendingFiles.length === 0 ? (
             <p className="text-sm text-ink-soft">Nessun file selezionato.</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {pendingFiles.map((f, idx) => (
-                <div
-                  key={`${f.name}-${idx}`}
-                  className="relative aspect-square rounded-xl overflow-hidden border-2 border-ink/15 bg-cream"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={URL.createObjectURL(f)}
-                    alt={f.name}
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removePendingFile(idx)}
-                    className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
-                    aria-label="Rimuovi"
-                  >
-                    ✕
-                  </button>
-                  <span className="absolute bottom-1 left-1 right-1 text-[10px] text-white bg-ink/70 rounded px-1 py-0.5 truncate text-center">
-                    {f.name}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <>
+              {pendingFiles.length > 1 && (
+                <p className="text-xs text-ink-soft mb-2">
+                  La prima è la copertina · clicca ⭐ per cambiarla
+                </p>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {pendingFiles.map((f, idx) => {
+                  const isCover = idx === 0;
+                  return (
+                    <div
+                      key={`${f.name}-${idx}`}
+                      className={
+                        "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream " +
+                        (isCover ? "border-pink-deep" : "border-ink/15")
+                      }
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={URL.createObjectURL(f)}
+                        alt={f.name}
+                        className="w-full h-full object-cover"
+                      />
+
+                      {isCover && (
+                        <span className="absolute top-1 left-1 chip chip-pink text-[10px] py-0.5">
+                          ⭐ Copertina
+                        </span>
+                      )}
+
+                      {!isCover && (
+                        <button
+                          type="button"
+                          onClick={() => setPendingCover(idx)}
+                          className="absolute top-1 left-1 w-7 h-7 rounded-full bg-pink text-ink text-xs flex items-center justify-center border-2 border-ink"
+                          aria-label="Imposta come copertina"
+                          title="Imposta come copertina"
+                        >
+                          ⭐
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => removePendingFile(idx)}
+                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
+                        aria-label="Rimuovi"
+                      >
+                        ✕
+                      </button>
+                      <span className="absolute bottom-1 left-1 right-1 text-[10px] text-white bg-ink/70 rounded px-1 py-0.5 truncate text-center">
+                        {f.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}
