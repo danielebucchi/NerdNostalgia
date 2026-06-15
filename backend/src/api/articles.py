@@ -7,8 +7,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from helpers.article import ArticleHelper, get_article_helper
+from helpers.auth import require_admin
 from helpers.user import UserHelper, get_user_helper
-from models.db import Article, ArticleCondition, ArticleStatus
+from models.db import Article, ArticleCondition, ArticleStatus, User
 from models.entities.article import (
     ArticleCreate,
     ArticleImageAdd,
@@ -51,6 +52,7 @@ def create_article(
     article_data: ArticleCreate,
     article_helper: ArticleHelper = Depends(get_article_helper),
     user_helper: UserHelper = Depends(get_user_helper),
+    _admin: User = Depends(require_admin),
 ):
     """Crea un nuovo articolo."""
     owner = user_helper.get("id", article_data.user_id)
@@ -164,6 +166,7 @@ def update_article(
     article_id: int,
     article_data: ArticleUpdate,
     article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
 ):
     """Aggiorna un articolo."""
     article = article_helper.get("id", article_id)
@@ -189,6 +192,7 @@ def update_article(
 def delete_article(
     article_id: int,
     article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
 ):
     """Elimina un articolo."""
     article = article_helper.get("id", article_id)
@@ -205,6 +209,7 @@ def delete_article(
 def publish_article(
     article_id: int,
     article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
 ):
     """Marca l'articolo come pubblicato."""
     article = article_helper.get("id", article_id)
@@ -221,6 +226,7 @@ def publish_article(
 def sell_article(
     article_id: int,
     article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
 ):
     """Marca l'articolo come venduto."""
     article = article_helper.get("id", article_id)
@@ -237,6 +243,7 @@ def sell_article(
 def archive_article(
     article_id: int,
     article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
 ):
     """Marca l'articolo come archiviato."""
     article = article_helper.get("id", article_id)
@@ -254,6 +261,7 @@ def add_article_image(
     article_id: int,
     payload: ArticleImageAdd,
     article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
 ):
     """Aggiunge un URL immagine all'articolo."""
     article = article_helper.get("id", article_id)
@@ -271,6 +279,7 @@ def remove_article_image(
     article_id: int,
     url: str = Query(..., description="URL dell'immagine da rimuovere"),
     article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
 ):
     """Rimuove un URL immagine dall'articolo."""
     article = article_helper.get("id", article_id)

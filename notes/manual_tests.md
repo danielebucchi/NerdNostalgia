@@ -109,3 +109,80 @@ curl -s -X DELETE $BASE/api/articles/$ART_ID -w "%{http_code}\n"  # 204
 docker compose -f docker-compose.yml -f docker-compose.local.yml down -v
 rm -f docker-compose.local.yml
 ```
+
+---
+
+# Manual tests — Auth JWT (NN-003)
+
+## Routing pubblico vs admin-only
+
+| Endpoint | Auth |
+|----------|------|
+| `POST /api/users/` | pubblico (signup, fa hash bcrypt) |
+| `GET /api/users/*`, `PATCH /api/users/{id}`, `DELETE /api/users/{id}` | admin-only |
+| `POST /api/auth/login`, `GET /api/auth/me` | login form-data, /me richiede Bearer |
+| `GET /api/articles/`, `/api/articles/{id}`, `/api/articles/sku/{sku}` | pubblico (vetrina) |
+| `POST/PATCH/DELETE /api/articles/...`, `publish/sell/archive/images` | admin-only |
+
+## Test E2E auth
+
+```bash
+BASE=http://localhost:7373
+
+# 1) Signup admin (la password viene hashata con bcrypt lato server)
+curl -s -X POST $BASE/api/users/ -H 'Content-Type: application/json' -d '{
+  "username":"dani","email":"dani@nerdnostalgia.it","password":"secret1",
+  "full_name":"Daniele","role":"ADMIN"
+}' | jq
+
+# 2) Login form-data (OAuth2 password flow)
+TOKEN=$(curl -s -X POST $BASE/api/auth/login \
+  -d 'username=dani&password=secret1' \
+  -H 'Content-Type: application/x-www-form-urlencoded' | jq -r '.access_token')
+
+# 3) /me col token
+curl -s $BASE/api/auth/me -H "Authorization: Bearer $TOKEN" | jq
+
+# 4) Endpoint protetto — articolo creato come admin
+curl -s -X POST $BASE/api/articles/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":1,"title":"Test","price":10,"sku":"T-1"}' | jq
+
+# 5) Senza token → 401
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $BASE/api/articles/ \
+  -H 'Content-Type: application/json' -d '{"user_id":1,"title":"x","price":1}'
+
+# 6) Con token USER (non admin) → 403
+curl -s -X POST $BASE/api/users/ -H 'Content-Type: application/json' -d '{
+  "username":"mario","email":"mario@nerd.it","password":"pwmario","role":"USER"
+}' > /dev/null
+TOKEN_USER=$(curl -s -X POST $BASE/api/auth/login \
+  -d 'username=mario&password=pwmario' \
+  -H 'Content-Type: application/x-www-form-urlencoded' | jq -r '.access_token')
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $BASE/api/articles/ \
+  -H "Authorization: Bearer $TOKEN_USER" \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":2,"title":"hack","price":1}'
+
+# 7) Token invalido → 401
+curl -s -o /dev/null -w '%{http_code}\n' $BASE/api/auth/me \
+  -H 'Authorization: Bearer notatoken'
+
+# 8) Vetrina pubblica resta accessibile senza token
+curl -s -o /dev/null -w '%{http_code}\n' $BASE/api/articles/
+```
+
+## Configurazione
+
+Variabili env in `.env` (vedi `.env.example`):
+
+- `JWT_SECRET_KEY` — in prod generare con `openssl rand -hex 32`
+- `JWT_ALGORITHM` — default `HS256`
+- `JWT_EXPIRE_MINUTES` — durata token in minuti (default `60`)
+
+## Bootstrap admin
+
+Il primo admin va creato via `POST /api/users/` (pubblico) finche' il signup
+non viene blindato in una fase successiva. Subito dopo, le rotte `/api/users/*`
+in lettura/scrittura diventano accessibili solo con token admin.
