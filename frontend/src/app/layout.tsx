@@ -1,17 +1,22 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { Footer, Header } from "@/components/Header";
+import { Footer, Header, Topbar } from "@/components/Header";
 
 export const metadata: Metadata = {
-  title: "NerdNostalgia — Compro e vendo nerderie",
+  title: "NerdNostalgia — Videogiochi, Pokémon & nerderie",
   description:
-    "Catalogo di videogiochi vintage, carte Pokemon e prodotti nerd. Compro, vendo, scambio.",
+    "Compro, vendo e scambio videogiochi vintage, carte Pokémon, Funko Pop e gadget nerd. Catalogo curato e spedizioni in tutta Italia.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#fff7ed",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="it">
       <body>
+        <Topbar />
         <Header />
         <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
         <Footer />
