@@ -93,6 +93,16 @@ export function ArticleForm({ initial, onSaved }: Props) {
     });
   }
 
+  function movePendingFile(index: number, delta: -1 | 1) {
+    setPendingFiles((curr) => {
+      const target = index + delta;
+      if (target < 0 || target >= curr.length) return curr;
+      const next = [...curr];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -329,50 +339,75 @@ export function ArticleForm({ initial, onSaved }: Props) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {pendingFiles.map((f, idx) => {
                   const isCover = idx === 0;
+                  const isLast = idx === pendingFiles.length - 1;
                   return (
-                    <div
-                      key={`${f.name}-${idx}`}
-                      className={
-                        "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream " +
-                        (isCover ? "border-pink-deep" : "border-ink/15")
-                      }
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={URL.createObjectURL(f)}
-                        alt={f.name}
-                        className="w-full h-full object-cover"
-                      />
+                    <div key={`${f.name}-${idx}`} className="flex flex-col gap-1">
+                      <div
+                        className={
+                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream " +
+                          (isCover ? "border-pink-deep" : "border-ink/15")
+                        }
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={URL.createObjectURL(f)}
+                          alt={f.name}
+                          className="w-full h-full object-cover"
+                        />
 
-                      {isCover && (
-                        <span className="absolute top-1 left-1 chip chip-pink text-[10px] py-0.5">
-                          ⭐ Copertina
-                        </span>
-                      )}
+                        {isCover && (
+                          <span className="absolute top-1 left-1 chip chip-pink text-[10px] py-0.5">
+                            ⭐ Copertina
+                          </span>
+                        )}
 
-                      {!isCover && (
+                        {!isCover && (
+                          <button
+                            type="button"
+                            onClick={() => setPendingCover(idx)}
+                            className="absolute top-1 left-1 w-7 h-7 rounded-full bg-pink text-ink text-xs flex items-center justify-center border-2 border-ink"
+                            aria-label="Imposta come copertina"
+                            title="Imposta come copertina"
+                          >
+                            ⭐
+                          </button>
+                        )}
+
                         <button
                           type="button"
-                          onClick={() => setPendingCover(idx)}
-                          className="absolute top-1 left-1 w-7 h-7 rounded-full bg-pink text-ink text-xs flex items-center justify-center border-2 border-ink"
-                          aria-label="Imposta come copertina"
-                          title="Imposta come copertina"
+                          onClick={() => removePendingFile(idx)}
+                          className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
+                          aria-label="Rimuovi"
                         >
-                          ⭐
+                          ✕
                         </button>
-                      )}
 
-                      <button
-                        type="button"
-                        onClick={() => removePendingFile(idx)}
-                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
-                        aria-label="Rimuovi"
-                      >
-                        ✕
-                      </button>
-                      <span className="absolute bottom-1 left-1 right-1 text-[10px] text-white bg-ink/70 rounded px-1 py-0.5 truncate text-center">
-                        {f.name}
-                      </span>
+                        <span className="absolute bottom-1 left-1 right-1 text-[10px] text-white bg-ink/70 rounded px-1 py-0.5 truncate text-center">
+                          {idx + 1} · {f.name}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => movePendingFile(idx, -1)}
+                          disabled={isCover}
+                          className="flex-1 h-7 rounded-lg border-2 border-ink bg-white text-ink text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Sposta a sinistra"
+                          title="Sposta a sinistra"
+                        >
+                          ←
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => movePendingFile(idx, 1)}
+                          disabled={isLast}
+                          className="flex-1 h-7 rounded-lg border-2 border-ink bg-white text-ink text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Sposta a destra"
+                          title="Sposta a destra"
+                        >
+                          →
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
