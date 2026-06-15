@@ -118,7 +118,7 @@ class Article(BaseModel):
             "weight_kg": float(self.weight_kg) if self.weight_kg else None,
             "dimensions_cm": self.dimensions_cm,
             "images": self.images or [],
-            "metadata": self.metadata or {},
+            "article_metadata": self.article_metadata or {},
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "published_at": self.published_at.isoformat() if self.published_at else None,

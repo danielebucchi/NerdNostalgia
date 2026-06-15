@@ -3,7 +3,7 @@ Modello User per SQLAlchemy.
 """
 from sqlalchemy import Column, String, Boolean
 from sqlalchemy import Enum as PgEnum
-from base import BaseModel
+from .base import BaseModel
 from models.entities.user import UserRole
 
 
