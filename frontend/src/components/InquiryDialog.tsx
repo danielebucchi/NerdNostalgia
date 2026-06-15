@@ -8,9 +8,26 @@ interface InquiryDialogProps {
   onClose: () => void;
   articleId?: number;
   articleTitle?: string;
+  /** Override del subject autogenerato (es. "Ce l'ho: <titolo>") */
+  customSubject?: string;
+  /** Titolo del dialog (default: "Chiedi info" se articleTitle, sennò "Contattami") */
+  dialogTitle?: string;
+  /** Sottotitolo opzionale sotto al titolo */
+  subtitle?: React.ReactNode;
+  /** Placeholder textarea */
+  messagePlaceholder?: string;
 }
 
-export function InquiryDialog({ open, onClose, articleId, articleTitle }: InquiryDialogProps) {
+export function InquiryDialog({
+  open,
+  onClose,
+  articleId,
+  articleTitle,
+  customSubject,
+  dialogTitle,
+  subtitle,
+  messagePlaceholder,
+}: InquiryDialogProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -46,12 +63,14 @@ export function InquiryDialog({ open, onClose, articleId, articleTitle }: Inquir
     setSubmitting(true);
     setError(null);
     try {
+      const subject =
+        customSubject ?? (articleTitle ? `Info su: ${articleTitle}` : undefined);
       await submitInquiry({
         article_id: articleId ?? null,
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
-        subject: articleTitle ? `Info su: ${articleTitle}` : undefined,
+        subject,
         message: message.trim(),
       });
       setDone(true);
@@ -78,10 +97,12 @@ export function InquiryDialog({ open, onClose, articleId, articleTitle }: Inquir
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             <h2 className="display text-2xl text-ink">
-              {articleTitle ? "Chiedi info" : "Contattami"}
+              {dialogTitle ?? (articleTitle ? "Chiedi info" : "Contattami")}
             </h2>
-            {articleTitle && (
-              <p className="text-sm text-ink-soft mt-1">su <strong>{articleTitle}</strong></p>
+            {(subtitle || articleTitle) && (
+              <p className="text-sm text-ink-soft mt-1">
+                {subtitle ?? <>su <strong>{articleTitle}</strong></>}
+              </p>
             )}
           </div>
           <button
@@ -148,9 +169,10 @@ export function InquiryDialog({ open, onClose, articleId, articleTitle }: Inquir
                 minLength={5}
                 maxLength={4000}
                 placeholder={
-                  articleTitle
+                  messagePlaceholder ??
+                  (articleTitle
                     ? "Sono interessato/a a questo articolo, vorrei sapere se..."
-                    : "Scrivimi cosa cerchi o cosa hai da propormi..."
+                    : "Scrivimi cosa cerchi o cosa hai da propormi...")
                 }
               />
             </Field>
