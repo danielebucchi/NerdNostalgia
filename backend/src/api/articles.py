@@ -4,7 +4,7 @@ API endpoint per gli articoli.
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 
 from helpers.article import ArticleHelper, get_article_helper
 from helpers.auth import require_admin
@@ -16,6 +16,12 @@ from models.entities.article import (
     ArticleListResponse,
     ArticleResponse,
     ArticleUpdate,
+)
+from utils.storage import (
+    UploadValidationError,
+    delete_article_dir,
+    delete_file_for_url,
+    save_article_image,
 )
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
@@ -194,7 +200,7 @@ def delete_article(
     article_helper: ArticleHelper = Depends(get_article_helper),
     _admin: User = Depends(require_admin),
 ):
-    """Elimina un articolo."""
+    """Elimina un articolo e tutti i suoi file immagine caricati."""
     article = article_helper.get("id", article_id)
     if not article:
         raise HTTPException(
@@ -202,6 +208,7 @@ def delete_article(
             detail=f"Articolo con ID {article_id} non trovato",
         )
     article_helper.delete(article)
+    delete_article_dir(article_id)
     return None
 
 
@@ -281,7 +288,8 @@ def remove_article_image(
     article_helper: ArticleHelper = Depends(get_article_helper),
     _admin: User = Depends(require_admin),
 ):
-    """Rimuove un URL immagine dall'articolo."""
+    """Rimuove un URL immagine dall'articolo. Se l'URL e' servito dal nostro
+    storage statico, cancella anche il file su disco."""
     article = article_helper.get("id", article_id)
     if not article:
         raise HTTPException(
@@ -289,4 +297,38 @@ def remove_article_image(
             detail=f"Articolo con ID {article_id} non trovato",
         )
     article_helper.remove_image(article, url)
+    delete_file_for_url(url)
+    return _to_response(article)
+
+
+@router.post("/{article_id}/upload-image", response_model=ArticleResponse)
+def upload_article_image(
+    article_id: int,
+    file: UploadFile = File(...),
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Carica un file immagine per l'articolo e aggiunge il suo URL pubblico
+    all'array images. Accetta image/jpeg, image/png, image/webp, image/gif
+    fino a MAX_UPLOAD_SIZE_MB MB (default 5)."""
+    article = article_helper.get("id", article_id)
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Articolo con ID {article_id} non trovato",
+        )
+
+    try:
+        url, _ = save_article_image(
+            article_id=article_id,
+            file_obj=file.file,
+            content_type=file.content_type or "",
+        )
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    article_helper.add_image(article, url)
     return _to_response(article)
