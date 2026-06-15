@@ -5,22 +5,47 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        retro: {
-          bg: "#0d0221",
-          panel: "#1a0633",
-          accent: "#ff1f87",
-          neon: "#00f0ff",
-          sun: "#ffe66d",
-          green: "#7cff6b",
+        // Palette dal logo NerdNostalgia (pastello, kawaii)
+        cream: "#fff7ed",
+        ink: {
+          DEFAULT: "#3d2a5c",
+          soft: "#6b5b8a",
+          mute: "#9b8db8",
         },
+        pink: {
+          DEFAULT: "#f8a8c8",
+          deep: "#e879a8",
+          soft: "#fce4ee",
+        },
+        mint: {
+          DEFAULT: "#a8e6d4",
+          deep: "#7dd1b8",
+          soft: "#e0f5ec",
+        },
+        sky: {
+          DEFAULT: "#b8e0e8",
+          deep: "#8ec5d8",
+          soft: "#e6f3f7",
+        },
+        lilac: {
+          DEFAULT: "#d4c4f0",
+          deep: "#a890d8",
+          soft: "#efe9fa",
+        },
+        star: "#fff4a8",
       },
       fontFamily: {
-        pixel: ['"Press Start 2P"', "ui-monospace", "monospace"],
-        retro: ['"VT323"', "ui-monospace", "monospace"],
+        display: ['"Fredoka"', "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ['"Manrope"', "ui-sans-serif", "system-ui", "sans-serif"],
+      },
+      borderRadius: {
+        chonk: "28px",
+        big: "22px",
       },
       boxShadow: {
-        pixel: "4px 4px 0 0 rgba(0,0,0,0.8)",
-        neon: "0 0 12px rgba(0,240,255,0.6), 0 0 32px rgba(255,31,135,0.4)",
+        soft: "0 18px 40px -18px rgba(61, 42, 92, 0.25)",
+        pop: "0 8px 0 0 rgba(61, 42, 92, 0.12)",
+        hover: "0 22px 50px -16px rgba(232, 121, 168, 0.45)",
       },
     },
   },

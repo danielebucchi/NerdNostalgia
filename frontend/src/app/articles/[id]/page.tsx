@@ -7,17 +7,24 @@ interface PageProps {
 }
 
 const CONDITION_LABEL: Record<string, string> = {
-  NEW: "NUOVO",
-  USED: "USATO",
-  REFURBISHED: "REVISIONATO",
-  FOR_PARTS: "PER PEZZI",
+  NEW: "Nuovo",
+  USED: "Usato",
+  REFURBISHED: "Revisionato",
+  FOR_PARTS: "Per pezzi",
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  PUBLISHED: "DISPONIBILE",
-  SOLD: "VENDUTO",
-  DRAFT: "BOZZA",
-  ARCHIVED: "ARCHIVIATO",
+  PUBLISHED: "Disponibile",
+  SOLD: "Venduto",
+  DRAFT: "Bozza",
+  ARCHIVED: "Archiviato",
+};
+
+const STATUS_CHIP: Record<string, string> = {
+  PUBLISHED: "chip-mint",
+  SOLD: "chip-pink",
+  DRAFT: "chip-lilac",
+  ARCHIVED: "chip-sky",
 };
 
 export default async function ArticleDetailPage({ params }: PageProps) {
@@ -33,89 +40,85 @@ export default async function ArticleDetailPage({ params }: PageProps) {
 
   return (
     <article>
-      <Link href="/" className="pixel-btn ghost inline-block mb-8">
-        ← CATALOGO
+      <Link href="/" className="btn btn-ghost text-sm mb-8">
+        ← Catalogo
       </Link>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        {/* Gallery */}
         <div>
-          <div className="card aspect-square w-full flex items-center justify-center p-2">
+          <div className="card aspect-square w-full flex items-center justify-center p-4 overflow-hidden">
             {cover ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={cover}
                 alt={article.title}
-                className="pixel-img max-h-full max-w-full object-contain"
+                className="max-w-full max-h-full object-contain"
               />
             ) : (
-              <span className="font-pixel text-retro-neon text-sm">NO PHOTO</span>
+              <span className="display text-ink-soft text-xl">No photo</span>
             )}
           </div>
 
           {gallery.length > 0 && (
             <div className="mt-4 grid grid-cols-4 gap-3">
               {gallery.map((img) => (
-                <div key={img} className="aspect-square card p-1">
+                <div key={img} className="aspect-square card p-1 overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img} alt="" className="pixel-img w-full h-full object-contain" />
+                  <img src={img} alt="" className="w-full h-full object-cover rounded-lg" />
                 </div>
               ))}
             </div>
           )}
         </div>
 
+        {/* Info */}
         <div>
-          <div className="flex gap-2 flex-wrap mb-4">
-            <span className="badge text-retro-neon">
-              {CONDITION_LABEL[article.condition] ?? article.condition}
-            </span>
-            <span className="badge text-retro-sun">
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className={`chip ${STATUS_CHIP[article.status] ?? "chip-mint"}`}>
               {STATUS_LABEL[article.status] ?? article.status}
             </span>
+            <span className="chip chip-sky">
+              {CONDITION_LABEL[article.condition] ?? article.condition}
+            </span>
             {article.category && (
-              <span className="badge text-retro-green">{article.category.toUpperCase()}</span>
+              <span className="chip chip-lilac">{article.category.replace(/-/g, " ")}</span>
             )}
           </div>
 
-          <h1 className="font-pixel text-retro-sun glow text-lg sm:text-xl leading-snug">
+          <h1 className="display text-3xl sm:text-4xl text-ink leading-tight">
             {article.title}
           </h1>
 
-          <div className="mt-6 font-pixel text-retro-accent glow text-2xl">
+          <div className="mt-6 display text-4xl text-pink-deep">
             {formatPrice(article)}
           </div>
 
           {article.description && (
-            <p className="mt-6 font-retro text-xl text-[#f1e6ff] whitespace-pre-line leading-relaxed">
+            <p className="mt-6 text-ink-soft text-lg whitespace-pre-line leading-relaxed">
               {article.description}
             </p>
           )}
 
-          <dl className="mt-8 grid grid-cols-2 gap-3 text-sm font-retro text-retro-neon">
-            {article.brand && (
-              <Row label="MARCA" value={article.brand} />
-            )}
-            {article.model && (
-              <Row label="MODELLO" value={article.model} />
-            )}
+          <dl className="mt-8 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            {article.brand && <Row label="Marca" value={article.brand} />}
+            {article.model && <Row label="Modello" value={article.model} />}
             {article.sku && <Row label="SKU" value={article.sku} />}
-            <Row label="QUANTITA" value={String(article.quantity)} />
-            {article.weight_kg && <Row label="PESO" value={`${article.weight_kg} kg`} />}
-            {article.dimensions_cm && (
-              <Row label="DIMENSIONI" value={article.dimensions_cm} />
-            )}
+            <Row label="Quantità" value={String(article.quantity)} />
+            {article.weight_kg && <Row label="Peso" value={`${article.weight_kg} kg`} />}
+            {article.dimensions_cm && <Row label="Dimensioni" value={article.dimensions_cm} />}
           </dl>
 
           <div className="mt-10 flex flex-wrap gap-3">
-            <button className="pixel-btn" type="button" disabled>
-              AGGIUNGI AL CARRELLO
+            <button type="button" className="btn btn-primary" disabled>
+              Aggiungi al carrello
             </button>
-            <button className="pixel-btn ghost" type="button" disabled>
-              CHIEDI INFO
+            <button type="button" className="btn btn-ghost" disabled>
+              Chiedi info
             </button>
           </div>
-          <p className="mt-3 text-retro-sun font-retro text-base">
-            (Carrello e form contatti arrivano nelle prossime fasi.)
+          <p className="mt-3 text-xs text-ink-soft">
+            Carrello e form contatti arrivano nelle prossime fasi.
           </p>
         </div>
       </div>
@@ -125,9 +128,9 @@ export default async function ArticleDetailPage({ params }: PageProps) {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <dt className="font-pixel text-[10px] text-retro-accent">{label}</dt>
-      <dd className="text-lg text-retro-sun">{value}</dd>
+    <div className="border-b border-dashed border-ink/15 pb-2">
+      <dt className="text-xs uppercase tracking-wider text-ink-soft">{label}</dt>
+      <dd className="text-base text-ink font-semibold">{value}</dd>
     </div>
   );
 }
