@@ -25,6 +25,13 @@ class ArticleStatus(enum.Enum):
     ARCHIVED = "ARCHIVED"
 
 
+class VintedStatus(enum.Enum):
+    """Stato sincronizzazione con Vinted."""
+    NOT_LISTED = "NOT_LISTED"
+    LISTED = "LISTED"
+    SOLD = "SOLD"
+
+
 class Article(BaseModel):
     """
     Modello articolo del sistema.
@@ -83,6 +90,16 @@ class Article(BaseModel):
 
     # Ordinamento manuale del catalogo (piu' basso = prima)
     display_order = Column(Integer, nullable=False, default=0, index=True)
+
+    # Vinted sync (manuale assistito)
+    vinted_status = Column(
+        Enum(VintedStatus, name="vinted_status", create_type=False),
+        nullable=False,
+        default=VintedStatus.NOT_LISTED,
+        index=True,
+    )
+    vinted_url = Column(String(500))
+    vinted_synced_at = Column(DateTime)
 
     # Timestamp aggiuntivi
     published_at = Column(DateTime)

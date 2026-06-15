@@ -1,5 +1,6 @@
 export type ArticleCondition = "NEW" | "USED" | "REFURBISHED" | "FOR_PARTS";
 export type ArticleStatus = "DRAFT" | "PUBLISHED" | "SOLD" | "ARCHIVED";
+export type VintedStatus = "NOT_LISTED" | "LISTED" | "SOLD";
 
 export interface Article {
   id: number;
@@ -20,6 +21,9 @@ export interface Article {
   images: string[];
   article_metadata: Record<string, unknown>;
   display_order?: number;
+  vinted_status: VintedStatus;
+  vinted_url: string | null;
+  vinted_synced_at: string | null;
   created_at: string;
   updated_at: string;
   published_at: string | null;
