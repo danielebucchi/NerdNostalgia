@@ -65,6 +65,8 @@ export function ArticleForm({ initial, onSaved }: Props) {
   const [state, setState] = useState<FormState>(initial ? toForm(initial) : empty);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
 
   const isEdit = Boolean(initial);
 
@@ -72,10 +74,20 @@ export function ArticleForm({ initial, onSaved }: Props) {
     setState((s) => ({ ...s, [key]: value }));
   }
 
+  function addPendingFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setPendingFiles((curr) => [...curr, ...Array.from(files)]);
+  }
+
+  function removePendingFile(index: number) {
+    setPendingFiles((curr) => curr.filter((_, i) => i !== index));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setUploadProgress(null);
     try {
       const payload: Record<string, unknown> = {
         title: state.title.trim(),
@@ -98,9 +110,25 @@ export function ArticleForm({ initial, onSaved }: Props) {
         payload.status = state.status;
       }
 
-      const result = isEdit
+      let result = isEdit
         ? await adminApi.patch<Article>(`/api/articles/${initial!.id}`, payload)
         : await adminApi.post<Article>("/api/articles/", payload);
+
+      // Upload sequenziale di eventuali file selezionati (solo in create)
+      if (!isEdit && pendingFiles.length > 0) {
+        for (let i = 0; i < pendingFiles.length; i++) {
+          const file = pendingFiles[i];
+          setUploadProgress(`Carico immagine ${i + 1} di ${pendingFiles.length}…`);
+          const fd = new FormData();
+          fd.append("file", file);
+          result = await adminApi.postForm<Article>(
+            `/api/articles/${result.id}/upload-image`,
+            fd,
+          );
+        }
+        setPendingFiles([]);
+        setUploadProgress(null);
+      }
 
       if (onSaved) onSaved(result);
       else router.push(`/admin/articles/${result.id}`);
@@ -108,6 +136,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSubmitting(false);
+      setUploadProgress(null);
     }
   }
 
@@ -253,11 +282,76 @@ export function ArticleForm({ initial, onSaved }: Props) {
         </Field>
       </Row>
 
+      {!isEdit && (
+        <div className="border-2 border-dashed border-ink/25 rounded-big p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <h3 className="display text-base text-ink">Immagini iniziali</h3>
+              <p className="text-xs text-ink-soft">
+                Verranno caricate subito dopo la creazione dell&apos;articolo.
+                JPEG / PNG / WebP / GIF · max 5 MB per file.
+              </p>
+            </div>
+            <label className="btn btn-ghost text-sm cursor-pointer flex-shrink-0">
+              📷 Aggiungi
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  addPendingFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+
+          {pendingFiles.length === 0 ? (
+            <p className="text-sm text-ink-soft">Nessun file selezionato.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {pendingFiles.map((f, idx) => (
+                <div
+                  key={`${f.name}-${idx}`}
+                  className="relative aspect-square rounded-xl overflow-hidden border-2 border-ink/15 bg-cream"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={URL.createObjectURL(f)}
+                    alt={f.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removePendingFile(idx)}
+                    className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
+                    aria-label="Rimuovi"
+                  >
+                    ✕
+                  </button>
+                  <span className="absolute bottom-1 left-1 right-1 text-[10px] text-white bg-ink/70 rounded px-1 py-0.5 truncate text-center">
+                    {f.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {error && <p className="text-pink-deep font-semibold">⚠ {error}</p>}
+      {uploadProgress && <p className="text-ink-soft text-sm">{uploadProgress}</p>}
 
       <div className="flex gap-3 pt-3">
         <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? "Salvataggio…" : isEdit ? "Salva modifiche" : "Crea articolo"}
+          {submitting
+            ? uploadProgress ?? "Salvataggio…"
+            : isEdit
+              ? "Salva modifiche"
+              : pendingFiles.length > 0
+                ? `Crea articolo (+${pendingFiles.length} ${pendingFiles.length === 1 ? "foto" : "foto"})`
+                : "Crea articolo"}
         </button>
         <button
           type="button"
