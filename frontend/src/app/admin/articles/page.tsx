@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { Sortable } from "@/components/admin/Sortable";
 import { adminApi } from "@/lib/admin-api";
 import { formatPrice } from "@/lib/api";
 import type { Article, ArticleListResponse } from "@/lib/types";
@@ -83,33 +84,69 @@ function ArticlesListContent() {
         </div>
       )}
 
-      <div className="space-y-3">
-        {items.map((a) => (
-          <Link
-            key={a.id}
-            href={`/admin/articles/${a.id}`}
-            className="card card-clickable p-4 flex items-center gap-4"
+      {items.length > 1 && (
+        <p className="text-xs text-ink-soft mb-3">
+          Trascina la maniglia ⋮⋮ per riordinare il catalogo.
+        </p>
+      )}
+
+      <Sortable
+        items={items}
+        getKey={(a) => String(a.id)}
+        onReorder={async (next) => {
+          setItems(next);
+          try {
+            await adminApi.post("/api/articles/reorder", {
+              order: next.map((a) => a.id),
+            });
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+          }
+        }}
+        strategy="vertical"
+        className="space-y-3"
+        renderItem={(a, _idx, { listeners, attributes, isDragging }) => (
+          <div
+            className={
+              "card p-4 flex items-center gap-4 " +
+              (isDragging ? "ring-4 ring-pink-deep " : "")
+            }
           >
-            <div className="w-16 h-16 rounded-xl border-2 border-ink/15 overflow-hidden bg-cream flex-shrink-0">
-              {a.images?.[0] && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={a.images[0]} alt="" className="w-full h-full object-cover" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="display text-base text-ink truncate">{a.title}</p>
-              <p className="text-xs text-ink-soft">
-                #{a.id} · {a.category ?? "—"} · {a.condition}
-                {a.sku ? ` · SKU ${a.sku}` : ""}
-              </p>
-            </div>
-            <span className={`chip ${STATUS_CHIP[a.status] ?? ""}`}>{a.status}</span>
-            <span className="display text-lg text-pink-deep w-24 text-right">
-              {formatPrice(a)}
-            </span>
-          </Link>
-        ))}
-      </div>
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              className="text-ink-soft text-2xl cursor-grab active:cursor-grabbing select-none px-1"
+              aria-label="Trascina per riordinare"
+              title="Trascina per riordinare"
+            >
+              ⋮⋮
+            </button>
+            <Link
+              href={`/admin/articles/${a.id}`}
+              className="flex items-center gap-4 flex-1 min-w-0"
+            >
+              <div className="w-16 h-16 rounded-xl border-2 border-ink/15 overflow-hidden bg-cream flex-shrink-0">
+                {a.images?.[0] && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.images[0]} alt="" className="w-full h-full object-cover" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="display text-base text-ink truncate">{a.title}</p>
+                <p className="text-xs text-ink-soft">
+                  #{a.id} · {a.category ?? "—"} · {a.condition}
+                  {a.sku ? ` · SKU ${a.sku}` : ""}
+                </p>
+              </div>
+              <span className={`chip ${STATUS_CHIP[a.status] ?? ""}`}>{a.status}</span>
+              <span className="display text-lg text-pink-deep w-24 text-right">
+                {formatPrice(a)}
+              </span>
+            </Link>
+          </div>
+        )}
+      />
     </AdminShell>
   );
 }

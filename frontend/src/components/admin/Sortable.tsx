@@ -14,11 +14,15 @@ import {
 import {
   SortableContext,
   arrayMove,
+  horizontalListSortingStrategy,
   rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+type SortStrategy = "rect" | "vertical" | "horizontal";
 
 interface ItemRenderProps {
   isDragging: boolean;
@@ -26,21 +30,29 @@ interface ItemRenderProps {
   attributes: ReturnType<typeof useSortable>["attributes"];
 }
 
-interface SortableImageGridProps<T> {
+interface SortableProps<T> {
   items: T[];
   getKey: (item: T) => string;
   onReorder: (next: T[]) => void;
   renderItem: (item: T, index: number, props: ItemRenderProps) => ReactNode;
   className?: string;
+  strategy?: SortStrategy;
 }
 
-export function SortableImageGrid<T>({
+const STRATEGY = {
+  rect: rectSortingStrategy,
+  vertical: verticalListSortingStrategy,
+  horizontal: horizontalListSortingStrategy,
+} as const;
+
+export function Sortable<T>({
   items,
   getKey,
   onReorder,
   renderItem,
   className,
-}: SortableImageGridProps<T>) {
+  strategy = "rect",
+}: SortableProps<T>) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
@@ -62,7 +74,7 @@ export function SortableImageGrid<T>({
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      <SortableContext items={items.map(getKey)} strategy={rectSortingStrategy}>
+      <SortableContext items={items.map(getKey)} strategy={STRATEGY[strategy]}>
         <div className={className}>
           {items.map((item, index) => (
             <SortableItem key={getKey(item)} id={getKey(item)}>
@@ -74,6 +86,9 @@ export function SortableImageGrid<T>({
     </DndContext>
   );
 }
+
+/** Back-compat alias (le pagine articoli importavano SortableImageGrid). */
+export const SortableImageGrid = Sortable;
 
 interface SortableItemProps {
   id: string;
