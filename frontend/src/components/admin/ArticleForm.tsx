@@ -67,6 +67,8 @@ export function ArticleForm({ initial, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
 
   const isEdit = Boolean(initial);
 
@@ -101,6 +103,42 @@ export function ArticleForm({ initial, onSaved }: Props) {
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
+  }
+
+  function handleDragStart(e: React.DragEvent<HTMLDivElement>, index: number) {
+    setDragIdx(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>, index: number) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (overIdx !== index) setOverIdx(index);
+  }
+
+  function handleDragLeave() {
+    setOverIdx(null);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>, target: number) {
+    e.preventDefault();
+    const from = dragIdx ?? Number(e.dataTransfer.getData("text/plain"));
+    setDragIdx(null);
+    setOverIdx(null);
+    if (Number.isNaN(from) || from === target) return;
+    setPendingFiles((curr) => {
+      if (from < 0 || from >= curr.length) return curr;
+      const next = [...curr];
+      const [moved] = next.splice(from, 1);
+      next.splice(target, 0, moved);
+      return next;
+    });
+  }
+
+  function handleDragEnd() {
+    setDragIdx(null);
+    setOverIdx(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -333,19 +371,29 @@ export function ArticleForm({ initial, onSaved }: Props) {
             <>
               {pendingFiles.length > 1 && (
                 <p className="text-xs text-ink-soft mb-2">
-                  La prima è la copertina · clicca ⭐ per cambiarla
+                  Trascina per riordinare · ⭐ per copertina · ← → per spostare
                 </p>
               )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {pendingFiles.map((f, idx) => {
                   const isCover = idx === 0;
                   const isLast = idx === pendingFiles.length - 1;
+                  const isDragging = dragIdx === idx;
+                  const isOver = overIdx === idx && dragIdx !== null && dragIdx !== idx;
                   return (
                     <div key={`${f.name}-${idx}`} className="flex flex-col gap-1">
                       <div
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={(e) => handleDragOver(e, idx)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        onDragEnd={handleDragEnd}
                         className={
-                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream " +
-                          (isCover ? "border-pink-deep" : "border-ink/15")
+                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream cursor-grab active:cursor-grabbing transition-all " +
+                          (isCover ? "border-pink-deep " : "border-ink/15 ") +
+                          (isDragging ? "opacity-40 scale-95 " : "") +
+                          (isOver ? "ring-4 ring-pink-deep ring-offset-2 ring-offset-white " : "")
                         }
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}

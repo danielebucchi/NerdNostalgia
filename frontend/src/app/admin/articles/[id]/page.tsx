@@ -20,6 +20,8 @@ export default function AdminArticleEditPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -121,6 +123,39 @@ export default function AdminArticleEditPage({ params }: PageProps) {
     }
   }
 
+  function handleDragStart(e: React.DragEvent<HTMLDivElement>, index: number) {
+    setDragIdx(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>, index: number) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (overIdx !== index) setOverIdx(index);
+  }
+
+  function handleDragLeave() {
+    setOverIdx(null);
+  }
+
+  async function handleDrop(e: React.DragEvent<HTMLDivElement>, target: number) {
+    e.preventDefault();
+    const from = dragIdx ?? Number(e.dataTransfer.getData("text/plain"));
+    setDragIdx(null);
+    setOverIdx(null);
+    if (!article || Number.isNaN(from) || from === target) return;
+    const next = [...article.images];
+    const [moved] = next.splice(from, 1);
+    next.splice(target, 0, moved);
+    await persistImages(next);
+  }
+
+  function handleDragEnd() {
+    setDragIdx(null);
+    setOverIdx(null);
+  }
+
   return (
     <AdminShell>
       <Link href="/admin/articles" className="btn btn-ghost text-sm mb-6">
@@ -187,7 +222,7 @@ export default function AdminArticleEditPage({ params }: PageProps) {
               <h2 className="display text-lg text-ink">Immagini</h2>
               {article.images.length > 1 && (
                 <p className="text-xs text-ink-soft">
-                  La prima è la copertina · clicca ⭐ per cambiarla
+                  Trascina per riordinare · ⭐ per copertina · ← → per spostare
                 </p>
               )}
             </div>
@@ -198,12 +233,22 @@ export default function AdminArticleEditPage({ params }: PageProps) {
                 {article.images.map((url, idx) => {
                   const isCover = idx === 0;
                   const isLast = idx === article.images.length - 1;
+                  const isDragging = dragIdx === idx;
+                  const isOver = overIdx === idx && dragIdx !== null && dragIdx !== idx;
                   return (
                     <div key={url} className="flex flex-col gap-1">
                       <div
+                        draggable={!busy}
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={(e) => handleDragOver(e, idx)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        onDragEnd={handleDragEnd}
                         className={
-                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream " +
-                          (isCover ? "border-pink-deep shadow-hover" : "border-ink/15")
+                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream cursor-grab active:cursor-grabbing transition-all " +
+                          (isCover ? "border-pink-deep shadow-hover " : "border-ink/15 ") +
+                          (isDragging ? "opacity-40 scale-95 " : "") +
+                          (isOver ? "ring-4 ring-pink-deep ring-offset-2 ring-offset-white " : "")
                         }
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
