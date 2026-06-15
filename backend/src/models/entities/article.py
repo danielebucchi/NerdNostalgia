@@ -22,6 +22,12 @@ class ArticleStatus(str, enum.Enum):
     ARCHIVED = "ARCHIVED"
 
 
+class VintedStatus(str, enum.Enum):
+    NOT_LISTED = "NOT_LISTED"
+    LISTED = "LISTED"
+    SOLD = "SOLD"
+
+
 class ArticleCreate(BaseModel):
     user_id: int = Field(..., description="ID utente proprietario")
     title: str = Field(..., min_length=1, max_length=255)
@@ -84,6 +90,9 @@ class ArticleResponse(BaseModel):
     images: List[str]
     article_metadata: dict
     display_order: int = 0
+    vinted_status: VintedStatus = VintedStatus.NOT_LISTED
+    vinted_url: Optional[str] = None
+    vinted_synced_at: Optional[str] = None
     created_at: str
     updated_at: str
     published_at: Optional[str]
@@ -99,3 +108,8 @@ class ArticleListResponse(BaseModel):
 
 class ReorderRequest(BaseModel):
     order: List[int] = Field(..., min_length=1)
+
+
+class VintedSyncUpdate(BaseModel):
+    vinted_status: VintedStatus
+    vinted_url: Optional[str] = Field(None, max_length=500)

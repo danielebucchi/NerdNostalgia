@@ -11,7 +11,7 @@ from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session
 
 from helpers import BaseHelper
-from models.db import Article, ArticleCondition, ArticleStatus
+from models.db import Article, ArticleCondition, ArticleStatus, VintedStatus
 from models.entities.article import ArticleUpdate
 from utils.session import get_db
 
@@ -71,6 +71,28 @@ class ArticleHelper(BaseHelper):
             .all()
         )
         return items, total
+
+    def set_vinted(
+        self,
+        article: Article,
+        status: VintedStatus,
+        url: Optional[str],
+    ) -> None:
+        """Aggiorna i metadati Vinted. Se status=SOLD, marca l'articolo
+        come SOLD nel catalogo principale (sparisce dalla vetrina)."""
+        now = dt.now(datetime.UTC)
+        article.vinted_status = status
+        article.vinted_url = url.strip() if url else None
+        article.vinted_synced_at = now
+
+        if status == VintedStatus.SOLD and article.status != ArticleStatus.SOLD:
+            article.status = ArticleStatus.SOLD
+            if not article.sold_at:
+                article.sold_at = now
+
+        article.updated_at = now
+        self.db.commit()
+        self.db.refresh(article)
 
     def reorder(self, ordered_ids: List[int]) -> None:
         """Imposta display_order in base alla posizione nella lista (0..n-1)."""
