@@ -3,11 +3,13 @@ Main FastAPI application for NerdNostalgia backend.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import os
 
 from api.articles import router as articles_router
 from api.auth import router as auth_router
 from api.users import router as users_router
+from utils.storage import UPLOADS_DIR, ensure_dirs
 
 # Create FastAPI app
 app = FastAPI(
@@ -29,6 +31,10 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(articles_router)
+
+# Static files (uploaded images)
+ensure_dirs()
+app.mount("/static", StaticFiles(directory=str(UPLOADS_DIR)), name="static")
 
 
 @app.get("/")
