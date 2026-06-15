@@ -97,11 +97,22 @@ export default function AdminArticleEditPage({ params }: PageProps) {
   async function handleSetCover(url: string) {
     if (!article || article.images[0] === url) return;
     const reordered = [url, ...article.images.filter((u) => u !== url)];
+    await persistImages(reordered);
+  }
+
+  async function handleMoveImage(index: number, delta: -1 | 1) {
+    if (!article) return;
+    const target = index + delta;
+    if (target < 0 || target >= article.images.length) return;
+    const next = [...article.images];
+    [next[index], next[target]] = [next[target], next[index]];
+    await persistImages(next);
+  }
+
+  async function persistImages(next: string[]) {
     setBusy(true);
     try {
-      const a = await adminApi.patch<Article>(`/api/articles/${id}`, {
-        images: reordered,
-      });
+      const a = await adminApi.patch<Article>(`/api/articles/${id}`, { images: next });
       setArticle(a);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -186,45 +197,73 @@ export default function AdminArticleEditPage({ params }: PageProps) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 {article.images.map((url, idx) => {
                   const isCover = idx === 0;
+                  const isLast = idx === article.images.length - 1;
                   return (
-                    <div
-                      key={url}
-                      className={
-                        "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream " +
-                        (isCover ? "border-pink-deep shadow-hover" : "border-ink/15")
-                      }
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" className="w-full h-full object-cover" />
+                    <div key={url} className="flex flex-col gap-1">
+                      <div
+                        className={
+                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream " +
+                          (isCover ? "border-pink-deep shadow-hover" : "border-ink/15")
+                        }
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" className="w-full h-full object-cover" />
 
-                      {isCover && (
-                        <span className="absolute top-1 left-1 chip chip-pink text-[10px] py-0.5">
-                          ⭐ Copertina
-                        </span>
-                      )}
+                        {isCover && (
+                          <span className="absolute top-1 left-1 chip chip-pink text-[10px] py-0.5">
+                            ⭐ Copertina
+                          </span>
+                        )}
 
-                      {!isCover && (
+                        {!isCover && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetCover(url)}
+                            className="absolute top-1 left-1 w-7 h-7 rounded-full bg-pink text-ink text-xs flex items-center justify-center border-2 border-ink"
+                            disabled={busy}
+                            aria-label="Imposta come copertina"
+                            title="Imposta come copertina"
+                          >
+                            ⭐
+                          </button>
+                        )}
+
                         <button
                           type="button"
-                          onClick={() => handleSetCover(url)}
-                          className="absolute top-1 left-1 w-7 h-7 rounded-full bg-pink text-ink text-xs flex items-center justify-center border-2 border-ink"
+                          onClick={() => handleRemoveImage(url)}
+                          className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
                           disabled={busy}
-                          aria-label="Imposta come copertina"
-                          title="Imposta come copertina"
+                          aria-label="Rimuovi"
                         >
-                          ⭐
+                          ✕
                         </button>
-                      )}
 
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImage(url)}
-                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
-                        disabled={busy}
-                        aria-label="Rimuovi"
-                      >
-                        ✕
-                      </button>
+                        <span className="absolute bottom-1 right-1 text-[10px] text-white bg-ink/70 rounded px-1.5 py-0.5">
+                          {idx + 1}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveImage(idx, -1)}
+                          disabled={busy || isCover}
+                          className="flex-1 h-7 rounded-lg border-2 border-ink bg-white text-ink text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Sposta a sinistra"
+                          title="Sposta a sinistra"
+                        >
+                          ←
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveImage(idx, 1)}
+                          disabled={busy || isLast}
+                          className="flex-1 h-7 rounded-lg border-2 border-ink bg-white text-ink text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Sposta a destra"
+                          title="Sposta a destra"
+                        >
+                          →
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
