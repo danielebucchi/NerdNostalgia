@@ -94,6 +94,22 @@ export default function AdminArticleEditPage({ params }: PageProps) {
     }
   }
 
+  async function handleSetCover(url: string) {
+    if (!article || article.images[0] === url) return;
+    const reordered = [url, ...article.images.filter((u) => u !== url)];
+    setBusy(true);
+    try {
+      const a = await adminApi.patch<Article>(`/api/articles/${id}`, {
+        images: reordered,
+      });
+      setArticle(a);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <AdminShell>
       <Link href="/admin/articles" className="btn btn-ghost text-sm mb-6">
@@ -156,26 +172,62 @@ export default function AdminArticleEditPage({ params }: PageProps) {
 
           {/* Images */}
           <div className="card p-5 mb-6">
-            <h2 className="display text-lg text-ink mb-3">Immagini</h2>
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className="display text-lg text-ink">Immagini</h2>
+              {article.images.length > 1 && (
+                <p className="text-xs text-ink-soft">
+                  La prima è la copertina · clicca ⭐ per cambiarla
+                </p>
+              )}
+            </div>
             {article.images.length === 0 ? (
               <p className="text-ink-soft text-sm">Nessuna immagine caricata.</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                {article.images.map((url) => (
-                  <div key={url} className="relative aspect-square rounded-xl overflow-hidden border-2 border-ink/15 bg-cream">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(url)}
-                      className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
-                      disabled={busy}
-                      aria-label="Rimuovi"
+                {article.images.map((url, idx) => {
+                  const isCover = idx === 0;
+                  return (
+                    <div
+                      key={url}
+                      className={
+                        "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream " +
+                        (isCover ? "border-pink-deep shadow-hover" : "border-ink/15")
+                      }
                     >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+
+                      {isCover && (
+                        <span className="absolute top-1 left-1 chip chip-pink text-[10px] py-0.5">
+                          ⭐ Copertina
+                        </span>
+                      )}
+
+                      {!isCover && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetCover(url)}
+                          className="absolute top-1 left-1 w-7 h-7 rounded-full bg-pink text-ink text-xs flex items-center justify-center border-2 border-ink"
+                          disabled={busy}
+                          aria-label="Imposta come copertina"
+                          title="Imposta come copertina"
+                        >
+                          ⭐
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(url)}
+                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
+                        disabled={busy}
+                        aria-label="Rimuovi"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
             <label className="btn btn-ghost text-sm inline-flex cursor-pointer">
