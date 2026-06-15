@@ -186,3 +186,77 @@ Variabili env in `.env` (vedi `.env.example`):
 Il primo admin va creato via `POST /api/users/` (pubblico) finche' il signup
 non viene blindato in una fase successiva. Subito dopo, le rotte `/api/users/*`
 in lettura/scrittura diventano accessibili solo con token admin.
+
+---
+
+# Manual tests — Images upload (NN-004)
+
+## Endpoint
+
+- `POST /api/articles/{id}/upload-image` — multipart/form-data, campo `file`.
+  Salva su `${APP_TMP_DIR}/uploads/articles/{id}/{uuid}.{ext}` e aggiunge
+  l'URL pubblico a `article.images`. Admin-only.
+- `DELETE /api/articles/{id}/images?url=...` — rimuove URL dall'array; se
+  l'URL e' interno al nostro storage cancella anche il file su disco.
+- `DELETE /api/articles/{id}` — cancella articolo + intera cartella uploads
+  dell'articolo.
+- `GET /static/articles/{id}/{filename}` — servito da FastAPI StaticFiles.
+
+Validazioni:
+- Content-type ammessi: `image/jpeg`, `image/png`, `image/webp`, `image/gif`.
+- Dimensione massima: `MAX_UPLOAD_SIZE_MB` (default 5).
+
+## Test E2E
+
+```bash
+BASE=http://localhost:7373
+
+# PNG 1x1 valido di test
+python3 -c "
+import base64
+open('/tmp/test.png','wb').write(base64.b64decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII='
+))
+"
+
+TOKEN=$(curl -s -X POST $BASE/api/auth/login \
+  -d 'username=dani&password=secret1' \
+  -H 'Content-Type: application/x-www-form-urlencoded' | jq -r '.access_token')
+
+# Upload
+curl -s -X POST $BASE/api/articles/1/upload-image \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/tmp/test.png;type=image/png" | jq '.images'
+
+# Senza token → 401
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $BASE/api/articles/1/upload-image \
+  -F "file=@/tmp/test.png;type=image/png"
+
+# Content-type non ammesso → 400
+echo "not an image" > /tmp/test.txt
+curl -s -X POST $BASE/api/articles/1/upload-image \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/tmp/test.txt;type=text/plain" -w "\n%{http_code}\n"
+
+# Dimensione > limite → 400 (richiede file >5MB, opzionale)
+# dd if=/dev/urandom of=/tmp/big.png bs=1M count=6
+# curl -s -X POST $BASE/api/articles/1/upload-image -H "Authorization: Bearer $TOKEN" \
+#   -F "file=@/tmp/big.png;type=image/png" -w "\n%{http_code}\n"
+```
+
+## Configurazione
+
+Variabili env (vedi `.env.example`):
+
+- `APP_TMP_DIR` — directory base degli upload (default `/tmp/nerdnostalgia`)
+- `BASE_URL` — usato per costruire gli URL pubblici (default `http://localhost:7373`)
+- `MAX_UPLOAD_SIZE_MB` — limite di dimensione per file (default 5)
+
+## Note
+
+- I file vengono salvati come `{uuid}.{ext}` per evitare path traversal e
+  conflitti tra upload dello stesso nome.
+- La directory `uploads/` deve essere persistente: il `docker-compose.yml`
+  monta `./tmp:/tmp/nerdnostalgia`.
+- In produzione, sostituire lo static FS con un object store (es. S3/R2/MinIO)
+  cambiando l'implementazione di `utils/storage.py` senza toccare l'API.
