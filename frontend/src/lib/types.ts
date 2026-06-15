@@ -19,6 +19,7 @@ export interface Article {
   dimensions_cm: string | null;
   images: string[];
   article_metadata: Record<string, unknown>;
+  display_order?: number;
   created_at: string;
   updated_at: string;
   published_at: string | null;

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { Sortable } from "@/components/admin/Sortable";
 import { adminApi } from "@/lib/admin-api";
 import { formatMaxPrice } from "@/lib/api";
 import type { WantedItem, WantedListResponse, WantedStatus } from "@/lib/types";
@@ -81,30 +82,67 @@ function WantedListContent() {
         </div>
       )}
 
-      <div className="space-y-3">
-        {items.map((w) => (
-          <Link
-            key={w.id}
-            href={`/admin/wanted/${w.id}`}
-            className="card card-clickable p-4 flex items-center gap-4"
+      {items.length > 1 && (
+        <p className="text-xs text-ink-soft mb-3">
+          Trascina la maniglia ⋮⋮ per riordinare per priorità (la prima ha
+          priority più alta).
+        </p>
+      )}
+
+      <Sortable
+        items={items}
+        getKey={(w) => String(w.id)}
+        onReorder={async (next) => {
+          setItems(next);
+          try {
+            await adminApi.post("/api/wanted/reorder", {
+              order: next.map((w) => w.id),
+            });
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+          }
+        }}
+        strategy="vertical"
+        className="space-y-3"
+        renderItem={(w, _idx, { listeners, attributes, isDragging }) => (
+          <div
+            className={
+              "card p-4 flex items-center gap-4 " +
+              (isDragging ? "ring-4 ring-pink-deep " : "")
+            }
           >
-            <span className="display text-xl text-ink-soft w-10 text-right">
-              {w.priority}
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="display text-base text-ink truncate">{w.title}</p>
-              <p className="text-xs text-ink-soft truncate">
-                #{w.id} · {w.category ?? "—"}
-                {w.preferred_condition ? ` · ${w.preferred_condition}` : ""}
-              </p>
-            </div>
-            <span className={`chip ${STATUS_CHIP[w.status]}`}>{w.status}</span>
-            <span className="display text-lg text-pink-deep w-32 text-right">
-              {formatMaxPrice(w) ?? "—"}
-            </span>
-          </Link>
-        ))}
-      </div>
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              className="text-ink-soft text-2xl cursor-grab active:cursor-grabbing select-none px-1"
+              aria-label="Trascina per riordinare"
+              title="Trascina per riordinare"
+            >
+              ⋮⋮
+            </button>
+            <Link
+              href={`/admin/wanted/${w.id}`}
+              className="flex items-center gap-4 flex-1 min-w-0"
+            >
+              <span className="display text-xl text-ink-soft w-10 text-right">
+                {w.priority}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="display text-base text-ink truncate">{w.title}</p>
+                <p className="text-xs text-ink-soft truncate">
+                  #{w.id} · {w.category ?? "—"}
+                  {w.preferred_condition ? ` · ${w.preferred_condition}` : ""}
+                </p>
+              </div>
+              <span className={`chip ${STATUS_CHIP[w.status]}`}>{w.status}</span>
+              <span className="display text-lg text-pink-deep w-32 text-right">
+                {formatMaxPrice(w) ?? "—"}
+              </span>
+            </Link>
+          </div>
+        )}
+      />
     </AdminShell>
   );
 }

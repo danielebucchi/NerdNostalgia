@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
-import { SortableImageGrid } from "@/components/admin/SortableImageGrid";
+import { Sortable } from "@/components/admin/Sortable";
 import type { Article, ArticleCondition, ArticleStatus } from "@/lib/types";
 
 interface PendingFile {
@@ -350,7 +350,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
                   Trascina per riordinare · ⭐ per copertina · ← → per spostare
                 </p>
               )}
-              <SortableImageGrid
+              <Sortable
                 items={pendingFiles}
                 getKey={(p) => p.id}
                 onReorder={setPendingFiles}

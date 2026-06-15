@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ArticleForm } from "@/components/admin/ArticleForm";
-import { SortableImageGrid } from "@/components/admin/SortableImageGrid";
+import { Sortable } from "@/components/admin/Sortable";
 import { adminApi } from "@/lib/admin-api";
 import type { Article } from "@/lib/types";
 
@@ -196,7 +196,7 @@ export default function AdminArticleEditPage({ params }: PageProps) {
             {article.images.length === 0 ? (
               <p className="text-ink-soft text-sm">Nessuna immagine caricata.</p>
             ) : (
-              <SortableImageGrid
+              <Sortable
                 items={article.images}
                 getKey={(url) => url}
                 onReorder={(next) => persistImages(next)}

@@ -83,6 +83,7 @@ class ArticleResponse(BaseModel):
     dimensions_cm: Optional[str]
     images: List[str]
     article_metadata: dict
+    display_order: int = 0
     created_at: str
     updated_at: str
     published_at: Optional[str]
@@ -94,3 +95,7 @@ class ArticleListResponse(BaseModel):
     total: int
     skip: int
     limit: int
+
+
+class ReorderRequest(BaseModel):
+    order: List[int] = Field(..., min_length=1)

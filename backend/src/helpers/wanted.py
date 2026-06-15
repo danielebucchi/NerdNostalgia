@@ -98,6 +98,16 @@ class WantedItemHelper(BaseHelper):
         self.db.delete(item)
         self.db.commit()
 
+    def reorder(self, ordered_ids: List[int]) -> None:
+        """Imposta priority decrescente (n-1, n-2, ..., 0) in base alla
+        posizione nella lista."""
+        n = len(ordered_ids)
+        for position, wanted_id in enumerate(ordered_ids):
+            item = self.get("id", wanted_id)
+            if item is not None:
+                item.priority = max(0, n - 1 - position)
+        self.db.commit()
+
 
 def get_wanted_helper(db: Session = Depends(get_db)) -> WantedItemHelper:
     return WantedItemHelper(db=db)

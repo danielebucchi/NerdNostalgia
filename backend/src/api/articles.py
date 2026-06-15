@@ -16,6 +16,7 @@ from models.entities.article import (
     ArticleListResponse,
     ArticleResponse,
     ArticleUpdate,
+    ReorderRequest,
 )
 from utils.storage import (
     UploadValidationError,
@@ -25,6 +26,17 @@ from utils.storage import (
 )
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
+
+
+@router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT)
+def reorder_articles(
+    payload: ReorderRequest,
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Imposta display_order in base alla posizione nell'array `order`."""
+    article_helper.reorder(payload.order)
+    return None
 
 
 def _to_response(article: Article) -> ArticleResponse:
@@ -46,6 +58,7 @@ def _to_response(article: Article) -> ArticleResponse:
         dimensions_cm=article.dimensions_cm,
         images=article.images or [],
         article_metadata=article.article_metadata or {},
+        display_order=article.display_order or 0,
         created_at=article.created_at.isoformat() if article.created_at else None,
         updated_at=article.updated_at.isoformat() if article.updated_at else None,
         published_at=article.published_at.isoformat() if article.published_at else None,

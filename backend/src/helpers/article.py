@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import List, Optional, Tuple
 
 from fastapi import Depends
-from sqlalchemy import desc, func, or_
+from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session
 
 from helpers import BaseHelper
@@ -64,8 +64,21 @@ class ArticleHelper(BaseHelper):
             query = query.filter(tsvector.op("@@")(tsquery))
 
         total = query.count()
-        items = query.order_by(desc(Article.created_at)).offset(skip).limit(limit).all()
+        items = (
+            query.order_by(asc(Article.display_order), desc(Article.created_at))
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
         return items, total
+
+    def reorder(self, ordered_ids: List[int]) -> None:
+        """Imposta display_order in base alla posizione nella lista (0..n-1)."""
+        for position, article_id in enumerate(ordered_ids):
+            article = self.get("id", article_id)
+            if article is not None:
+                article.display_order = position
+        self.db.commit()
 
     def save(self, article: Article) -> None:
         self.db.add(article)

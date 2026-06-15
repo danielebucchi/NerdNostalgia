@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from helpers.auth import require_admin
 from helpers.wanted import WantedItemHelper, get_wanted_helper
 from models.db import ArticleCondition, User, WantedItem, WantedStatus
+from models.entities.article import ReorderRequest
 from models.entities.wanted import (
     WantedItemCreate,
     WantedItemListResponse,
@@ -17,6 +18,18 @@ from models.entities.wanted import (
 )
 
 router = APIRouter(prefix="/api/wanted", tags=["wanted"])
+
+
+@router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT)
+def reorder_wanted(
+    payload: ReorderRequest,
+    helper: WantedItemHelper = Depends(get_wanted_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Imposta `priority` decrescente in base alla posizione nell'array
+    `order` (la prima ottiene priority = N-1)."""
+    helper.reorder(payload.order)
+    return None
 
 
 def _to_response(item: WantedItem) -> WantedItemResponse:
