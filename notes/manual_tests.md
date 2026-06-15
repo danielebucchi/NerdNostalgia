@@ -324,4 +324,72 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST $BASE/api/inquiries/ \
 - `/articles/{id}` — bottone "Chiedi info" apre il dialog con l'`article_id`
   precompilato e l'oggetto `Info su: <titolo>`.
 - `InquiryDialog.tsx` — client component con validazione HTML5, gestione
-  stato `inviato`, errori.
+  stato `inviato`, errori. Supporta `customSubject`, `dialogTitle`,
+  `subtitle`, `messagePlaceholder` per essere riusato dal flow "Ce l'ho!"
+  della sezione cerco/compro.
+
+---
+
+# Manual tests — Wanted / Cerco-Compro (NN-006)
+
+## Endpoint
+
+- `GET /api/wanted/` — pubblico. Lista articoli cercati dall'admin.
+  Default `status=ACTIVE`, ordinati per `priority DESC, created_at DESC`.
+  Filtri: `status`, `category`, `condition`, `max_budget`, `search`
+  (full-text italiano su title + description).
+- `GET /api/wanted/{id}` — pubblico.
+- `POST /api/wanted/` — admin.
+- `PATCH /api/wanted/{id}` — admin. Passando `status=FULFILLED` popola
+  `fulfilled_at`.
+- `DELETE /api/wanted/{id}` — admin.
+
+## Test E2E
+
+```bash
+BASE=http://localhost:7373
+TOKEN=$(curl -s -X POST $BASE/api/auth/login \
+  -d 'username=dani&password=secret1' \
+  -H 'Content-Type: application/x-www-form-urlencoded' | jq -r '.access_token')
+
+# 1) Crea (admin)
+curl -s -X POST $BASE/api/wanted/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "title": "Cerco Game Boy Advance SP",
+    "description": "Qualsiasi colore, funzionante.",
+    "category": "videogames", "brand": "Nintendo",
+    "preferred_condition": "USED",
+    "max_price": 80, "priority": 70
+  }' | jq
+
+# 2) Lista pubblica (default ACTIVE, ordinata per priority)
+curl -s $BASE/api/wanted/ | jq '.items | map({id, title, priority})'
+
+# 3) Filtri
+curl -s "$BASE/api/wanted/?search=charizard" | jq '.total'
+curl -s "$BASE/api/wanted/?max_budget=50" | jq '.items | map(.title)'
+
+# 4) FULFILLED → popola fulfilled_at
+curl -s -X PATCH $BASE/api/wanted/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"FULFILLED"}' | jq
+
+# 5) "Ce l'ho!" via inquiry con subject custom
+curl -s -X POST $BASE/api/inquiries/ -H 'Content-Type: application/json' -d '{
+  "name":"Anna","email":"anna@test.it",
+  "subject":"Ce l'ho: Cerco Charizard EX (wanted #2)",
+  "message":"Ho un Charizard EX in italiano PSA 9, te lo posso vendere a 200."
+}' | jq
+```
+
+## Frontend
+
+- `/cerco-compro` — lista pubblica con hero, chip "🔥 con urgenza" sui
+  wanted con `priority >= 50`, badge categoria.
+- `/cerco-compro/{id}` — dettaglio con sidebar offerta e bottone
+  "Ce l'ho! Te lo vendo" che apre `InquiryDialog` con `customSubject`
+  `Ce l'ho: <titolo> (wanted #<id>)` e placeholder dedicato.
+- Header: link "Cerco/Compro" attivo (sia desktop sia mobile).
