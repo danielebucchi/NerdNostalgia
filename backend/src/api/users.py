@@ -5,9 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
+from helpers.auth import require_admin
 from helpers.user import get_user_helper, UserHelper
 from models.db import User
 from models.entities.user import UserResponse, UserCreate, UserUpdate
+from utils.security import hash_password
 from utils.session import get_db
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -43,11 +45,10 @@ def create_user(user_data: UserCreate, user_helper: UserHelper = Depends(get_use
             detail=f"Email '{user_data.email}' gia' registrata"
         )
 
-    # Create user (TODO: hash password with bcrypt!)
     new_user = User(
         username=user_data.username,
         email=user_data.email,
-        hashed_password=user_data.password,  # TODO: Hash this in production!
+        hashed_password=hash_password(user_data.password),
         full_name=user_data.full_name,
         role=user_data.role,
     )
@@ -73,7 +74,8 @@ def list_users(
     skip: int = 0,
     limit: int = 100,
     is_active: Optional[bool] = None,
-    user_helper: UserHelper = Depends(get_user_helper)
+    user_helper: UserHelper = Depends(get_user_helper),
+    _admin: User = Depends(require_admin),
 ):
     """
     Lista tutti gli utenti con paginazione e filtri.
@@ -106,7 +108,11 @@ def list_users(
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, user_helper: UserHelper = Depends(get_user_helper)):
+def get_user(
+    user_id: int,
+    user_helper: UserHelper = Depends(get_user_helper),
+    _admin: User = Depends(require_admin),
+):
     """
     Ottieni un utente per ID.
 
@@ -143,7 +149,8 @@ def get_user(user_id: int, user_helper: UserHelper = Depends(get_user_helper)):
 @router.patch("/{user_id}", response_model=UserResponse)
 def update_user(user_id: int,
                 user_data: UserUpdate,
-                user_helper: UserHelper = Depends(get_user_helper)):
+                user_helper: UserHelper = Depends(get_user_helper),
+                _admin: User = Depends(require_admin)):
     """
     Aggiorna un utente.
 
@@ -182,7 +189,8 @@ def update_user(user_id: int,
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: int,
-                user_helper: UserHelper = Depends(get_user_helper)):
+                user_helper: UserHelper = Depends(get_user_helper),
+                _admin: User = Depends(require_admin)):
     """
     Elimina un utente.
 
@@ -207,7 +215,8 @@ def delete_user(user_id: int,
 
 @router.get("/username/{username}", response_model=UserResponse)
 def get_user_by_username(username: str,
-                user_helper: UserHelper = Depends(get_user_helper)):
+                user_helper: UserHelper = Depends(get_user_helper),
+                _admin: User = Depends(require_admin)):
     """
     Ottieni un utente per username.
 
