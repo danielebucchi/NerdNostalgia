@@ -1,6 +1,7 @@
-import type { Article, ArticleListResponse } from "./types";
+import type { Article, ArticleListResponse, Inquiry, InquiryCreate } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:7373";
+export const PUBLIC_API_BASE = API_BASE;
 
 export interface ListArticlesParams {
   status?: string;
@@ -37,6 +38,27 @@ export async function getArticle(id: number | string): Promise<Article | null> {
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Errore caricamento articolo: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function submitInquiry(payload: InquiryCreate): Promise<Inquiry> {
+  const res = await fetch(`${API_BASE}/api/inquiries/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let detail = `${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.detail) {
+        detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
   }
   return res.json();
 }

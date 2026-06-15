@@ -29,11 +29,12 @@ export function Header() {
         <nav className="hidden md:flex items-center gap-2">
           <Link href="/" className="btn btn-ghost text-sm">Catalogo</Link>
           <a href="#" className="btn btn-ghost text-sm opacity-60 cursor-not-allowed" aria-disabled>Cerco/Compro</a>
-          <a href="#" className="btn btn-primary text-sm" aria-disabled>Contattami</a>
+          <Link href="/contatti" className="btn btn-primary text-sm">Contattami</Link>
         </nav>
 
         <nav className="flex md:hidden gap-2">
           <Link href="/" className="btn btn-ghost text-xs px-3 py-2">Catalogo</Link>
+          <Link href="/contatti" className="btn btn-primary text-xs px-3 py-2">Scrivi</Link>
         </nav>
       </div>
     </header>

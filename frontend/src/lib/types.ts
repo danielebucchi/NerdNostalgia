@@ -31,3 +31,29 @@ export interface ArticleListResponse {
   skip: number;
   limit: number;
 }
+
+export type InquiryStatus = "NEW" | "READ" | "REPLIED" | "CLOSED";
+
+export interface Inquiry {
+  id: number;
+  article_id: number | null;
+  name: string;
+  email: string;
+  phone: string | null;
+  subject: string | null;
+  message: string;
+  status: InquiryStatus;
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  replied_at: string | null;
+}
+
+export interface InquiryCreate {
+  article_id?: number | null;
+  name: string;
+  email: string;
+  phone?: string;
+  subject?: string;
+  message: string;
+}

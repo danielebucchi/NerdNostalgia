@@ -260,3 +260,68 @@ Variabili env (vedi `.env.example`):
   monta `./tmp:/tmp/nerdnostalgia`.
 - In produzione, sostituire lo static FS con un object store (es. S3/R2/MinIO)
   cambiando l'implementazione di `utils/storage.py` senza toccare l'API.
+
+---
+
+# Manual tests — Inquiries (NN-005)
+
+## Endpoint
+
+- `POST /api/inquiries/` — pubblico. Submit di una richiesta di contatto.
+  Campi: `name`, `email`, `message` obbligatori. `article_id`, `phone`,
+  `subject` opzionali.
+- `GET /api/inquiries/` — admin-only. Lista con filtri `status`,
+  `article_id`, `email`, paginazione.
+- `GET /api/inquiries/{id}` — admin-only. Auto-marca come `READ` se era `NEW`.
+- `PATCH /api/inquiries/{id}` — admin-only. Aggiorna `status` e/o
+  `admin_notes`. Passando `status=REPLIED` popola `replied_at`.
+- `DELETE /api/inquiries/{id}` — admin-only.
+
+## Test E2E
+
+```bash
+BASE=http://localhost:7373
+
+# 1) Submit pubblico (no token)
+curl -s -X POST $BASE/api/inquiries/ -H 'Content-Type: application/json' -d '{
+  "name":"Mario Rossi","email":"mario@test.it",
+  "subject":"Ricerca Game Boy Advance",
+  "message":"Ciao, vorrei sapere se hai per caso un Game Boy Advance SP."
+}' | jq
+
+# 2) Submit con article_id
+curl -s -X POST $BASE/api/inquiries/ -H 'Content-Type: application/json' -d '{
+  "article_id": 6, "name":"Luigi","email":"luigi@test.it",
+  "message":"Salve, e ancora disponibile?"
+}' | jq
+
+# 3) Senza token (GET) → 401
+curl -s -o /dev/null -w '%{http_code}\n' $BASE/api/inquiries/
+
+# 4) Admin login + lista
+TOKEN=$(curl -s -X POST $BASE/api/auth/login \
+  -d 'username=dani&password=secret1' \
+  -H 'Content-Type: application/x-www-form-urlencoded' | jq -r '.access_token')
+curl -s $BASE/api/inquiries/ -H "Authorization: Bearer $TOKEN" | jq
+
+# 5) Dettaglio (auto NEW → READ)
+curl -s $BASE/api/inquiries/1 -H "Authorization: Bearer $TOKEN" | jq '.status'
+
+# 6) Set REPLIED (popola replied_at)
+curl -s -X PATCH $BASE/api/inquiries/1 -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"REPLIED","admin_notes":"Risposto via email"}' | jq
+
+# 7) Validazione: email invalida o messaggio troppo corto → 422
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $BASE/api/inquiries/ \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"x","email":"non-email","message":"hello"}'
+```
+
+## Frontend
+
+- `/contatti` — pagina con CTA che apre il dialog di contatto generico.
+- `/articles/{id}` — bottone "Chiedi info" apre il dialog con l'`article_id`
+  precompilato e l'oggetto `Info su: <titolo>`.
+- `InquiryDialog.tsx` — client component con validazione HTML5, gestione
+  stato `inviato`, errori.
