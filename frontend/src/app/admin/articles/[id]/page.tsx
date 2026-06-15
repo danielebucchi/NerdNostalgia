@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ArticleForm } from "@/components/admin/ArticleForm";
+import { SortableImageGrid } from "@/components/admin/SortableImageGrid";
 import { adminApi } from "@/lib/admin-api";
 import type { Article } from "@/lib/types";
 
@@ -20,8 +21,6 @@ export default function AdminArticleEditPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [overIdx, setOverIdx] = useState<number | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -123,38 +122,6 @@ export default function AdminArticleEditPage({ params }: PageProps) {
     }
   }
 
-  function handleDragStart(e: React.DragEvent<HTMLDivElement>, index: number) {
-    setDragIdx(index);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", String(index));
-  }
-
-  function handleDragOver(e: React.DragEvent<HTMLDivElement>, index: number) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (overIdx !== index) setOverIdx(index);
-  }
-
-  function handleDragLeave() {
-    setOverIdx(null);
-  }
-
-  async function handleDrop(e: React.DragEvent<HTMLDivElement>, target: number) {
-    e.preventDefault();
-    const from = dragIdx ?? Number(e.dataTransfer.getData("text/plain"));
-    setDragIdx(null);
-    setOverIdx(null);
-    if (!article || Number.isNaN(from) || from === target) return;
-    const next = [...article.images];
-    const [moved] = next.splice(from, 1);
-    next.splice(target, 0, moved);
-    await persistImages(next);
-  }
-
-  function handleDragEnd() {
-    setDragIdx(null);
-    setOverIdx(null);
-  }
 
   return (
     <AdminShell>
@@ -229,33 +196,30 @@ export default function AdminArticleEditPage({ params }: PageProps) {
             {article.images.length === 0 ? (
               <p className="text-ink-soft text-sm">Nessuna immagine caricata.</p>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                {article.images.map((url, idx) => {
+              <SortableImageGrid
+                items={article.images}
+                getKey={(url) => url}
+                onReorder={(next) => persistImages(next)}
+                className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4"
+                renderItem={(url, idx, { listeners, attributes, isDragging }) => {
                   const isCover = idx === 0;
                   const isLast = idx === article.images.length - 1;
-                  const isDragging = dragIdx === idx;
-                  const isOver = overIdx === idx && dragIdx !== null && dragIdx !== idx;
                   return (
-                    <div key={url} className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1">
                       <div
-                        draggable={!busy}
-                        onDragStart={(e) => handleDragStart(e, idx)}
-                        onDragOver={(e) => handleDragOver(e, idx)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, idx)}
-                        onDragEnd={handleDragEnd}
+                        {...attributes}
+                        {...listeners}
                         className={
-                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream cursor-grab active:cursor-grabbing transition-all " +
+                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream cursor-grab active:cursor-grabbing " +
                           (isCover ? "border-pink-deep shadow-hover " : "border-ink/15 ") +
-                          (isDragging ? "opacity-40 scale-95 " : "") +
-                          (isOver ? "ring-4 ring-pink-deep ring-offset-2 ring-offset-white " : "")
+                          (isDragging ? "ring-4 ring-pink-deep ring-offset-2 ring-offset-white " : "")
                         }
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <img src={url} alt="" className="w-full h-full object-cover pointer-events-none" />
 
                         {isCover && (
-                          <span className="absolute top-1 left-1 chip chip-pink text-[10px] py-0.5">
+                          <span className="absolute top-1 left-1 chip chip-pink text-[10px] py-0.5 pointer-events-none">
                             ⭐ Copertina
                           </span>
                         )}
@@ -263,6 +227,7 @@ export default function AdminArticleEditPage({ params }: PageProps) {
                         {!isCover && (
                           <button
                             type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
                             onClick={() => handleSetCover(url)}
                             className="absolute top-1 left-1 w-7 h-7 rounded-full bg-pink text-ink text-xs flex items-center justify-center border-2 border-ink"
                             disabled={busy}
@@ -275,6 +240,7 @@ export default function AdminArticleEditPage({ params }: PageProps) {
 
                         <button
                           type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
                           onClick={() => handleRemoveImage(url)}
                           className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
                           disabled={busy}
@@ -283,7 +249,7 @@ export default function AdminArticleEditPage({ params }: PageProps) {
                           ✕
                         </button>
 
-                        <span className="absolute bottom-1 right-1 text-[10px] text-white bg-ink/70 rounded px-1.5 py-0.5">
+                        <span className="absolute bottom-1 right-1 text-[10px] text-white bg-ink/70 rounded px-1.5 py-0.5 pointer-events-none">
                           {idx + 1}
                         </span>
                       </div>
@@ -311,8 +277,8 @@ export default function AdminArticleEditPage({ params }: PageProps) {
                       </div>
                     </div>
                   );
-                })}
-              </div>
+                }}
+              />
             )}
             <label className="btn btn-ghost text-sm inline-flex cursor-pointer">
               {uploading ? "Caricamento…" : "📷 Carica immagine"}
