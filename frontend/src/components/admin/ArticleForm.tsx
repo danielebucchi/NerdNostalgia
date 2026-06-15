@@ -3,7 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
+import { SortableImageGrid } from "@/components/admin/SortableImageGrid";
 import type { Article, ArticleCondition, ArticleStatus } from "@/lib/types";
+
+interface PendingFile {
+  id: string;
+  file: File;
+}
+
+let pendingCounter = 0;
+function makePending(file: File): PendingFile {
+  pendingCounter += 1;
+  return { id: `pf-${Date.now()}-${pendingCounter}`, file };
+}
 
 interface Props {
   initial?: Article;
@@ -65,10 +77,8 @@ export function ArticleForm({ initial, onSaved }: Props) {
   const [state, setState] = useState<FormState>(initial ? toForm(initial) : empty);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [overIdx, setOverIdx] = useState<number | null>(null);
 
   const isEdit = Boolean(initial);
 
@@ -78,67 +88,33 @@ export function ArticleForm({ initial, onSaved }: Props) {
 
   function addPendingFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    setPendingFiles((curr) => [...curr, ...Array.from(files)]);
+    setPendingFiles((curr) => [...curr, ...Array.from(files).map(makePending)]);
   }
 
-  function removePendingFile(index: number) {
-    setPendingFiles((curr) => curr.filter((_, i) => i !== index));
+  function removePendingFile(id: string) {
+    setPendingFiles((curr) => curr.filter((p) => p.id !== id));
   }
 
-  function setPendingCover(index: number) {
+  function setPendingCover(id: string) {
     setPendingFiles((curr) => {
-      if (index <= 0 || index >= curr.length) return curr;
+      const idx = curr.findIndex((p) => p.id === id);
+      if (idx <= 0) return curr;
       const next = [...curr];
-      const [file] = next.splice(index, 1);
-      next.unshift(file);
+      const [item] = next.splice(idx, 1);
+      next.unshift(item);
       return next;
     });
   }
 
-  function movePendingFile(index: number, delta: -1 | 1) {
+  function movePendingFile(id: string, delta: -1 | 1) {
     setPendingFiles((curr) => {
-      const target = index + delta;
-      if (target < 0 || target >= curr.length) return curr;
+      const idx = curr.findIndex((p) => p.id === id);
+      const target = idx + delta;
+      if (idx < 0 || target < 0 || target >= curr.length) return curr;
       const next = [...curr];
-      [next[index], next[target]] = [next[target], next[index]];
+      [next[idx], next[target]] = [next[target], next[idx]];
       return next;
     });
-  }
-
-  function handleDragStart(e: React.DragEvent<HTMLDivElement>, index: number) {
-    setDragIdx(index);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", String(index));
-  }
-
-  function handleDragOver(e: React.DragEvent<HTMLDivElement>, index: number) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (overIdx !== index) setOverIdx(index);
-  }
-
-  function handleDragLeave() {
-    setOverIdx(null);
-  }
-
-  function handleDrop(e: React.DragEvent<HTMLDivElement>, target: number) {
-    e.preventDefault();
-    const from = dragIdx ?? Number(e.dataTransfer.getData("text/plain"));
-    setDragIdx(null);
-    setOverIdx(null);
-    if (Number.isNaN(from) || from === target) return;
-    setPendingFiles((curr) => {
-      if (from < 0 || from >= curr.length) return curr;
-      const next = [...curr];
-      const [moved] = next.splice(from, 1);
-      next.splice(target, 0, moved);
-      return next;
-    });
-  }
-
-  function handleDragEnd() {
-    setDragIdx(null);
-    setOverIdx(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -175,10 +151,10 @@ export function ArticleForm({ initial, onSaved }: Props) {
       // Upload sequenziale di eventuali file selezionati (solo in create)
       if (!isEdit && pendingFiles.length > 0) {
         for (let i = 0; i < pendingFiles.length; i++) {
-          const file = pendingFiles[i];
+          const pending = pendingFiles[i];
           setUploadProgress(`Carico immagine ${i + 1} di ${pendingFiles.length}…`);
           const fd = new FormData();
-          fd.append("file", file);
+          fd.append("file", pending.file);
           result = await adminApi.postForm<Article>(
             `/api/articles/${result.id}/upload-image`,
             fd,
@@ -374,37 +350,34 @@ export function ArticleForm({ initial, onSaved }: Props) {
                   Trascina per riordinare · ⭐ per copertina · ← → per spostare
                 </p>
               )}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {pendingFiles.map((f, idx) => {
+              <SortableImageGrid
+                items={pendingFiles}
+                getKey={(p) => p.id}
+                onReorder={setPendingFiles}
+                className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+                renderItem={(p, idx, { listeners, attributes, isDragging }) => {
                   const isCover = idx === 0;
                   const isLast = idx === pendingFiles.length - 1;
-                  const isDragging = dragIdx === idx;
-                  const isOver = overIdx === idx && dragIdx !== null && dragIdx !== idx;
                   return (
-                    <div key={`${f.name}-${idx}`} className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1">
                       <div
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, idx)}
-                        onDragOver={(e) => handleDragOver(e, idx)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, idx)}
-                        onDragEnd={handleDragEnd}
+                        {...attributes}
+                        {...listeners}
                         className={
-                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream cursor-grab active:cursor-grabbing transition-all " +
+                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream cursor-grab active:cursor-grabbing " +
                           (isCover ? "border-pink-deep " : "border-ink/15 ") +
-                          (isDragging ? "opacity-40 scale-95 " : "") +
-                          (isOver ? "ring-4 ring-pink-deep ring-offset-2 ring-offset-white " : "")
+                          (isDragging ? "ring-4 ring-pink-deep ring-offset-2 ring-offset-white " : "")
                         }
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={URL.createObjectURL(f)}
-                          alt={f.name}
-                          className="w-full h-full object-cover"
+                          src={URL.createObjectURL(p.file)}
+                          alt={p.file.name}
+                          className="w-full h-full object-cover pointer-events-none"
                         />
 
                         {isCover && (
-                          <span className="absolute top-1 left-1 chip chip-pink text-[10px] py-0.5">
+                          <span className="absolute top-1 left-1 chip chip-pink text-[10px] py-0.5 pointer-events-none">
                             ⭐ Copertina
                           </span>
                         )}
@@ -412,7 +385,8 @@ export function ArticleForm({ initial, onSaved }: Props) {
                         {!isCover && (
                           <button
                             type="button"
-                            onClick={() => setPendingCover(idx)}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => setPendingCover(p.id)}
                             className="absolute top-1 left-1 w-7 h-7 rounded-full bg-pink text-ink text-xs flex items-center justify-center border-2 border-ink"
                             aria-label="Imposta come copertina"
                             title="Imposta come copertina"
@@ -423,21 +397,22 @@ export function ArticleForm({ initial, onSaved }: Props) {
 
                         <button
                           type="button"
-                          onClick={() => removePendingFile(idx)}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={() => removePendingFile(p.id)}
                           className="absolute top-1 right-1 w-7 h-7 rounded-full bg-ink text-white text-xs flex items-center justify-center"
                           aria-label="Rimuovi"
                         >
                           ✕
                         </button>
 
-                        <span className="absolute bottom-1 left-1 right-1 text-[10px] text-white bg-ink/70 rounded px-1 py-0.5 truncate text-center">
-                          {idx + 1} · {f.name}
+                        <span className="absolute bottom-1 left-1 right-1 text-[10px] text-white bg-ink/70 rounded px-1 py-0.5 truncate text-center pointer-events-none">
+                          {idx + 1} · {p.file.name}
                         </span>
                       </div>
                       <div className="flex gap-1">
                         <button
                           type="button"
-                          onClick={() => movePendingFile(idx, -1)}
+                          onClick={() => movePendingFile(p.id, -1)}
                           disabled={isCover}
                           className="flex-1 h-7 rounded-lg border-2 border-ink bg-white text-ink text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
                           aria-label="Sposta a sinistra"
@@ -447,7 +422,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => movePendingFile(idx, 1)}
+                          onClick={() => movePendingFile(p.id, 1)}
                           disabled={isLast}
                           className="flex-1 h-7 rounded-lg border-2 border-ink bg-white text-ink text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
                           aria-label="Sposta a destra"
@@ -458,8 +433,8 @@ export function ArticleForm({ initial, onSaved }: Props) {
                       </div>
                     </div>
                   );
-                })}
-              </div>
+                }}
+              />
             </>
           )}
         </div>
