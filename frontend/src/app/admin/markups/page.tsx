@@ -201,7 +201,7 @@ export default function AdminMarkupsPage() {
           display: block;
           width: 100%;
           padding: 0.55rem 0.8rem;
-          border: 2px solid #3d2a5c;
+          border: 1px solid rgba(61, 42, 92, 0.12);
           border-radius: 12px;
           background: #fffaf3;
           color: #3d2a5c;

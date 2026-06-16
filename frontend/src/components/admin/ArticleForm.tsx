@@ -394,7 +394,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
       </Row>
 
       {!isEdit && (
-        <div className="border-2 border-dashed border-ink/25 rounded-big p-4">
+        <div className="border border-dashed border-ink/20 rounded-big p-4 bg-white/40">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
               <h3 className="display text-base text-ink">Immagini iniziali</h3>
@@ -441,9 +441,9 @@ export function ArticleForm({ initial, onSaved }: Props) {
                         {...attributes}
                         {...listeners}
                         className={
-                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream cursor-grab active:cursor-grabbing " +
-                          (isCover ? "border-pink-deep " : "border-ink/15 ") +
-                          (isDragging ? "ring-4 ring-pink-deep ring-offset-2 ring-offset-white " : "")
+                          "relative aspect-square rounded-2xl overflow-hidden bg-white/60 cursor-grab active:cursor-grabbing transition-all " +
+                          (isCover ? "ring-2 ring-pink-deep shadow-soft " : "ring-1 ring-ink/10 ") +
+                          (isDragging ? "ring-4 ring-lilac-deep/50 " : "")
                         }
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -464,7 +464,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
                             type="button"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={() => setPendingCover(p.id)}
-                            className="absolute top-1 left-1 w-7 h-7 rounded-full bg-pink text-ink text-xs flex items-center justify-center border-2 border-ink"
+                            className="absolute top-1 left-1 w-7 h-7 rounded-full bg-white/95 backdrop-blur text-ink text-xs flex items-center justify-center ring-1 ring-ink/15 shadow-soft hover:bg-pink-soft transition-colors"
                             aria-label="Imposta come copertina"
                             title="Imposta come copertina"
                           >
@@ -491,7 +491,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
                           type="button"
                           onClick={() => movePendingFile(p.id, -1)}
                           disabled={isCover}
-                          className="flex-1 h-7 rounded-lg border-2 border-ink bg-white text-ink text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="flex-1 h-7 rounded-full ring-1 ring-ink/15 bg-white/80 text-ink text-sm font-bold hover:ring-ink/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                           aria-label="Sposta a sinistra"
                           title="Sposta a sinistra"
                         >
@@ -501,7 +501,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
                           type="button"
                           onClick={() => movePendingFile(p.id, 1)}
                           disabled={isLast}
-                          className="flex-1 h-7 rounded-lg border-2 border-ink bg-white text-ink text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="flex-1 h-7 rounded-full ring-1 ring-ink/15 bg-white/80 text-ink text-sm font-bold hover:ring-ink/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                           aria-label="Sposta a destra"
                           title="Sposta a destra"
                         >
@@ -518,7 +518,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
       )}
 
       {!isEdit && (
-        <div className="border-2 border-dashed border-ink/25 rounded-big p-4">
+        <div className="border border-dashed border-ink/20 rounded-big p-4 bg-white/40">
           <h3 className="display text-base text-ink mb-1">
             Sincronizza subito su marketplace
           </h3>
@@ -572,7 +572,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
           display: block;
           width: 100%;
           padding: 0.55rem 0.8rem;
-          border: 2px solid #3d2a5c;
+          border: 1px solid rgba(61, 42, 92, 0.12);
           border-radius: 12px;
           background: #fffaf3;
           color: #3d2a5c;
@@ -648,8 +648,10 @@ function MarketplacePicker({
   return (
     <div
       className={
-        "rounded-xl border-2 p-3 transition-colors " +
-        (state.enabled ? "border-pink-deep bg-pink-soft" : "border-ink/15 bg-white")
+        "rounded-2xl p-3 transition-all " +
+        (state.enabled
+          ? "ring-2 ring-pink-deep bg-pink-soft/40 shadow-soft"
+          : "ring-1 ring-ink/10 bg-white/70 hover:ring-ink/20")
       }
     >
       <div className="flex items-start justify-between gap-2">
@@ -723,7 +725,7 @@ function MarketplacePicker({
                     onClick={() =>
                       onChange({ ...state, price: calcMarkup(basePrice, m) })
                     }
-                    className="text-[11px] font-bold px-2 py-1 rounded-lg border-2 border-ink hover:bg-mint-soft"
+                    className="text-[11px] font-bold px-2.5 py-1 rounded-full ring-1 ring-ink/15 bg-white/80 backdrop-blur hover:ring-lilac-deep hover:bg-lilac-soft transition-all"
                     title={`${basePrice} + ${m}% = ${calcMarkup(basePrice, m)}`}
                   >
                     {m === 0 ? "uguale" : `+${m}%`}
@@ -733,7 +735,7 @@ function MarketplacePicker({
                   <button
                     type="button"
                     onClick={() => onChange({ ...state, price: "" })}
-                    className="text-[11px] font-bold px-2 py-1 rounded-lg border-2 border-ink/30 hover:border-ink"
+                    className="text-[11px] font-bold px-2.5 py-1 rounded-full ring-1 ring-ink/10 text-ink-soft bg-white/60 hover:ring-ink/30 hover:text-ink transition-all"
                   >
                     ✕ vuota
                   </button>

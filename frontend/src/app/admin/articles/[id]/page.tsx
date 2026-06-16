@@ -211,9 +211,9 @@ export default function AdminArticleEditPage({ params }: PageProps) {
                         {...attributes}
                         {...listeners}
                         className={
-                          "relative aspect-square rounded-xl overflow-hidden border-2 bg-cream cursor-grab active:cursor-grabbing " +
-                          (isCover ? "border-pink-deep shadow-hover " : "border-ink/15 ") +
-                          (isDragging ? "ring-4 ring-pink-deep ring-offset-2 ring-offset-white " : "")
+                          "relative aspect-square rounded-2xl overflow-hidden bg-white/60 cursor-grab active:cursor-grabbing transition-all " +
+                          (isCover ? "ring-2 ring-pink-deep shadow-soft " : "ring-1 ring-ink/10 ") +
+                          (isDragging ? "ring-4 ring-lilac-deep/50 " : "")
                         }
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -230,7 +230,7 @@ export default function AdminArticleEditPage({ params }: PageProps) {
                             type="button"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={() => handleSetCover(url)}
-                            className="absolute top-1 left-1 w-7 h-7 rounded-full bg-pink text-ink text-xs flex items-center justify-center border-2 border-ink"
+                            className="absolute top-1 left-1 w-7 h-7 rounded-full bg-white/95 backdrop-blur text-ink text-xs flex items-center justify-center ring-1 ring-ink/15 shadow-soft hover:bg-pink-soft transition-colors"
                             disabled={busy}
                             aria-label="Imposta come copertina"
                             title="Imposta come copertina"
@@ -259,7 +259,7 @@ export default function AdminArticleEditPage({ params }: PageProps) {
                           type="button"
                           onClick={() => handleMoveImage(idx, -1)}
                           disabled={busy || isCover}
-                          className="flex-1 h-7 rounded-lg border-2 border-ink bg-white text-ink text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="flex-1 h-7 rounded-full ring-1 ring-ink/15 bg-white/80 text-ink text-sm font-bold hover:ring-ink/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                           aria-label="Sposta a sinistra"
                           title="Sposta a sinistra"
                         >
@@ -269,7 +269,7 @@ export default function AdminArticleEditPage({ params }: PageProps) {
                           type="button"
                           onClick={() => handleMoveImage(idx, 1)}
                           disabled={busy || isLast}
-                          className="flex-1 h-7 rounded-lg border-2 border-ink bg-white text-ink text-sm font-bold disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="flex-1 h-7 rounded-full ring-1 ring-ink/15 bg-white/80 text-ink text-sm font-bold hover:ring-ink/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                           aria-label="Sposta a destra"
                           title="Sposta a destra"
                         >

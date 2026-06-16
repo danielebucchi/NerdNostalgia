@@ -108,15 +108,15 @@ function ArticlesListContent() {
         renderItem={(a, _idx, { listeners, attributes, isDragging }) => (
           <div
             className={
-              "card p-4 flex items-center gap-4 " +
-              (isDragging ? "ring-4 ring-pink-deep " : "")
+              "card p-3 sm:p-4 flex items-center gap-3 sm:gap-4 transition-all " +
+              (isDragging ? "ring-2 ring-lilac-deep/40 " : "")
             }
           >
             <button
               type="button"
               {...attributes}
               {...listeners}
-              className="text-ink-soft text-2xl cursor-grab active:cursor-grabbing select-none px-1"
+              className="text-ink-soft/50 text-xl cursor-grab active:cursor-grabbing select-none px-1 hover:text-ink"
               aria-label="Trascina per riordinare"
               title="Trascina per riordinare"
             >
@@ -124,23 +124,31 @@ function ArticlesListContent() {
             </button>
             <Link
               href={`/admin/articles/${a.id}`}
-              className="flex items-center gap-4 flex-1 min-w-0"
+              className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0"
             >
-              <div className="w-16 h-16 rounded-xl border-2 border-ink/15 overflow-hidden bg-cream flex-shrink-0">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl ring-1 ring-ink/8 overflow-hidden bg-white/60 flex-shrink-0">
                 {a.images?.[0] && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.images[0]} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={a.images[0]}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="display text-base text-ink truncate">{a.title}</p>
-                <p className="text-xs text-ink-soft">
+                <p className="text-xs text-ink-soft truncate">
                   #{a.id} · {a.category ?? "—"} · {a.condition}
-                  {a.sku ? ` · SKU ${a.sku}` : ""}
+                  {a.sku ? ` · ${a.sku}` : ""}
                 </p>
               </div>
-              <span className={`chip ${STATUS_CHIP[a.status] ?? ""}`}>{a.status}</span>
-              <span className="display text-lg text-pink-deep w-24 text-right">
+              <span
+                className={`chip ${STATUS_CHIP[a.status] ?? ""} hidden sm:inline-flex`}
+              >
+                {a.status}
+              </span>
+              <span className="display text-lg text-pink-deep w-20 sm:w-24 text-right flex-shrink-0">
                 {formatPrice(a)}
               </span>
             </Link>

@@ -107,15 +107,15 @@ function WantedListContent() {
         renderItem={(w, _idx, { listeners, attributes, isDragging }) => (
           <div
             className={
-              "card p-4 flex items-center gap-4 " +
-              (isDragging ? "ring-4 ring-pink-deep " : "")
+              "card p-3 sm:p-4 flex items-center gap-3 sm:gap-4 transition-all " +
+              (isDragging ? "ring-2 ring-lilac-deep/40 " : "")
             }
           >
             <button
               type="button"
               {...attributes}
               {...listeners}
-              className="text-ink-soft text-2xl cursor-grab active:cursor-grabbing select-none px-1"
+              className="text-ink-soft/50 text-xl cursor-grab active:cursor-grabbing select-none px-1 hover:text-ink"
               aria-label="Trascina per riordinare"
               title="Trascina per riordinare"
             >
@@ -123,9 +123,9 @@ function WantedListContent() {
             </button>
             <Link
               href={`/admin/wanted/${w.id}`}
-              className="flex items-center gap-4 flex-1 min-w-0"
+              className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0"
             >
-              <span className="display text-xl text-ink-soft w-10 text-right">
+              <span className="display text-lg sm:text-xl text-ink-soft w-8 sm:w-10 text-right flex-shrink-0">
                 {w.priority}
               </span>
               <div className="flex-1 min-w-0">
@@ -135,8 +135,12 @@ function WantedListContent() {
                   {w.preferred_condition ? ` · ${w.preferred_condition}` : ""}
                 </p>
               </div>
-              <span className={`chip ${STATUS_CHIP[w.status]}`}>{w.status}</span>
-              <span className="display text-lg text-pink-deep w-32 text-right">
+              <span
+                className={`chip ${STATUS_CHIP[w.status]} hidden sm:inline-flex`}
+              >
+                {w.status}
+              </span>
+              <span className="display text-base sm:text-lg text-pink-deep w-24 sm:w-32 text-right flex-shrink-0">
                 {formatMaxPrice(w) ?? "—"}
               </span>
             </Link>
