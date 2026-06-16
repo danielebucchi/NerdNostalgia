@@ -96,7 +96,9 @@ export function ArticleCard({ article }: { article: Article }) {
           <span className="display text-2xl text-pink-deep leading-none">
             {formatPrice(article)}
           </span>
-          <span className="text-xs text-ink-soft">vedi →</span>
+          <span className="text-2xl text-ink-soft leading-none" aria-hidden="true">
+            →
+          </span>
         </div>
 
         {/* Slot prezzi marketplace SOTTO al prezzo: altezza riservata
