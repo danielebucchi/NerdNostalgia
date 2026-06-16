@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
 import { Sortable } from "@/components/admin/Sortable";
+import { calcMarkup } from "@/components/admin/MarketplaceSyncBox";
 import type {
   Article,
   ArticleCondition,
@@ -22,19 +23,27 @@ interface MarketplaceSeed {
 
 const MARKETPLACE_META: Record<
   MarketplaceKey,
-  { label: string; emoji: string; urlPlaceholder: string; newListingUrl: string }
+  {
+    label: string;
+    emoji: string;
+    urlPlaceholder: string;
+    newListingUrl: string;
+    markups: number[];
+  }
 > = {
   vinted: {
     label: "Vinted",
     emoji: "🛍",
     urlPlaceholder: "https://www.vinted.it/items/123456789-…",
     newListingUrl: "https://www.vinted.it/items/new",
+    markups: [0, 5],
   },
   ebay: {
     label: "eBay",
     emoji: "🏷",
     urlPlaceholder: "https://www.ebay.it/itm/123456789",
     newListingUrl: "https://www.ebay.it/sl/sell",
+    markups: [10, 12, 15],
   },
 };
 
@@ -526,11 +535,13 @@ export function ArticleForm({ initial, onSaved }: Props) {
               marketplace="vinted"
               state={vinted}
               onChange={setVinted}
+              basePrice={state.price}
             />
             <MarketplacePicker
               marketplace="ebay"
               state={ebay}
               onChange={setEbay}
+              basePrice={state.price}
             />
           </div>
         </div>
@@ -620,12 +631,15 @@ function MarketplacePicker({
   marketplace,
   state,
   onChange,
+  basePrice,
 }: {
   marketplace: MarketplaceKey;
   state: MarketplaceSeed;
   onChange: (next: MarketplaceSeed) => void;
+  basePrice: string;
 }) {
   const meta = MARKETPLACE_META[marketplace];
+  const hasBase = basePrice.trim() !== "" && Number(basePrice) > 0;
 
   return (
     <div
@@ -693,6 +707,35 @@ function MarketplacePicker({
               placeholder="vuoto = usa prezzo catalogo"
               className="input mt-1"
             />
+            {hasBase && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                <span className="text-[10px] uppercase tracking-wider text-ink-soft self-center mr-1">
+                  Da catalogo:
+                </span>
+                {meta.markups.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() =>
+                      onChange({ ...state, price: calcMarkup(basePrice, m) })
+                    }
+                    className="text-[11px] font-bold px-2 py-1 rounded-lg border-2 border-ink hover:bg-mint-soft"
+                    title={`${basePrice} + ${m}% = ${calcMarkup(basePrice, m)}`}
+                  >
+                    {m === 0 ? "uguale" : `+${m}%`}
+                  </button>
+                ))}
+                {state.price && (
+                  <button
+                    type="button"
+                    onClick={() => onChange({ ...state, price: "" })}
+                    className="text-[11px] font-bold px-2 py-1 rounded-lg border-2 border-ink/30 hover:border-ink"
+                  >
+                    ✕ vuota
+                  </button>
+                )}
+              </div>
+            )}
           </label>
           <label className="block">
             <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">

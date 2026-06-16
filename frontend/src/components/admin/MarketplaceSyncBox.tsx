@@ -16,7 +16,7 @@ interface MarketplaceConfig {
   descriptionFooter: string;
 }
 
-const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
+const CONFIGS: Record<MarketplaceKey, MarketplaceConfig & { markups: number[] }> = {
   vinted: {
     key: "vinted",
     label: "Vinted",
@@ -24,6 +24,8 @@ const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
     newListingUrl: "https://www.vinted.it/items/new",
     descriptionFooter:
       "Spedizione tracciata in tutta Italia.\nAltri pezzi nerd su nerdnostalgia.it",
+    // Vinted: commissioni a carico buyer, di solito non si maggiora
+    markups: [0, 5],
   },
   ebay: {
     key: "ebay",
@@ -33,8 +35,16 @@ const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
     descriptionFooter:
       "Spedizione tracciata in tutta Italia con corriere assicurato.\n" +
       "Altri pezzi nerd su nerdnostalgia.it",
+    // eBay: commissione finale ~10-12% per categoria standard
+    markups: [10, 12, 15],
   },
 };
+
+export function calcMarkup(basePrice: string | number, percent: number): string {
+  const base = typeof basePrice === "string" ? Number(basePrice) : basePrice;
+  if (!Number.isFinite(base) || base <= 0) return "";
+  return (base * (1 + percent / 100)).toFixed(2);
+}
 
 const STATUS_LABEL: Record<MarketplaceStatus, string> = {
   NOT_LISTED: "Non listato",
@@ -202,7 +212,7 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
         </button>
       </div>
 
-      <div className="grid sm:grid-cols-[1fr_auto] gap-3 mb-3">
+      <div className="mb-3">
         <label className="block">
           <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
             Prezzo su {config.label} ({article.currency})
@@ -216,10 +226,35 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
             placeholder={`default: ${article.price}`}
             className="input mt-1"
           />
-          <span className="text-[10px] text-ink-soft block mt-1">
-            Vuoto = usa il prezzo del catalogo ({article.price} {article.currency}).
-          </span>
         </label>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          <span className="text-[10px] uppercase tracking-wider text-ink-soft self-center mr-1">
+            Da catalogo:
+          </span>
+          {config.markups.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setPrice(calcMarkup(article.price, m))}
+              className="text-[11px] font-bold px-2 py-1 rounded-lg border-2 border-ink hover:bg-mint-soft"
+              title={`Calcola ${article.price} ${article.currency} + ${m}% = ${calcMarkup(article.price, m)} ${article.currency}`}
+            >
+              {m === 0 ? "uguale" : `+${m}%`}
+            </button>
+          ))}
+          {price && (
+            <button
+              type="button"
+              onClick={() => setPrice("")}
+              className="text-[11px] font-bold px-2 py-1 rounded-lg border-2 border-ink/30 hover:border-ink"
+            >
+              ✕ vuota
+            </button>
+          )}
+        </div>
+        <span className="text-[10px] text-ink-soft block mt-1">
+          Vuoto = usa il prezzo del catalogo ({article.price} {article.currency}).
+        </span>
       </div>
 
       <label className="block mb-3">
