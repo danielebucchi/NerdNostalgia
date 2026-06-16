@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
 import { Sortable } from "@/components/admin/Sortable";
-import { calcMarkup, getMarkups } from "@/components/admin/MarketplaceSyncBox";
+import { calcMarkup } from "@/components/admin/MarketplaceSyncBox";
+import { getMarkupsFromFees, useMarketplaceFees } from "@/lib/useMarketplaceFees";
 import type {
   Article,
   ArticleCondition,
@@ -641,7 +642,8 @@ function MarketplacePicker({
 }) {
   const meta = MARKETPLACE_META[marketplace];
   const hasBase = basePrice.trim() !== "" && Number(basePrice) > 0;
-  const markups = getMarkups(marketplace, category.trim() || null);
+  const { fees } = useMarketplaceFees();
+  const markups = getMarkupsFromFees(fees, marketplace, category.trim() || null);
 
   return (
     <div

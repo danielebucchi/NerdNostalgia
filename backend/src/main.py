@@ -9,6 +9,7 @@ import os
 from api.articles import router as articles_router
 from api.auth import router as auth_router
 from api.inquiries import router as inquiries_router
+from api.marketplace_fees import router as marketplace_fees_router
 from api.users import router as users_router
 from api.wanted import router as wanted_router
 from utils.storage import UPLOADS_DIR, ensure_dirs
@@ -35,6 +36,7 @@ app.include_router(users_router)
 app.include_router(articles_router)
 app.include_router(inquiries_router)
 app.include_router(wanted_router)
+app.include_router(marketplace_fees_router)
 
 # Static files (uploaded images)
 ensure_dirs()
