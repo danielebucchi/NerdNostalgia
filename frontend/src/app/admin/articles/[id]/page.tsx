@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ArticleForm } from "@/components/admin/ArticleForm";
+import { MarketplaceSyncBox } from "@/components/admin/MarketplaceSyncBox";
 import { Sortable } from "@/components/admin/Sortable";
-import { VintedSyncBox } from "@/components/admin/VintedSyncBox";
 import { adminApi } from "@/lib/admin-api";
 import type { Article } from "@/lib/types";
 
@@ -290,9 +290,18 @@ export default function AdminArticleEditPage({ params }: PageProps) {
             </p>
           </div>
 
-          {/* Vinted sync */}
-          <div className="mb-6">
-            <VintedSyncBox article={article} onUpdated={(a) => setArticle(a)} />
+          {/* Marketplace sync (Vinted + eBay) */}
+          <div className="grid gap-4 lg:grid-cols-2 mb-6">
+            <MarketplaceSyncBox
+              article={article}
+              marketplace="vinted"
+              onUpdated={(a) => setArticle(a)}
+            />
+            <MarketplaceSyncBox
+              article={article}
+              marketplace="ebay"
+              onUpdated={(a) => setArticle(a)}
+            />
           </div>
 
           {/* Edit form */}

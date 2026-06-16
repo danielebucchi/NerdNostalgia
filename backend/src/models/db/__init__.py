@@ -3,8 +3,15 @@ Database models package.
 """
 from .base import Base, BaseModel
 from .users import User, UserRole
-from .articles import Article, ArticleCondition, ArticleStatus, VintedStatus
+from .articles import (
+    Article,
+    ArticleCondition,
+    ArticleStatus,
+    EbayStatus,
+    VintedStatus,
+)
 from .inquiries import Inquiry, InquiryStatus
+from .marketplace_fees import MarketplaceFee
 from .wanted import WantedItem, WantedStatus
 
 __all__ = [
@@ -16,8 +23,10 @@ __all__ = [
     "ArticleCondition",
     "ArticleStatus",
     "VintedStatus",
+    "EbayStatus",
     "Inquiry",
     "InquiryStatus",
     "WantedItem",
     "WantedStatus",
+    "MarketplaceFee",
 ]

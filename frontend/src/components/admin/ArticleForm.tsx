@@ -4,7 +4,46 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
 import { Sortable } from "@/components/admin/Sortable";
-import type { Article, ArticleCondition, ArticleStatus } from "@/lib/types";
+import { calcMarkup } from "@/components/admin/MarketplaceSyncBox";
+import { getMarkupsFromFees, useMarketplaceFees } from "@/lib/useMarketplaceFees";
+import type {
+  Article,
+  ArticleCondition,
+  ArticleStatus,
+  MarketplaceStatus,
+} from "@/lib/types";
+
+type MarketplaceKey = "vinted" | "ebay";
+
+interface MarketplaceSeed {
+  enabled: boolean;
+  status: MarketplaceStatus;
+  url: string;
+  price: string;
+}
+
+const MARKETPLACE_META: Record<
+  MarketplaceKey,
+  {
+    label: string;
+    emoji: string;
+    urlPlaceholder: string;
+    newListingUrl: string;
+  }
+> = {
+  vinted: {
+    label: "Vinted",
+    emoji: "🛍",
+    urlPlaceholder: "https://www.vinted.it/items/123456789-…",
+    newListingUrl: "https://www.vinted.it/items/new",
+  },
+  ebay: {
+    label: "eBay",
+    emoji: "🏷",
+    urlPlaceholder: "https://www.ebay.it/itm/123456789",
+    newListingUrl: "https://www.ebay.it/sl/sell",
+  },
+};
 
 interface PendingFile {
   id: string;
@@ -79,6 +118,18 @@ export function ArticleForm({ initial, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [vinted, setVinted] = useState<MarketplaceSeed>({
+    enabled: false,
+    status: "LISTED",
+    url: "",
+    price: "",
+  });
+  const [ebay, setEbay] = useState<MarketplaceSeed>({
+    enabled: false,
+    status: "LISTED",
+    url: "",
+    price: "",
+  });
 
   const isEdit = Boolean(initial);
 
@@ -161,6 +212,32 @@ export function ArticleForm({ initial, onSaved }: Props) {
           );
         }
         setPendingFiles([]);
+      }
+
+      // Sync iniziale Vinted / eBay (solo in create)
+      if (!isEdit) {
+        if (vinted.enabled) {
+          setUploadProgress("Sincronizzo Vinted…");
+          result = await adminApi.patch<Article>(
+            `/api/articles/${result.id}/vinted`,
+            {
+              vinted_status: vinted.status,
+              vinted_url: vinted.url.trim() || null,
+              vinted_price: vinted.price.trim() ? Number(vinted.price) : null,
+            },
+          );
+        }
+        if (ebay.enabled) {
+          setUploadProgress("Sincronizzo eBay…");
+          result = await adminApi.patch<Article>(
+            `/api/articles/${result.id}/ebay`,
+            {
+              ebay_status: ebay.status,
+              ebay_url: ebay.url.trim() || null,
+              ebay_price: ebay.price.trim() ? Number(ebay.price) : null,
+            },
+          );
+        }
         setUploadProgress(null);
       }
 
@@ -440,6 +517,36 @@ export function ArticleForm({ initial, onSaved }: Props) {
         </div>
       )}
 
+      {!isEdit && (
+        <div className="border-2 border-dashed border-ink/25 rounded-big p-4">
+          <h3 className="display text-base text-ink mb-1">
+            Sincronizza subito su marketplace
+          </h3>
+          <p className="text-xs text-ink-soft mb-4">
+            Spunta solo se hai già pubblicato (o stai per pubblicare) l&apos;annuncio
+            altrove. Cliccando <strong>Apri ↗</strong> da mobile si apre direttamente
+            l&apos;app Vinted / eBay (se installata).
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <MarketplacePicker
+              marketplace="vinted"
+              state={vinted}
+              onChange={setVinted}
+              basePrice={state.price}
+              category={state.category}
+            />
+            <MarketplacePicker
+              marketplace="ebay"
+              state={ebay}
+              onChange={setEbay}
+              basePrice={state.price}
+              category={state.category}
+            />
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-pink-deep font-semibold">⚠ {error}</p>}
       {uploadProgress && <p className="text-ink-soft text-sm">{uploadProgress}</p>}
 
@@ -449,9 +556,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
             ? uploadProgress ?? "Salvataggio…"
             : isEdit
               ? "Salva modifiche"
-              : pendingFiles.length > 0
-                ? `Crea articolo (+${pendingFiles.length} ${pendingFiles.length === 1 ? "foto" : "foto"})`
-                : "Crea articolo"}
+              : buildCreateLabel(pendingFiles.length, vinted.enabled, ebay.enabled)}
         </button>
         <button
           type="button"
@@ -505,5 +610,151 @@ function Field({
       <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">{label}</span>
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+function buildCreateLabel(
+  fileCount: number,
+  vintedOn: boolean,
+  ebayOn: boolean,
+): string {
+  const extras: string[] = [];
+  if (fileCount > 0) extras.push(`+${fileCount} foto`);
+  if (vintedOn) extras.push("Vinted");
+  if (ebayOn) extras.push("eBay");
+  return extras.length > 0
+    ? `Crea articolo (${extras.join(" · ")})`
+    : "Crea articolo";
+}
+
+function MarketplacePicker({
+  marketplace,
+  state,
+  onChange,
+  basePrice,
+  category,
+}: {
+  marketplace: MarketplaceKey;
+  state: MarketplaceSeed;
+  onChange: (next: MarketplaceSeed) => void;
+  basePrice: string;
+  category: string;
+}) {
+  const meta = MARKETPLACE_META[marketplace];
+  const hasBase = basePrice.trim() !== "" && Number(basePrice) > 0;
+  const { fees } = useMarketplaceFees();
+  const markups = getMarkupsFromFees(fees, marketplace, category.trim() || null);
+
+  return (
+    <div
+      className={
+        "rounded-xl border-2 p-3 transition-colors " +
+        (state.enabled ? "border-pink-deep bg-pink-soft" : "border-ink/15 bg-white")
+      }
+    >
+      <div className="flex items-start justify-between gap-2">
+        <label className="flex items-start gap-2 cursor-pointer flex-1">
+          <input
+            type="checkbox"
+            checked={state.enabled}
+            onChange={(e) => onChange({ ...state, enabled: e.target.checked })}
+            className="mt-1 accent-pink-deep w-4 h-4"
+          />
+          <span className="flex-1">
+            <span className="display text-base text-ink block">
+              {meta.emoji} Anche su {meta.label}
+            </span>
+            <span className="text-xs text-ink-soft">
+              Spunta se vuoi tracciare il listing su {meta.label}.
+            </span>
+          </span>
+        </label>
+        <a
+          href={meta.newListingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-xs font-bold text-pink-deep underline whitespace-nowrap flex-shrink-0 mt-1"
+          title={`Apri ${meta.label} (app se installata su mobile)`}
+        >
+          Apri ↗
+        </a>
+      </div>
+
+      {state.enabled && (
+        <div className="mt-3 space-y-2">
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+              Stato
+            </span>
+            <select
+              value={state.status}
+              onChange={(e) =>
+                onChange({ ...state, status: e.target.value as MarketplaceStatus })
+              }
+              className="input mt-1"
+            >
+              <option value="NOT_LISTED">Da listare</option>
+              <option value="LISTED">Online (ho già pubblicato)</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+              Prezzo su {meta.label} (opzionale)
+            </span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={state.price}
+              onChange={(e) => onChange({ ...state, price: e.target.value })}
+              placeholder="vuoto = usa prezzo catalogo"
+              className="input mt-1"
+            />
+            {hasBase && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                <span className="text-[10px] uppercase tracking-wider text-ink-soft self-center mr-1">
+                  Da catalogo:
+                </span>
+                {markups.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() =>
+                      onChange({ ...state, price: calcMarkup(basePrice, m) })
+                    }
+                    className="text-[11px] font-bold px-2 py-1 rounded-lg border-2 border-ink hover:bg-mint-soft"
+                    title={`${basePrice} + ${m}% = ${calcMarkup(basePrice, m)}`}
+                  >
+                    {m === 0 ? "uguale" : `+${m}%`}
+                  </button>
+                ))}
+                {state.price && (
+                  <button
+                    type="button"
+                    onClick={() => onChange({ ...state, price: "" })}
+                    className="text-[11px] font-bold px-2 py-1 rounded-lg border-2 border-ink/30 hover:border-ink"
+                  >
+                    ✕ vuota
+                  </button>
+                )}
+              </div>
+            )}
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+              URL listing (opzionale)
+            </span>
+            <input
+              type="url"
+              value={state.url}
+              onChange={(e) => onChange({ ...state, url: e.target.value })}
+              placeholder={meta.urlPlaceholder}
+              className="input mt-1"
+            />
+          </label>
+        </div>
+      )}
+    </div>
   );
 }
