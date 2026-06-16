@@ -1,6 +1,18 @@
 export type ArticleCondition = "NEW" | "USED" | "REFURBISHED" | "FOR_PARTS";
 export type ArticleStatus = "DRAFT" | "PUBLISHED" | "SOLD" | "ARCHIVED";
-export type VintedStatus = "NOT_LISTED" | "LISTED" | "SOLD";
+export type MarketplaceStatus = "NOT_LISTED" | "LISTED" | "SOLD";
+export type VintedStatus = MarketplaceStatus;
+export type EbayStatus = MarketplaceStatus;
+
+export interface MarketplaceFee {
+  id: number;
+  marketplace: string;
+  category: string | null;
+  markup_percent: string;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Article {
   id: number;
@@ -24,6 +36,11 @@ export interface Article {
   vinted_status: VintedStatus;
   vinted_url: string | null;
   vinted_synced_at: string | null;
+  vinted_price: string | null;
+  ebay_status: EbayStatus;
+  ebay_url: string | null;
+  ebay_synced_at: string | null;
+  ebay_price: string | null;
   created_at: string;
   updated_at: string;
   published_at: string | null;

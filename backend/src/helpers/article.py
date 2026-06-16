@@ -11,7 +11,13 @@ from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session
 
 from helpers import BaseHelper
-from models.db import Article, ArticleCondition, ArticleStatus, VintedStatus
+from models.db import (
+    Article,
+    ArticleCondition,
+    ArticleStatus,
+    EbayStatus,
+    VintedStatus,
+)
 from models.entities.article import ArticleUpdate
 from utils.session import get_db
 
@@ -77,15 +83,41 @@ class ArticleHelper(BaseHelper):
         article: Article,
         status: VintedStatus,
         url: Optional[str],
+        price: Optional[Decimal] = None,
     ) -> None:
         """Aggiorna i metadati Vinted. Se status=SOLD, marca l'articolo
         come SOLD nel catalogo principale (sparisce dalla vetrina)."""
         now = dt.now(datetime.UTC)
         article.vinted_status = status
         article.vinted_url = url.strip() if url else None
+        article.vinted_price = price
         article.vinted_synced_at = now
 
         if status == VintedStatus.SOLD and article.status != ArticleStatus.SOLD:
+            article.status = ArticleStatus.SOLD
+            if not article.sold_at:
+                article.sold_at = now
+
+        article.updated_at = now
+        self.db.commit()
+        self.db.refresh(article)
+
+    def set_ebay(
+        self,
+        article: Article,
+        status: EbayStatus,
+        url: Optional[str],
+        price: Optional[Decimal] = None,
+    ) -> None:
+        """Aggiorna i metadati eBay. Se status=SOLD, marca l'articolo
+        come SOLD nel catalogo principale (sparisce dalla vetrina)."""
+        now = dt.now(datetime.UTC)
+        article.ebay_status = status
+        article.ebay_url = url.strip() if url else None
+        article.ebay_price = price
+        article.ebay_synced_at = now
+
+        if status == EbayStatus.SOLD and article.status != ArticleStatus.SOLD:
             article.status = ArticleStatus.SOLD
             if not article.sold_at:
                 article.sold_at = now

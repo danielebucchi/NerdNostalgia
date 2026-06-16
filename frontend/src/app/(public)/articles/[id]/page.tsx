@@ -110,16 +110,28 @@ export default async function ArticleDetailPage({ params }: PageProps) {
             {article.dimensions_cm && <Row label="Dimensioni" value={article.dimensions_cm} />}
           </dl>
 
-          {article.vinted_status === "LISTED" && article.vinted_url && (
-            <a
-              href={article.vinted_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-6 inline-flex items-center gap-2 chip chip-pink"
-            >
-              🛍 Anche su Vinted ↗
-            </a>
-          )}
+          <div className="mt-6 flex flex-wrap gap-2">
+            {article.vinted_status === "LISTED" && article.vinted_url && (
+              <a
+                href={article.vinted_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="chip chip-pink"
+              >
+                🛍 Anche su Vinted ↗
+              </a>
+            )}
+            {article.ebay_status === "LISTED" && article.ebay_url && (
+              <a
+                href={article.ebay_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="chip chip-mint"
+              >
+                🏷 Anche su eBay ↗
+              </a>
+            )}
+          </div>
 
           <div className="mt-10">
             <ArticleActions

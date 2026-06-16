@@ -48,11 +48,14 @@ export function ArticleCard({ article }: { article: Article }) {
           {CONDITION_LABEL[article.condition]}
         </span>
 
-        {article.vinted_status === "LISTED" && article.vinted_url && (
-          <span className="chip chip-pink absolute top-3 right-3 text-[10px]">
-            🛍 Vinted
-          </span>
-        )}
+        <div className="absolute top-3 right-3 flex flex-col gap-1 items-end">
+          {article.vinted_status === "LISTED" && article.vinted_url && (
+            <span className="chip chip-pink text-[10px]">🛍 Vinted</span>
+          )}
+          {article.ebay_status === "LISTED" && article.ebay_url && (
+            <span className="chip chip-mint text-[10px]">🏷 eBay</span>
+          )}
+        </div>
 
         {article.status === "SOLD" && (
           <div className="absolute inset-0 bg-ink/70 flex items-center justify-center">
@@ -81,6 +84,20 @@ export function ArticleCard({ article }: { article: Article }) {
           <span className="display text-2xl text-pink-deep">{formatPrice(article)}</span>
           <span className="text-xs text-ink-soft">vedi →</span>
         </div>
+        {(article.vinted_price || article.ebay_price) && (
+          <div className="text-[10px] text-ink-soft flex flex-wrap gap-x-2">
+            {article.vinted_price && (
+              <span>
+                🛍 {formatPrice({ price: article.vinted_price, currency: article.currency })}
+              </span>
+            )}
+            {article.ebay_price && (
+              <span>
+                🏷 {formatPrice({ price: article.ebay_price, currency: article.currency })}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </Link>
   );

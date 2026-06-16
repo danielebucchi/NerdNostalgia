@@ -32,6 +32,13 @@ class VintedStatus(enum.Enum):
     SOLD = "SOLD"
 
 
+class EbayStatus(enum.Enum):
+    """Stato sincronizzazione con eBay."""
+    NOT_LISTED = "NOT_LISTED"
+    LISTED = "LISTED"
+    SOLD = "SOLD"
+
+
 class Article(BaseModel):
     """
     Modello articolo del sistema.
@@ -100,6 +107,18 @@ class Article(BaseModel):
     )
     vinted_url = Column(String(500))
     vinted_synced_at = Column(DateTime)
+    vinted_price = Column(Numeric(10, 2))
+
+    # eBay sync (manuale assistito)
+    ebay_status = Column(
+        Enum(EbayStatus, name="ebay_status", create_type=False),
+        nullable=False,
+        default=EbayStatus.NOT_LISTED,
+        index=True,
+    )
+    ebay_url = Column(String(500))
+    ebay_synced_at = Column(DateTime)
+    ebay_price = Column(Numeric(10, 2))
 
     # Timestamp aggiuntivi
     published_at = Column(DateTime)
