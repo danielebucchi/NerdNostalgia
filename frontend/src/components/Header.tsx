@@ -19,10 +19,10 @@ export function Header() {
           <LogoImage
             size={48}
             alt="NerdNostalgia"
-            className="w-12 h-12 rounded-full border-2 border-ink object-cover bg-cream"
+            className="w-12 h-12 rounded-full ring-1 ring-ink/10 object-cover bg-white shadow-soft"
           />
           <span className="display text-2xl sm:text-3xl text-ink leading-none">
-            Nerd<span className="text-pink-deep">.</span>Nostalgia
+            Nerd<span className="text-lilac-deep">.</span>Nostalgia
           </span>
         </Link>
 

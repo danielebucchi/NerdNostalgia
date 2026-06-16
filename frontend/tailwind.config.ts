@@ -39,13 +39,19 @@ const config: Config = {
         sans: ['"Manrope"', "ui-sans-serif", "system-ui", "sans-serif"],
       },
       borderRadius: {
-        chonk: "28px",
-        big: "22px",
+        chonk: "32px",
+        big: "24px",
       },
       boxShadow: {
-        soft: "0 18px 40px -18px rgba(61, 42, 92, 0.25)",
-        pop: "0 8px 0 0 rgba(61, 42, 92, 0.12)",
-        hover: "0 22px 50px -16px rgba(232, 121, 168, 0.45)",
+        soft: "0 14px 32px -14px rgba(61, 42, 92, 0.14)",
+        glow: "0 18px 40px -16px rgba(168, 144, 216, 0.4)",
+        hover: "0 24px 50px -20px rgba(61, 42, 92, 0.18)",
+      },
+      backgroundImage: {
+        "gradient-primary":
+          "linear-gradient(135deg, #f8a8c8 0%, #a890d8 100%)",
+        "gradient-soft":
+          "linear-gradient(135deg, #f6effd 0%, #ecf5f7 50%, #ecf7f1 100%)",
       },
     },
   },

@@ -53,7 +53,7 @@ export default async function HomePage() {
           <div className="hidden md:flex items-center justify-center relative">
             <LogoImage
               size={256}
-              className="w-64 h-64 rounded-full border-2 border-ink shadow-soft object-cover bg-cream"
+              className="w-64 h-64 rounded-full ring-1 ring-lilac-deep/20 shadow-glow object-cover bg-white"
               alt="NerdNostalgia logo"
             />
           </div>

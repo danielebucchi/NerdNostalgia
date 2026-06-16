@@ -58,8 +58,8 @@ export function ArticleCard({ article }: { article: Article }) {
         </div>
 
         {article.status === "SOLD" && (
-          <div className="absolute inset-0 bg-ink/70 flex items-center justify-center">
-            <span className="display text-2xl text-pink rotate-[-6deg] border-2 border-pink rounded-chonk px-4 py-1 bg-ink">
+          <div className="absolute inset-0 bg-ink/55 backdrop-blur-[2px] flex items-center justify-center">
+            <span className="display text-2xl text-white bg-white/15 backdrop-blur-md rounded-full px-5 py-1.5 ring-1 ring-white/40">
               Venduto
             </span>
           </div>
