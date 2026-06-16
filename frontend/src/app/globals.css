@@ -1,0 +1,180 @@
+@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #fff7ed;
+  --ink: #3d2a5c;
+  --pink: #f8a8c8;
+  --pink-deep: #e879a8;
+  --mint: #a8e6d4;
+  --sky: #b8e0e8;
+  --lilac: #d4c4f0;
+  --star: #fff4a8;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100%;
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01" on, "cv11" on;
+}
+
+body {
+  background-image:
+    radial-gradient(circle at 8% 8%, rgba(248, 168, 200, 0.25), transparent 35%),
+    radial-gradient(circle at 92% 18%, rgba(184, 224, 232, 0.32), transparent 38%),
+    radial-gradient(circle at 50% 110%, rgba(212, 196, 240, 0.32), transparent 50%),
+    linear-gradient(180deg, #fffaf3 0%, #fdf2f8 40%, #f0f7fa 100%);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(rgba(168, 230, 212, 0.45) 1px, transparent 1.4px),
+    radial-gradient(rgba(248, 168, 200, 0.4) 1px, transparent 1.4px);
+  background-size: 48px 48px, 64px 64px;
+  background-position: 0 0, 24px 24px;
+  opacity: 0.5;
+  z-index: -1;
+}
+
+h1,
+h2,
+h3,
+h4,
+.display {
+  font-family: "Fredoka", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+/* Pill button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.2rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border: 2px solid var(--ink);
+  transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--pink);
+  color: var(--ink);
+  box-shadow: 4px 4px 0 0 var(--ink);
+}
+
+.btn-primary:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0 0 var(--ink);
+  background: var(--pink-deep);
+}
+
+.btn-primary:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 0 var(--ink);
+}
+
+.btn-ghost {
+  background: white;
+  color: var(--ink);
+  box-shadow: 4px 4px 0 0 var(--ink);
+}
+
+.btn-ghost:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0 0 var(--ink);
+  background: var(--sky);
+}
+
+/* Card */
+.card {
+  background: white;
+  border: 2px solid var(--ink);
+  border-radius: 22px;
+  box-shadow: 6px 6px 0 0 rgba(61, 42, 92, 0.12);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.card-clickable:hover {
+  transform: translateY(-3px);
+  box-shadow: 10px 10px 0 0 rgba(232, 121, 168, 0.35);
+}
+
+/* Pill badge */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1.5px solid var(--ink);
+  background: white;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.chip-pink { background: var(--pink); }
+.chip-mint { background: var(--mint); }
+.chip-sky { background: var(--sky); }
+.chip-lilac { background: var(--lilac); }
+.chip-star { background: var(--star); }
+
+/* Topbar */
+.topbar {
+  background: var(--ink);
+  color: var(--cream, #fff7ed);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 0.5rem 1rem;
+  letter-spacing: 0.02em;
+}
+
+/* Sticky header */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(255, 247, 237, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 2px solid var(--ink);
+}
+
+/* Hero blob */
+.hero-blob {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(248, 168, 200, 0.5), transparent 60%),
+    radial-gradient(circle at 70% 80%, rgba(168, 230, 212, 0.45), transparent 55%),
+    linear-gradient(135deg, #fce4ee 0%, #efe9fa 50%, #e0f5ec 100%);
+  border: 2px solid var(--ink);
+  border-radius: 28px;
+}
+
+/* Sparkle decorations */
+.sparkle::before,
+.sparkle::after {
+  content: "✦";
+  color: var(--pink-deep);
+  margin: 0 0.5rem;
+  font-size: 1.1em;
+}
