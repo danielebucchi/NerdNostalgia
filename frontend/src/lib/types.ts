@@ -57,3 +57,30 @@ export interface InquiryCreate {
   subject?: string;
   message: string;
 }
+
+export type WantedStatus = "ACTIVE" | "FULFILLED" | "CLOSED";
+
+export interface WantedItem {
+  id: number;
+  title: string;
+  description: string | null;
+  category: string | null;
+  brand: string | null;
+  model: string | null;
+  preferred_condition: ArticleCondition | null;
+  max_price: string | null;
+  currency: string;
+  notes: string | null;
+  priority: number;
+  status: WantedStatus;
+  created_at: string;
+  updated_at: string;
+  fulfilled_at: string | null;
+}
+
+export interface WantedListResponse {
+  items: WantedItem[];
+  total: number;
+  skip: number;
+  limit: number;
+}
