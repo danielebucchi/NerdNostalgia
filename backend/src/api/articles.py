@@ -9,13 +9,21 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from helpers.article import ArticleHelper, get_article_helper
 from helpers.auth import require_admin
 from helpers.user import UserHelper, get_user_helper
-from models.db import Article, ArticleCondition, ArticleStatus, User, VintedStatus
+from models.db import (
+    Article,
+    ArticleCondition,
+    ArticleStatus,
+    EbayStatus,
+    User,
+    VintedStatus,
+)
 from models.entities.article import (
     ArticleCreate,
     ArticleImageAdd,
     ArticleListResponse,
     ArticleResponse,
     ArticleUpdate,
+    EbaySyncUpdate,
     ReorderRequest,
     VintedSyncUpdate,
 )
@@ -63,6 +71,9 @@ def _to_response(article: Article) -> ArticleResponse:
         vinted_status=article.vinted_status.value if article.vinted_status else "NOT_LISTED",
         vinted_url=article.vinted_url,
         vinted_synced_at=article.vinted_synced_at.isoformat() if article.vinted_synced_at else None,
+        ebay_status=article.ebay_status.value if article.ebay_status else "NOT_LISTED",
+        ebay_url=article.ebay_url,
+        ebay_synced_at=article.ebay_synced_at.isoformat() if article.ebay_synced_at else None,
         created_at=article.created_at.isoformat() if article.created_at else None,
         updated_at=article.updated_at.isoformat() if article.updated_at else None,
         published_at=article.published_at.isoformat() if article.published_at else None,
@@ -299,6 +310,29 @@ def update_vinted_sync(
         article,
         VintedStatus(payload.vinted_status.value),
         payload.vinted_url,
+    )
+    return _to_response(article)
+
+
+@router.patch("/{article_id}/ebay", response_model=ArticleResponse)
+def update_ebay_sync(
+    article_id: int,
+    payload: EbaySyncUpdate,
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Aggiorna stato e URL eBay dell'articolo. Se ebay_status=SOLD,
+    l'articolo viene marcato come SOLD anche nel catalogo principale."""
+    article = article_helper.get("id", article_id)
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Articolo con ID {article_id} non trovato",
+        )
+    article_helper.set_ebay(
+        article,
+        EbayStatus(payload.ebay_status.value),
+        payload.ebay_url,
     )
     return _to_response(article)
 

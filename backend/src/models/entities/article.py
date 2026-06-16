@@ -28,6 +28,12 @@ class VintedStatus(str, enum.Enum):
     SOLD = "SOLD"
 
 
+class EbayStatus(str, enum.Enum):
+    NOT_LISTED = "NOT_LISTED"
+    LISTED = "LISTED"
+    SOLD = "SOLD"
+
+
 class ArticleCreate(BaseModel):
     user_id: int = Field(..., description="ID utente proprietario")
     title: str = Field(..., min_length=1, max_length=255)
@@ -93,6 +99,9 @@ class ArticleResponse(BaseModel):
     vinted_status: VintedStatus = VintedStatus.NOT_LISTED
     vinted_url: Optional[str] = None
     vinted_synced_at: Optional[str] = None
+    ebay_status: EbayStatus = EbayStatus.NOT_LISTED
+    ebay_url: Optional[str] = None
+    ebay_synced_at: Optional[str] = None
     created_at: str
     updated_at: str
     published_at: Optional[str]
@@ -113,3 +122,8 @@ class ReorderRequest(BaseModel):
 class VintedSyncUpdate(BaseModel):
     vinted_status: VintedStatus
     vinted_url: Optional[str] = Field(None, max_length=500)
+
+
+class EbaySyncUpdate(BaseModel):
+    ebay_status: EbayStatus
+    ebay_url: Optional[str] = Field(None, max_length=500)
