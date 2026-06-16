@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatPrice, getArticle } from "@/lib/api";
+import { ArticleActions } from "@/components/ArticleActions";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -109,17 +110,13 @@ export default async function ArticleDetailPage({ params }: PageProps) {
             {article.dimensions_cm && <Row label="Dimensioni" value={article.dimensions_cm} />}
           </dl>
 
-          <div className="mt-10 flex flex-wrap gap-3">
-            <button type="button" className="btn btn-primary" disabled>
-              Aggiungi al carrello
-            </button>
-            <button type="button" className="btn btn-ghost" disabled>
-              Chiedi info
-            </button>
+          <div className="mt-10">
+            <ArticleActions
+              articleId={article.id}
+              articleTitle={article.title}
+              sold={article.status === "SOLD"}
+            />
           </div>
-          <p className="mt-3 text-xs text-ink-soft">
-            Carrello e form contatti arrivano nelle prossime fasi.
-          </p>
         </div>
       </div>
     </article>
