@@ -47,18 +47,18 @@ export function ArticleCard({ article }: { article: Article }) {
           {CONDITION_LABEL[article.condition]}
         </span>
 
-        {/* Marketplace: solo loghi, in basso a sinistra. Pillole uniformi. */}
+        {/* Marketplace: pillole compatte uniformi in basso a sinistra. */}
         {((article.vinted_status === "LISTED" && article.vinted_url) ||
           (article.ebay_status === "LISTED" && article.ebay_url)) && (
-          <div className="absolute bottom-2 left-2 flex gap-1.5 pointer-events-none">
+          <div className="absolute bottom-2 left-2 flex gap-1 pointer-events-none">
             {article.vinted_status === "LISTED" && article.vinted_url && (
-              <span className="inline-flex items-center bg-white/85 backdrop-blur rounded-full h-7 px-2.5 ring-1 ring-ink/10 shadow-soft">
-                <MarketplaceLogo marketplace="vinted" height={14} />
+              <span className="inline-flex items-center bg-white/90 backdrop-blur rounded-full h-5 px-1.5 ring-1 ring-ink/10 shadow-soft">
+                <MarketplaceLogo marketplace="vinted" height={10} />
               </span>
             )}
             {article.ebay_status === "LISTED" && article.ebay_url && (
-              <span className="inline-flex items-center bg-white/85 backdrop-blur rounded-full h-7 px-2.5 ring-1 ring-ink/10 shadow-soft">
-                <MarketplaceLogo marketplace="ebay" height={14} />
+              <span className="inline-flex items-center bg-white/90 backdrop-blur rounded-full h-5 px-1.5 ring-1 ring-ink/10 shadow-soft">
+                <MarketplaceLogo marketplace="ebay" height={10} />
               </span>
             )}
           </div>
