@@ -34,16 +34,18 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="card w-full max-w-md p-8">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6">
+      <div className="card w-full max-w-md p-6 sm:p-8">
         <Link href="/" className="display text-xl text-ink block mb-1">
-          Nerd<span className="text-pink-deep">.</span>Nostalgia
+          Nerd<span className="text-lilac-deep">.</span>Nostalgia
         </Link>
-        <p className="text-xs text-ink-soft uppercase tracking-wider mb-6">Area admin</p>
+        <p className="text-[10px] text-ink-soft uppercase tracking-[0.16em] mb-6">
+          Area admin
+        </p>
 
         <h1 className="display text-2xl text-ink mb-2">Accedi</h1>
         <p className="text-ink-soft text-sm mb-6">
-          Inserisci le tue credenziali admin per gestire catalogo, richieste e wishlist.
+          Inserisci le tue credenziali per gestire catalogo, richieste e wishlist.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -58,7 +60,7 @@ export default function AdminLoginPage() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="input mt-1"
+              className="admin-input mt-1.5"
             />
           </label>
           <label className="block">
@@ -71,39 +73,50 @@ export default function AdminLoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="input mt-1"
+              className="admin-input mt-1.5"
             />
           </label>
 
-          {error && <p className="text-pink-deep text-sm font-semibold">⚠ {error}</p>}
+          {error && (
+            <p className="text-pink-deep text-sm font-semibold">⚠ {error}</p>
+          )}
 
-          <button type="submit" className="btn btn-primary w-full justify-center" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn btn-primary w-full justify-center mt-2"
+            disabled={submitting}
+          >
             {submitting ? "Accesso in corso…" : "Entra"}
           </button>
         </form>
 
-        <p className="text-xs text-ink-soft mt-4 text-center">
-          <Link href="/" className="underline">← Torna al sito</Link>
+        <p className="text-xs text-ink-soft mt-5 text-center">
+          <Link href="/" className="underline hover:text-ink">
+            ← Torna al sito
+          </Link>
         </p>
       </div>
 
       <style>{`
-        .input {
+        .admin-input {
           display: block;
           width: 100%;
-          padding: 0.6rem 0.85rem;
-          border: 2px solid #3d2a5c;
-          border-radius: 12px;
-          background: #fffaf3;
+          padding: 0.65rem 0.9rem;
+          border: 1px solid rgba(61, 42, 92, 0.12);
+          border-radius: 14px;
+          background: rgba(255, 255, 255, 0.78);
+          backdrop-filter: blur(8px);
           color: #3d2a5c;
           font-family: "Manrope", sans-serif;
           font-size: 0.95rem;
           outline: none;
-          transition: box-shadow 120ms ease, border-color 120ms ease;
+          transition:
+            box-shadow 150ms ease,
+            border-color 150ms ease;
         }
-        .input:focus {
-          box-shadow: 0 0 0 3px rgba(248, 168, 200, 0.45);
-          border-color: #e879a8;
+        .admin-input:focus {
+          border-color: var(--lilac-deep);
+          box-shadow: 0 0 0 3px rgba(168, 144, 216, 0.25);
         }
       `}</style>
     </div>

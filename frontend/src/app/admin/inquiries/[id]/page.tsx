@@ -182,7 +182,7 @@ export default function AdminInquiryDetailPage({ params }: PageProps) {
           <style>{`
             .input {
               padding: 0.6rem 0.85rem;
-              border: 2px solid #3d2a5c;
+              border: 1px solid rgba(61, 42, 92, 0.12);
               border-radius: 12px;
               background: #fffaf3;
               color: #3d2a5c;

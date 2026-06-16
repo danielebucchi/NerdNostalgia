@@ -235,7 +235,7 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
               key={m}
               type="button"
               onClick={() => setPrice(calcMarkup(article.price, m))}
-              className="text-[11px] font-bold px-2 py-1 rounded-lg border-2 border-ink hover:bg-mint-soft"
+              className="text-[11px] font-bold px-2.5 py-1 rounded-full ring-1 ring-ink/15 bg-white/80 backdrop-blur hover:ring-lilac-deep hover:bg-lilac-soft transition-all"
               title={`Calcola ${article.price} ${article.currency} + ${m}% = ${calcMarkup(article.price, m)} ${article.currency}`}
             >
               {m === 0 ? "uguale" : `+${m}%`}
@@ -245,7 +245,7 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
             <button
               type="button"
               onClick={() => setPrice("")}
-              className="text-[11px] font-bold px-2 py-1 rounded-lg border-2 border-ink/30 hover:border-ink"
+              className="text-[11px] font-bold px-2.5 py-1 rounded-full ring-1 ring-ink/10 text-ink-soft bg-white/60 hover:ring-ink/30 hover:text-ink transition-all"
             >
               ✕ vuota
             </button>
@@ -356,7 +356,7 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
           display: block;
           width: 100%;
           padding: 0.55rem 0.8rem;
-          border: 2px solid #3d2a5c;
+          border: 1px solid rgba(61, 42, 92, 0.12);
           border-radius: 12px;
           background: #fffaf3;
           color: #3d2a5c;

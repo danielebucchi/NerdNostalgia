@@ -45,39 +45,84 @@ export default function AdminDashboardPage() {
 
   return (
     <AdminShell>
-      <h1 className="display text-3xl text-ink">Dashboard</h1>
-      <p className="text-ink-soft mt-1">
+      <h1 className="display text-2xl sm:text-3xl text-ink">Dashboard</h1>
+      <p className="text-ink-soft mt-1 text-sm sm:text-base">
         Riepilogo a colpo d&apos;occhio dello stato del negozio.
       </p>
 
       {error && (
-        <div className="card p-4 mt-6 text-pink-deep">⚠ {error}</div>
+        <div className="card p-4 mt-6 text-pink-deep font-semibold">⚠ {error}</div>
       )}
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-        <Stat label="Articoli pubblicati" value={stats?.articlesPublished} href="/admin/articles?status=PUBLISHED" tone="mint" />
-        <Stat label="Bozze" value={stats?.articlesDraft} href="/admin/articles?status=DRAFT" tone="lilac" />
-        <Stat label="Richieste nuove" value={stats?.inquiriesNew} hint={stats ? `su ${stats.inquiriesTotal}` : ""} href="/admin/inquiries?status=NEW" tone="pink" />
-        <Stat label="Wanted attivi" value={stats?.wantedActive} href="/admin/wanted" tone="sky" />
+        <Stat
+          label="Articoli pubblicati"
+          value={stats?.articlesPublished}
+          href="/admin/articles?status=PUBLISHED"
+          tone="mint"
+          icon="🎮"
+        />
+        <Stat
+          label="Bozze"
+          value={stats?.articlesDraft}
+          href="/admin/articles?status=DRAFT"
+          tone="lilac"
+          icon="📝"
+        />
+        <Stat
+          label="Richieste nuove"
+          value={stats?.inquiriesNew}
+          hint={stats ? `su ${stats.inquiriesTotal}` : ""}
+          href="/admin/inquiries?status=NEW"
+          tone="pink"
+          icon="✉"
+        />
+        <Stat
+          label="Wanted attivi"
+          value={stats?.wantedActive}
+          href="/admin/wanted"
+          tone="sky"
+          icon="🔍"
+        />
       </div>
 
-      <div className="mt-10 grid sm:grid-cols-2 gap-4">
-        <Link href="/admin/articles/new" className="card card-clickable p-6">
-          <h3 className="display text-lg text-ink">➕ Nuovo articolo</h3>
-          <p className="text-ink-soft text-sm mt-1">
-            Aggiungi un nuovo pezzo al catalogo (bozza o subito pubblicato).
-          </p>
+      <div className="mt-8 sm:mt-10 grid sm:grid-cols-2 gap-4">
+        <Link
+          href="/admin/articles/new"
+          className="card card-clickable p-5 sm:p-6 flex items-start gap-4"
+        >
+          <span className="text-3xl">➕</span>
+          <div>
+            <h3 className="display text-lg text-ink">Nuovo articolo</h3>
+            <p className="text-ink-soft text-sm mt-1 leading-relaxed">
+              Aggiungi un nuovo pezzo al catalogo (bozza o subito pubblicato).
+            </p>
+          </div>
         </Link>
-        <Link href="/admin/wanted/new" className="card card-clickable p-6">
-          <h3 className="display text-lg text-ink">🔍 Nuovo wanted</h3>
-          <p className="text-ink-soft text-sm mt-1">
-            Pubblica una richiesta di acquisto nella sezione &laquo;Cerco/Compro&raquo;.
-          </p>
+        <Link
+          href="/admin/wanted/new"
+          className="card card-clickable p-5 sm:p-6 flex items-start gap-4"
+        >
+          <span className="text-3xl">🔍</span>
+          <div>
+            <h3 className="display text-lg text-ink">Nuovo wanted</h3>
+            <p className="text-ink-soft text-sm mt-1 leading-relaxed">
+              Pubblica una richiesta di acquisto nella sezione
+              &laquo;Cerco/Compro&raquo;.
+            </p>
+          </div>
         </Link>
       </div>
     </AdminShell>
   );
 }
+
+const TONE_BG: Record<string, string> = {
+  pink: "from-pink/30 to-pink-soft",
+  mint: "from-mint/30 to-mint-soft",
+  sky: "from-sky/30 to-sky-soft",
+  lilac: "from-lilac/30 to-lilac-soft",
+};
 
 function Stat({
   label,
@@ -85,24 +130,36 @@ function Stat({
   hint,
   href,
   tone,
+  icon,
 }: {
   label: string;
   value: number | undefined;
   hint?: string;
   href: string;
   tone: "pink" | "mint" | "sky" | "lilac";
+  icon: string;
 }) {
-  const ring: Record<string, string> = {
-    pink: "border-pink-deep",
-    mint: "border-mint-deep",
-    sky: "border-sky-deep",
-    lilac: "border-lilac-deep",
-  };
   return (
-    <Link href={href} className={`card card-clickable p-5 block ${ring[tone]}`}>
-      <p className="text-xs uppercase tracking-wider text-ink-soft">{label}</p>
-      <p className="display text-4xl text-ink mt-2">{value ?? "…"}</p>
-      {hint && <p className="text-xs text-ink-soft mt-1">{hint}</p>}
+    <Link
+      href={href}
+      className="card card-clickable p-5 block relative overflow-hidden"
+    >
+      <div
+        className={`absolute -top-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-br ${TONE_BG[tone]} blur-xl pointer-events-none`}
+        aria-hidden="true"
+      />
+      <div className="relative">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs uppercase tracking-wider text-ink-soft">
+            {label}
+          </p>
+          <span className="text-lg opacity-60">{icon}</span>
+        </div>
+        <p className="display text-4xl text-ink leading-none">
+          {value ?? "…"}
+        </p>
+        {hint && <p className="text-xs text-ink-soft mt-2">{hint}</p>}
+      </div>
     </Link>
   );
 }
