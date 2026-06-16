@@ -1,11 +1,28 @@
 import Link from "next/link";
 import { LogoImage } from "@/components/LogoImage";
 
+const TOPBAR_MESSAGES = [
+  "Compro · Vendo · Scambio",
+  "Videogiochi, carte Pokémon, Funko & nerderie",
+  "Spedizioni in tutta Italia",
+];
+
 export function Topbar() {
   return (
-    <div className="topbar">
-      <span className="sparkle">
-        Compro · Vendo · Scambio · Videogiochi, carte Pokémon e nerderie · Spedizioni in tutta Italia
+    <div className="topbar overflow-hidden">
+      {/* Su mobile (<sm): scorrimento orizzontale marquee */}
+      <div className="sm:hidden marquee">
+        <div className="marquee-track">
+          {[...TOPBAR_MESSAGES, ...TOPBAR_MESSAGES].map((m, i) => (
+            <span key={i} className="marquee-item">
+              <span className="opacity-60">✦</span> {m}
+            </span>
+          ))}
+        </div>
+      </div>
+      {/* Da sm in su: testo statico */}
+      <span className="hidden sm:inline sparkle">
+        {TOPBAR_MESSAGES.join(" · ")}
       </span>
     </div>
   );
@@ -14,28 +31,42 @@ export function Topbar() {
 export function Header() {
   return (
     <header className="site-header">
-      <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-3" aria-label="NerdNostalgia home">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+        <Link
+          href="/"
+          className="flex items-center gap-2 sm:gap-3 min-w-0"
+          aria-label="NerdNostalgia home"
+        >
           <LogoImage
             size={48}
             alt="NerdNostalgia"
-            className="w-12 h-12 rounded-full ring-1 ring-ink/10 object-cover bg-white shadow-soft"
+            className="w-10 h-10 sm:w-12 sm:h-12 rounded-full ring-1 ring-ink/10 object-cover bg-white shadow-soft flex-shrink-0"
           />
-          <span className="display text-2xl sm:text-3xl text-ink leading-none">
+          <span className="display text-lg sm:text-2xl md:text-3xl text-ink leading-none truncate">
             Nerd<span className="text-lilac-deep">.</span>Nostalgia
           </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-2">
+        <nav className="hidden md:flex items-center gap-2 flex-shrink-0">
           <Link href="/" className="btn btn-ghost text-sm">Catalogo</Link>
           <Link href="/cerco-compro" className="btn btn-ghost text-sm">Cerco/Compro</Link>
           <Link href="/contatti" className="btn btn-primary text-sm">Contattami</Link>
         </nav>
 
-        <nav className="flex md:hidden gap-2">
-          <Link href="/" className="btn btn-ghost text-xs px-3 py-2">Catalogo</Link>
-          <Link href="/cerco-compro" className="btn btn-ghost text-xs px-3 py-2">Cerco</Link>
-          <Link href="/contatti" className="btn btn-primary text-xs px-3 py-2">Scrivi</Link>
+        <nav className="flex md:hidden gap-1.5 flex-shrink-0">
+          <Link
+            href="/cerco-compro"
+            className="btn btn-ghost text-xs px-2.5 py-1.5"
+            aria-label="Cerco / Compro"
+          >
+            🔍
+          </Link>
+          <Link
+            href="/contatti"
+            className="btn btn-primary text-xs px-3 py-1.5"
+          >
+            Scrivi
+          </Link>
         </nav>
       </div>
     </header>
@@ -44,13 +75,13 @@ export function Header() {
 
 export function Footer() {
   return (
-    <footer className="mt-20 border-t-2 border-ink/20 bg-cream/60 backdrop-blur">
-      <div className="mx-auto max-w-6xl px-6 py-10 grid gap-8 sm:grid-cols-3">
+    <footer className="mt-16 sm:mt-20 border-t border-ink/15 bg-white/40 backdrop-blur">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10 grid gap-6 sm:gap-8 sm:grid-cols-3">
         <div>
-          <h3 className="display text-xl text-ink">Nerd.Nostalgia</h3>
+          <h3 className="display text-lg sm:text-xl text-ink">Nerd.Nostalgia</h3>
           <p className="text-ink-soft mt-2 text-sm leading-relaxed">
-            Un piccolo angolo nerd dove ridare casa a videogiochi, carte e gadget che
-            hanno fatto la storia (almeno la mia).
+            Un piccolo angolo nerd dove ridare casa a videogiochi, carte e gadget
+            che hanno fatto la storia (almeno la mia).
           </p>
         </div>
         <div>
@@ -67,13 +98,17 @@ export function Footer() {
           <p className="text-sm text-ink-soft">
             Scrivimi per qualsiasi richiesta o per propormi un acquisto.
           </p>
-          <p className="text-sm text-pink-deep font-semibold mt-2">
+          <a
+            href="mailto:info@nerdnostalgia.it"
+            className="text-sm text-lilac-deep font-semibold mt-2 inline-block hover:underline"
+          >
             info@nerdnostalgia.it
-          </p>
+          </a>
         </div>
       </div>
-      <div className="text-center text-xs text-ink-soft pb-6">
-        © {new Date().getFullYear()} NerdNostalgia · made with <span className="text-pink-deep">♥</span>
+      <div className="text-center text-xs text-ink-soft pb-6 px-4">
+        © {new Date().getFullYear()} NerdNostalgia · made with{" "}
+        <span className="text-pink-deep">♥</span>
       </div>
     </footer>
   );

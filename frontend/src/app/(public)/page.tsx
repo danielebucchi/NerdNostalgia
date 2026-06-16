@@ -28,26 +28,36 @@ export default async function HomePage() {
   return (
     <>
       {/* Hero */}
-      <section className="hero-blob p-8 sm:p-12 mb-12 relative overflow-hidden">
+      <section className="hero-blob p-6 sm:p-10 md:p-12 mb-10 sm:mb-12 relative overflow-hidden">
+        {/* Logo mobile (sopra il testo) */}
+        <div className="md:hidden flex justify-center mb-5">
+          <LogoImage
+            size={160}
+            className="w-32 h-32 rounded-full ring-1 ring-lilac-deep/20 shadow-glow object-cover bg-white"
+            alt="NerdNostalgia logo"
+          />
+        </div>
         <div className="grid gap-8 md:grid-cols-[1.4fr_1fr] items-center">
-          <div>
-            <span className="chip chip-pink mb-4">★ nuovi arrivi ogni settimana</span>
-            <h1 className="display text-3xl sm:text-5xl text-ink leading-[1.05] mb-4">
+          <div className="text-center md:text-left">
+            <span className="chip chip-pink mb-4 inline-flex">
+              ★ nuovi arrivi ogni settimana
+            </span>
+            <h1 className="display text-3xl sm:text-4xl md:text-5xl text-ink leading-[1.1] mb-4">
               Le tue <span className="text-pink-deep">nerderie</span>,
-              <br />
+              <br className="hidden sm:inline" />{" "}
               casa dolce casa.
             </h1>
-            <p className="text-ink-soft text-lg max-w-md leading-relaxed">
-              Videogiochi vintage, carte Pokémon, Funko e gadget retro selezionati con
-              cura. Spedizione veloce in tutta Italia.
+            <p className="text-ink-soft text-base sm:text-lg max-w-md mx-auto md:mx-0 leading-relaxed">
+              Videogiochi vintage, carte Pokémon, Funko e gadget retro selezionati
+              con cura. Spedizione veloce in tutta Italia.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3 justify-center md:justify-start">
               <Link href="#catalogo" className="btn btn-primary">
                 Sfoglia il catalogo →
               </Link>
-              <a href="#" className="btn btn-ghost" aria-disabled>
+              <Link href="/cerco-compro" className="btn btn-ghost">
                 Vendi le tue cose
-              </a>
+              </Link>
             </div>
           </div>
           <div className="hidden md:flex items-center justify-center relative">
