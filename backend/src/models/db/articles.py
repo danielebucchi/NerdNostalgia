@@ -81,6 +81,9 @@ class Article(BaseModel):
     images = Column(JSONB, default=list)
     article_metadata = Column(JSONB, default=dict)
 
+    # Ordinamento manuale del catalogo (piu' basso = prima)
+    display_order = Column(Integer, nullable=False, default=0, index=True)
+
     # Timestamp aggiuntivi
     published_at = Column(DateTime)
     sold_at = Column(DateTime)
