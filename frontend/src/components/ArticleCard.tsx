@@ -92,15 +92,23 @@ export function ArticleCard({ article }: { article: Article }) {
           <span className="text-xs text-ink-soft">vedi →</span>
         </div>
         {(article.vinted_price || article.ebay_price) && (
-          <div className="text-[10px] text-ink-soft flex flex-wrap gap-x-2">
+          <div className="text-[11px] text-ink-soft flex flex-wrap items-center gap-x-3 gap-y-1">
             {article.vinted_price && (
-              <span>
-                🛍 {formatPrice({ price: article.vinted_price, currency: article.currency })}
+              <span className="inline-flex items-center gap-1.5">
+                <MarketplaceLogo marketplace="vinted" height={12} />
+                {formatPrice({
+                  price: article.vinted_price,
+                  currency: article.currency,
+                })}
               </span>
             )}
             {article.ebay_price && (
-              <span>
-                🏷 {formatPrice({ price: article.ebay_price, currency: article.currency })}
+              <span className="inline-flex items-center gap-1.5">
+                <MarketplaceLogo marketplace="ebay" height={12} />
+                {formatPrice({
+                  price: article.ebay_price,
+                  currency: article.currency,
+                })}
               </span>
             )}
           </div>
