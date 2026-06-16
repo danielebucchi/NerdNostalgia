@@ -8,14 +8,14 @@ export default function ContattiPage() {
 
   return (
     <section>
-      <div className="hero-blob p-8 sm:p-12 mb-12 text-center">
-        <span className="chip chip-mint mb-4">Scrivimi</span>
-        <h1 className="display text-3xl sm:text-5xl text-ink leading-tight">
+      <div className="hero-blob p-6 sm:p-10 md:p-12 mb-10 sm:mb-12 text-center">
+        <span className="chip chip-mint mb-4 inline-flex">Scrivimi</span>
+        <h1 className="display text-3xl sm:text-4xl md:text-5xl text-ink leading-tight">
           Mi serve solo una <span className="text-pink-deep">scintilla nerd</span>.
         </h1>
-        <p className="text-ink-soft text-lg max-w-xl mx-auto mt-4">
-          Hai un dubbio su un articolo? Vuoi propormi qualcosa che non vedi nel catalogo?
-          Scrivimi: rispondo a tutti, prometto.
+        <p className="text-ink-soft text-base sm:text-lg max-w-xl mx-auto mt-4">
+          Hai un dubbio su un articolo? Vuoi propormi qualcosa che non vedi nel
+          catalogo? Scrivimi: rispondo a tutti, prometto.
         </p>
         <div className="mt-6">
           <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>

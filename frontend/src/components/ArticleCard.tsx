@@ -29,7 +29,7 @@ export function ArticleCard({ article }: { article: Article }) {
 
   return (
     <Link href={`/articles/${article.id}`} className="card card-clickable block overflow-hidden">
-      <div className="aspect-square w-full bg-cream relative overflow-hidden border-b-2 border-ink/15">
+      <div className="aspect-square w-full bg-cream/40 relative overflow-hidden">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -44,22 +44,24 @@ export function ArticleCard({ article }: { article: Article }) {
           </div>
         )}
 
-        <span className={`chip ${conditionClass} absolute top-3 left-3`}>
-          {CONDITION_LABEL[article.condition]}
-        </span>
-
-        <div className="absolute top-3 right-3 flex flex-col gap-1 items-end">
-          {article.vinted_status === "LISTED" && article.vinted_url && (
-            <span className="chip chip-pink text-[10px]">🛍 Vinted</span>
-          )}
-          {article.ebay_status === "LISTED" && article.ebay_url && (
-            <span className="chip chip-mint text-[10px]">🏷 eBay</span>
-          )}
+        {/* Riga unica di chip in alto, scorrevole se non ci stanno */}
+        <div className="absolute top-2 left-2 right-2 flex items-start gap-1 flex-wrap pointer-events-none">
+          <span className={`chip ${conditionClass} text-[10px]`}>
+            {CONDITION_LABEL[article.condition]}
+          </span>
+          <span className="ml-auto flex gap-1 flex-wrap justify-end">
+            {article.vinted_status === "LISTED" && article.vinted_url && (
+              <span className="chip chip-pink text-[10px]">🛍</span>
+            )}
+            {article.ebay_status === "LISTED" && article.ebay_url && (
+              <span className="chip chip-mint text-[10px]">🏷</span>
+            )}
+          </span>
         </div>
 
         {article.status === "SOLD" && (
           <div className="absolute inset-0 bg-ink/55 backdrop-blur-[2px] flex items-center justify-center">
-            <span className="display text-2xl text-white bg-white/15 backdrop-blur-md rounded-full px-5 py-1.5 ring-1 ring-white/40">
+            <span className="display text-xl sm:text-2xl text-white bg-white/15 backdrop-blur-md rounded-full px-5 py-1.5 ring-1 ring-white/40">
               Venduto
             </span>
           </div>
