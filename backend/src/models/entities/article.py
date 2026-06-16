@@ -7,6 +7,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
+from models.entities.category import CategoryResponse
+
 
 class ArticleCondition(str, enum.Enum):
     NEW = "NEW"
@@ -40,7 +42,7 @@ class ArticleCreate(BaseModel):
     description: Optional[str] = None
     price: Decimal = Field(..., ge=0, max_digits=10, decimal_places=2)
     currency: str = Field("EUR", min_length=3, max_length=3)
-    category: Optional[str] = Field(None, max_length=100)
+    category_id: Optional[int] = Field(None, description="FK categoria/sottocategoria")
     condition: ArticleCondition = ArticleCondition.USED
     status: ArticleStatus = ArticleStatus.DRAFT
     quantity: int = Field(1, ge=0)
@@ -58,7 +60,7 @@ class ArticleUpdate(BaseModel):
     description: Optional[str] = None
     price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
     currency: Optional[str] = Field(None, min_length=3, max_length=3)
-    category: Optional[str] = Field(None, max_length=100)
+    category_id: Optional[int] = None
     condition: Optional[ArticleCondition] = None
     status: Optional[ArticleStatus] = None
     quantity: Optional[int] = Field(None, ge=0)
@@ -84,7 +86,9 @@ class ArticleResponse(BaseModel):
     description: Optional[str]
     price: Decimal
     currency: str
-    category: Optional[str]
+    category_id: Optional[int] = None
+    category: Optional[CategoryResponse] = None
+    parent_category: Optional[CategoryResponse] = None
     condition: ArticleCondition
     status: ArticleStatus
     quantity: int

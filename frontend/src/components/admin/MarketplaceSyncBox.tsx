@@ -113,7 +113,12 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
   const config = CONFIGS[marketplace];
   const current = getMarketplaceData(article, marketplace);
   const { fees } = useMarketplaceFees();
-  const markups = getMarkupsFromFees(fees, marketplace, article.category);
+  const markups = getMarkupsFromFees(
+    fees,
+    marketplace,
+    article.category_id,
+    article.parent_category?.id ?? article.category?.parent_id ?? null,
+  );
 
   const [status, setStatus] = useState<MarketplaceStatus>(current.status);
   const [url, setUrl] = useState<string>(current.url ?? "");

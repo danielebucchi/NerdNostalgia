@@ -37,7 +37,7 @@ class ArticleHelper(BaseHelper):
         skip: int = 0,
         limit: int = 100,
         status: Optional[ArticleStatus] = None,
-        category: Optional[str] = None,
+        category_ids: Optional[List[int]] = None,
         condition: Optional[ArticleCondition] = None,
         brand: Optional[str] = None,
         user_id: Optional[int] = None,
@@ -49,8 +49,8 @@ class ArticleHelper(BaseHelper):
 
         if status is not None:
             query = query.filter(Article.status == status)
-        if category:
-            query = query.filter(Article.category == category)
+        if category_ids:
+            query = query.filter(Article.category_id.in_(category_ids))
         if condition is not None:
             query = query.filter(Article.condition == condition)
         if brand:

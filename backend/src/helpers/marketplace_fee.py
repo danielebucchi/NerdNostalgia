@@ -29,7 +29,7 @@ class MarketplaceFeeHelper(BaseHelper):
             query = query.filter(MarketplaceFee.marketplace == marketplace)
         return query.order_by(
             asc(MarketplaceFee.marketplace),
-            nulls_first(asc(MarketplaceFee.category)),
+            nulls_first(asc(MarketplaceFee.category_id)),
             asc(MarketplaceFee.markup_percent),
         ).all()
 

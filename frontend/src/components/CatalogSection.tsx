@@ -4,6 +4,20 @@ import { useMemo, useState } from "react";
 import { ArticleCard } from "@/components/ArticleCard";
 import type { Article, ArticleCondition } from "@/lib/types";
 
+/** Slug top-level di un articolo (sé stesso se categoria top, altrimenti il parent). */
+function topSlugOf(article: Article): string | null {
+  if (!article.category) return null;
+  if (article.category.parent_id == null) return article.category.slug;
+  return article.parent_category?.slug ?? null;
+}
+
+/** Slug della sottocategoria (null se l'articolo ha solo categoria top-level). */
+function subSlugOf(article: Article): string | null {
+  if (!article.category) return null;
+  if (article.category.parent_id == null) return null;
+  return article.category.slug;
+}
+
 const CONDITION_LABEL: Record<ArticleCondition, string> = {
   NEW: "Nuovo",
   USED: "Usato",
@@ -13,7 +27,10 @@ const CONDITION_LABEL: Record<ArticleCondition, string> = {
 
 interface FilterState {
   search: string;
+  /** slug top-level (es. "carte"). null = tutte. */
   category: string | null;
+  /** slug sottocategoria (es. "pokemon"). null = qualsiasi sotto la top. */
+  subcategory: string | null;
   condition: ArticleCondition | null;
   brand: string | null;
   minPrice: string;
@@ -23,13 +40,14 @@ interface FilterState {
 const EMPTY: FilterState = {
   search: "",
   category: null,
+  subcategory: null,
   condition: null,
   brand: null,
   minPrice: "",
   maxPrice: "",
 };
 
-type Dim = "search" | "category" | "condition" | "brand" | "price";
+type Dim = "search" | "category" | "subcategory" | "condition" | "brand" | "price";
 
 interface Props {
   initialArticles: Article[];
@@ -43,14 +61,24 @@ export function CatalogSection({ initialArticles }: Props) {
   function matches(article: Article, exclude: Dim | null = null): boolean {
     if (exclude !== "search" && filters.search.trim()) {
       const q = filters.search.toLowerCase();
-      const hay = [article.title, article.description, article.brand, article.model, article.category]
+      const hay = [
+        article.title,
+        article.description,
+        article.brand,
+        article.model,
+        article.category?.name,
+        article.parent_category?.name,
+      ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
       if (!hay.includes(q)) return false;
     }
     if (exclude !== "category" && filters.category) {
-      if (article.category !== filters.category) return false;
+      if (topSlugOf(article) !== filters.category) return false;
+    }
+    if (exclude !== "subcategory" && filters.subcategory) {
+      if (subSlugOf(article) !== filters.subcategory) return false;
     }
     if (exclude !== "condition" && filters.condition) {
       if (article.condition !== filters.condition) return false;
@@ -86,16 +114,20 @@ export function CatalogSection({ initialArticles }: Props) {
     return n;
   }
 
-  // Faccette ricavate dai dati
+  // Faccette ricavate dai dati. category = top-level slug → label.
   const facets = useMemo(() => {
-    const categories: Record<string, number> = {};
+    const categoryNames: Record<string, string> = {};
     const conditions: Partial<Record<ArticleCondition, number>> = {};
     const brands: Record<string, number> = {};
     let minP = Infinity;
     let maxP = 0;
 
     for (const a of initialArticles) {
-      if (a.category) categories[a.category] = 0;
+      const slug = topSlugOf(a);
+      if (slug) {
+        const top = a.parent_category ?? a.category!;
+        categoryNames[slug] = top.name;
+      }
       conditions[a.condition] = 0;
       if (a.brand) brands[a.brand] = 0;
       const p = Number(a.price);
@@ -106,7 +138,8 @@ export function CatalogSection({ initialArticles }: Props) {
     }
 
     return {
-      categories: Object.keys(categories).sort(),
+      categories: Object.keys(categoryNames).sort(),
+      categoryNames,
       conditions: (Object.keys(conditions) as ArticleCondition[]).sort(),
       brands: Object.keys(brands).sort(),
       priceMin: Number.isFinite(minP) ? Math.floor(minP) : 0,
@@ -117,13 +150,20 @@ export function CatalogSection({ initialArticles }: Props) {
   const hasAnyFilter =
     filters.search !== "" ||
     filters.category !== null ||
+    filters.subcategory !== null ||
     filters.condition !== null ||
     filters.brand !== null ||
     filters.minPrice !== "" ||
     filters.maxPrice !== "";
 
   function update<K extends keyof FilterState>(key: K, value: FilterState[K]) {
-    setFilters((f) => ({ ...f, [key]: value }));
+    setFilters((f) => {
+      // Cambiare categoria top-level resetta la sottocategoria
+      if (key === "category") {
+        return { ...f, category: value as string | null, subcategory: null };
+      }
+      return { ...f, [key]: value };
+    });
   }
 
   function reset() {
@@ -133,8 +173,31 @@ export function CatalogSection({ initialArticles }: Props) {
   // Pre-calcola i count per ogni opzione (così la UI è snella)
   const catCounts: Record<string, number> = {};
   for (const c of facets.categories) {
-    catCounts[c] = countFor("category", (a) => a.category === c);
+    catCounts[c] = countFor("category", (a) => topSlugOf(a) === c);
   }
+
+  // Sottocategorie: solo se è attiva una top-level e ci sono sub presenti
+  // negli articoli che la appartengono.
+  const subSlugs = new Set<string>();
+  const subNames: Record<string, string> = {};
+  if (filters.category) {
+    for (const a of initialArticles) {
+      if (topSlugOf(a) !== filters.category) continue;
+      const slug = subSlugOf(a);
+      if (slug && a.category) {
+        subSlugs.add(slug);
+        subNames[slug] = a.category.name;
+      }
+    }
+  }
+  const subCounts: Record<string, number> = {};
+  for (const s of subSlugs) {
+    subCounts[s] = countFor("subcategory", (a) => subSlugOf(a) === s);
+  }
+  const totalAllSubs = filters.category
+    ? countFor("subcategory", () => true)
+    : 0;
+
   const condCounts: Partial<Record<ArticleCondition, number>> = {};
   for (const c of facets.conditions) {
     condCounts[c] = countFor("condition", (a) => a.condition === c);
@@ -159,6 +222,10 @@ export function CatalogSection({ initialArticles }: Props) {
       <Filters
         filters={filters}
         catCounts={catCounts}
+        categoryNames={facets.categoryNames}
+        subCounts={subCounts}
+        subNames={subNames}
+        totalAllSubs={totalAllSubs}
         condCounts={condCounts}
         brandCounts={brandCounts}
         topBrands={topBrands}
@@ -204,6 +271,10 @@ export function CatalogSection({ initialArticles }: Props) {
 interface FiltersProps {
   filters: FilterState;
   catCounts: Record<string, number>;
+  categoryNames: Record<string, string>;
+  subCounts: Record<string, number>;
+  subNames: Record<string, string>;
+  totalAllSubs: number;
   condCounts: Partial<Record<ArticleCondition, number>>;
   brandCounts: Record<string, number>;
   topBrands: string[];
@@ -224,6 +295,10 @@ interface FiltersProps {
 function Filters({
   filters,
   catCounts,
+  categoryNames,
+  subCounts,
+  subNames,
+  totalAllSubs,
   condCounts,
   brandCounts,
   topBrands,
@@ -301,7 +376,31 @@ function Filters({
                   count={catCounts[c]}
                   disabled={catCounts[c] === 0 && filters.category !== c}
                 >
-                  {c.replace(/-/g, " ")}
+                  {categoryNames[c] ?? c.replace(/-/g, " ")}
+                </FilterPill>
+              ))}
+            </FilterRow>
+          )}
+
+          {/* Sottocategoria: solo se una top-level è selezionata e ci sono sub */}
+          {filters.category && Object.keys(subCounts).length > 0 && (
+            <FilterRow label="Sottocategoria">
+              <FilterPill
+                active={filters.subcategory === null}
+                onClick={() => onUpdate("subcategory", null)}
+                count={totalAllSubs}
+              >
+                Tutte
+              </FilterPill>
+              {Object.keys(subCounts).map((s) => (
+                <FilterPill
+                  key={s}
+                  active={filters.subcategory === s}
+                  onClick={() => onUpdate("subcategory", s)}
+                  count={subCounts[s]}
+                  disabled={subCounts[s] === 0 && filters.subcategory !== s}
+                >
+                  {subNames[s] ?? s.replace(/-/g, " ")}
                 </FilterPill>
               ))}
             </FilterRow>

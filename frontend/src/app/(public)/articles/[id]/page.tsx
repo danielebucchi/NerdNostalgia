@@ -87,7 +87,7 @@ export default async function ArticleDetailPage({ params }: PageProps) {
     brand: article.brand
       ? { "@type": "Brand", name: article.brand }
       : undefined,
-    category: article.category ?? undefined,
+    category: article.category?.name ?? undefined,
     itemCondition: CONDITION_SCHEMA[article.condition] ?? CONDITION_SCHEMA.USED,
     offers: {
       "@type": "Offer",
@@ -152,7 +152,11 @@ export default async function ArticleDetailPage({ params }: PageProps) {
               {CONDITION_LABEL[article.condition] ?? article.condition}
             </span>
             {article.category && (
-              <span className="chip chip-lilac">{article.category.replace(/-/g, " ")}</span>
+              <span className="chip chip-lilac">
+                {article.parent_category
+                  ? `${article.parent_category.name} › ${article.category.name}`
+                  : article.category.name}
+              </span>
             )}
           </div>
 

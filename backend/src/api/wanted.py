@@ -7,9 +7,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from helpers.auth import require_admin
+from helpers.category import CategoryHelper, get_category_helper
 from helpers.wanted import WantedItemHelper, get_wanted_helper
-from models.db import ArticleCondition, User, WantedItem, WantedStatus
+from models.db import ArticleCondition, Category, User, WantedItem, WantedStatus
 from models.entities.article import ReorderRequest
+from models.entities.category import CategoryResponse
 from models.entities.wanted import (
     WantedItemCreate,
     WantedItemListResponse,
@@ -32,12 +34,27 @@ def reorder_wanted(
     return None
 
 
+def _category_to_response(cat: Optional[Category]) -> Optional[CategoryResponse]:
+    if cat is None:
+        return None
+    return CategoryResponse(
+        id=cat.id,
+        name=cat.name,
+        slug=cat.slug,
+        parent_id=cat.parent_id,
+        display_order=cat.display_order,
+    )
+
+
 def _to_response(item: WantedItem) -> WantedItemResponse:
+    parent_cat = item.category.parent if item.category and item.category.parent else None
     return WantedItemResponse(
         id=item.id,
         title=item.title,
         description=item.description,
-        category=item.category,
+        category_id=item.category_id,
+        category=_category_to_response(item.category),
+        parent_category=_category_to_response(parent_cat),
         brand=item.brand,
         model=item.model,
         preferred_condition=item.preferred_condition.value if item.preferred_condition else None,
@@ -57,21 +74,26 @@ def list_wanted(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     status_filter: Optional[WantedStatus] = Query(None, alias="status"),
-    category: Optional[str] = None,
+    category_id: Optional[int] = Query(None),
     condition: Optional[ArticleCondition] = None,
     max_budget: Optional[Decimal] = Query(None, ge=0),
     search: Optional[str] = None,
     helper: WantedItemHelper = Depends(get_wanted_helper),
+    category_helper: CategoryHelper = Depends(get_category_helper),
 ):
     """Lista pubblica degli articoli cercati. Default: solo ACTIVE."""
     db_status = WantedStatus(status_filter.value) if status_filter else WantedStatus.ACTIVE
     db_condition = ArticleCondition(condition.value) if condition else None
 
+    category_ids = None
+    if category_id is not None:
+        category_ids = category_helper.get_descendant_ids(category_id)
+
     items, total = helper.gets(
         skip=skip,
         limit=limit,
         status=db_status,
-        category=category,
+        category_ids=category_ids,
         condition=db_condition,
         max_budget=max_budget,
         search=search,
@@ -109,7 +131,7 @@ def create_wanted(
     new_item = WantedItem(
         title=data.title,
         description=data.description,
-        category=data.category,
+        category_id=data.category_id,
         brand=data.brand,
         model=data.model,
         preferred_condition=(
