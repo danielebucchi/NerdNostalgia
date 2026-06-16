@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { listArticles } from "@/lib/api";
 import { ArticleCard } from "@/components/ArticleCard";
 import { LogoImage } from "@/components/LogoImage";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 const CATEGORIES = [
   { slug: "videogames", label: "Videogiochi", emoji: "🎮", chip: "chip-sky" },

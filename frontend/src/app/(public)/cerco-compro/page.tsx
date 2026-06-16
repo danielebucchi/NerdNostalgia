@@ -1,6 +1,21 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { listWantedItems } from "@/lib/api";
 import { WantedCard } from "@/components/WantedCard";
+
+export const metadata: Metadata = {
+  title: "Cerco / Compro",
+  description:
+    "Stiamo cercando questi pezzi nerd: videogiochi vintage, carte Pokémon, console, " +
+    "Funko Pop. Hai qualcosa che fa al caso nostro? Scrivici.",
+  alternates: { canonical: "/cerco-compro" },
+  openGraph: {
+    title: "Cerco / Compro — NerdNostalgia",
+    description:
+      "I pezzi che stiamo cercando. Vendi i tuoi cimeli nerd in Italia: pagamento veloce.",
+    url: "/cerco-compro",
+  },
+};
 
 export default async function CercoCompoPage() {
   let items: Awaited<ReturnType<typeof listWantedItems>>["items"] = [];

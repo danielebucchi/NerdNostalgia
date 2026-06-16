@@ -1,10 +1,47 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatPrice, getArticle } from "@/lib/api";
 import { ArticleActions } from "@/components/ArticleActions";
+import { absUrl, clip, SITE_NAME } from "@/lib/seo";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+const CONDITION_SCHEMA: Record<string, string> = {
+  NEW: "https://schema.org/NewCondition",
+  USED: "https://schema.org/UsedCondition",
+  REFURBISHED: "https://schema.org/RefurbishedCondition",
+  FOR_PARTS: "https://schema.org/DamagedCondition",
+};
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const article = await getArticle(id).catch(() => null);
+  if (!article) {
+    return { title: "Articolo non trovato" };
+  }
+  const cover = article.images?.[0];
+  const desc = clip(article.description) || `${article.title} su ${SITE_NAME}.`;
+  return {
+    title: article.title,
+    description: desc,
+    alternates: { canonical: `/articles/${article.id}` },
+    openGraph: {
+      type: "website",
+      title: article.title,
+      description: desc,
+      url: absUrl(`/articles/${article.id}`),
+      images: cover ? [{ url: cover, alt: article.title }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: article.title,
+      description: desc,
+      images: cover ? [cover] : undefined,
+    },
+  };
 }
 
 const CONDITION_LABEL: Record<string, string> = {
@@ -39,8 +76,39 @@ export default async function ArticleDetailPage({ params }: PageProps) {
   const cover = article.images?.[0];
   const gallery = article.images?.slice(1) ?? [];
 
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: article.title,
+    description: article.description ?? article.title,
+    image: article.images ?? [],
+    sku: article.sku ?? `nn-${article.id}`,
+    brand: article.brand
+      ? { "@type": "Brand", name: article.brand }
+      : undefined,
+    category: article.category ?? undefined,
+    itemCondition: CONDITION_SCHEMA[article.condition] ?? CONDITION_SCHEMA.USED,
+    offers: {
+      "@type": "Offer",
+      url: absUrl(`/articles/${article.id}`),
+      priceCurrency: article.currency || "EUR",
+      price: article.price,
+      availability:
+        article.status === "PUBLISHED" && article.quantity > 0
+          ? "https://schema.org/InStock"
+          : article.status === "SOLD"
+            ? "https://schema.org/SoldOut"
+            : "https://schema.org/OutOfStock",
+      seller: { "@type": "Organization", name: SITE_NAME },
+    },
+  };
+
   return (
     <article>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
       <Link href="/" className="btn btn-ghost text-sm mb-8">
         ← Catalogo
       </Link>
