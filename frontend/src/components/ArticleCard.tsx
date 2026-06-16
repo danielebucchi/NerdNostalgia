@@ -43,10 +43,8 @@ export function ArticleCard({ article }: { article: Article }) {
           </div>
         )}
 
-        {/* Condizione: in alto a sinistra */}
-        <span
-          className={`chip ${NEUTRAL_CHIP} text-[10px] absolute top-2 left-2 pointer-events-none`}
-        >
+        {/* Condizione: in alto a sinistra, compatto come i loghi marketplace */}
+        <span className="absolute top-2 left-2 inline-flex items-center h-5 px-2 rounded-full bg-white/90 backdrop-blur ring-1 ring-ink/10 shadow-soft text-[9px] font-semibold uppercase tracking-wider text-ink pointer-events-none">
           {CONDITION_LABEL[article.condition]}
         </span>
 
