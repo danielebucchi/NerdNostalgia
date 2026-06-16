@@ -43,7 +43,7 @@ const MARKETPLACE_META: Record<
     emoji: "🏷",
     urlPlaceholder: "https://www.ebay.it/itm/123456789",
     newListingUrl: "https://www.ebay.it/sl/sell",
-    markups: [10, 12, 15],
+    markups: [11],
   },
 };
 

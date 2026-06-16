@@ -35,8 +35,8 @@ const CONFIGS: Record<MarketplaceKey, MarketplaceConfig & { markups: number[] }>
     descriptionFooter:
       "Spedizione tracciata in tutta Italia con corriere assicurato.\n" +
       "Altri pezzi nerd su nerdnostalgia.it",
-    // eBay: commissione finale ~10-12% per categoria standard
-    markups: [10, 12, 15],
+    // eBay: commissione finale ~11% per categoria standard
+    markups: [11],
   },
 };
 
