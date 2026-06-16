@@ -3,23 +3,67 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/admin-api";
 import { formatPrice } from "@/lib/api";
-import type { Article, VintedStatus } from "@/lib/types";
+import type { Article, MarketplaceStatus } from "@/lib/types";
 
-const VINTED_NEW_URL = "https://www.vinted.it/items/new";
+export type MarketplaceKey = "vinted" | "ebay";
 
-const STATUS_LABEL: Record<VintedStatus, string> = {
-  NOT_LISTED: "Non listato",
-  LISTED: "Online su Vinted",
-  SOLD: "Venduto su Vinted",
+interface MarketplaceConfig {
+  key: MarketplaceKey;
+  label: string;
+  emoji: string;
+  newListingUrl: string;
+  /** Testo aggiunto in fondo alla descrizione "copia formattata". */
+  descriptionFooter: string;
+}
+
+const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
+  vinted: {
+    key: "vinted",
+    label: "Vinted",
+    emoji: "🛍",
+    newListingUrl: "https://www.vinted.it/items/new",
+    descriptionFooter:
+      "Spedizione tracciata in tutta Italia.\nAltri pezzi nerd su nerdnostalgia.it",
+  },
+  ebay: {
+    key: "ebay",
+    label: "eBay",
+    emoji: "🏷",
+    newListingUrl: "https://www.ebay.it/sl/sell",
+    descriptionFooter:
+      "Spedizione tracciata in tutta Italia con corriere assicurato.\n" +
+      "Altri pezzi nerd su nerdnostalgia.it",
+  },
 };
 
-const STATUS_CHIP: Record<VintedStatus, string> = {
+const STATUS_LABEL: Record<MarketplaceStatus, string> = {
+  NOT_LISTED: "Non listato",
+  LISTED: "Online",
+  SOLD: "Venduto",
+};
+
+const STATUS_CHIP: Record<MarketplaceStatus, string> = {
   NOT_LISTED: "chip-lilac",
   LISTED: "chip-mint",
   SOLD: "chip-pink",
 };
 
-function buildVintedDescription(article: Article): string {
+function getMarketplaceData(article: Article, key: MarketplaceKey) {
+  if (key === "vinted") {
+    return {
+      status: article.vinted_status,
+      url: article.vinted_url,
+      syncedAt: article.vinted_synced_at,
+    };
+  }
+  return {
+    status: article.ebay_status,
+    url: article.ebay_url,
+    syncedAt: article.ebay_synced_at,
+  };
+}
+
+function buildDescription(article: Article, footer: string): string {
   const lines: string[] = [];
   lines.push(article.title);
   lines.push("");
@@ -39,38 +83,47 @@ function buildVintedDescription(article: Article): string {
   }
   lines.push(`Prezzo indicativo: ${formatPrice(article)}`);
   lines.push("");
-  lines.push("Spedizione tracciata in tutta Italia.");
-  lines.push("Altri pezzi nerd su nerdnostalgia.it");
+  lines.push(footer);
   return lines.join("\n");
 }
 
 interface Props {
   article: Article;
+  marketplace: MarketplaceKey;
   onUpdated: (updated: Article) => void;
 }
 
-export function VintedSyncBox({ article, onUpdated }: Props) {
-  const [status, setStatus] = useState<VintedStatus>(article.vinted_status);
-  const [url, setUrl] = useState<string>(article.vinted_url ?? "");
+export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
+  const config = CONFIGS[marketplace];
+  const current = getMarketplaceData(article, marketplace);
+
+  const [status, setStatus] = useState<MarketplaceStatus>(current.status);
+  const [url, setUrl] = useState<string>(current.url ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setStatus(article.vinted_status);
-    setUrl(article.vinted_url ?? "");
-  }, [article.id, article.vinted_status, article.vinted_url]);
+    setStatus(current.status);
+    setUrl(current.url ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [article.id, current.status, current.url]);
 
-  const dirty =
-    status !== article.vinted_status || (url || null) !== (article.vinted_url || null);
+  const dirty = status !== current.status || (url || null) !== (current.url || null);
 
-  async function handleSave() {
+  function buildPayload(s: MarketplaceStatus, u: string | null) {
+    return marketplace === "vinted"
+      ? { vinted_status: s, vinted_url: u }
+      : { ebay_status: s, ebay_url: u };
+  }
+
+  async function patch(payload: Record<string, unknown>) {
     setBusy(true);
     setError(null);
     try {
       const updated = await adminApi.patch<Article>(
-        `/api/articles/${article.id}/vinted`,
-        { vinted_status: status, vinted_url: url.trim() || null },
+        `/api/articles/${article.id}/${marketplace}`,
+        payload,
       );
       onUpdated(updated);
     } catch (err) {
@@ -80,24 +133,16 @@ export function VintedSyncBox({ article, onUpdated }: Props) {
     }
   }
 
-  async function quickAction(next: VintedStatus) {
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await adminApi.patch<Article>(
-        `/api/articles/${article.id}/vinted`,
-        { vinted_status: next, vinted_url: url.trim() || null },
-      );
-      onUpdated(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
+  async function handleSave() {
+    await patch(buildPayload(status, url.trim() || null));
+  }
+
+  async function quickAction(next: MarketplaceStatus) {
+    await patch(buildPayload(next, url.trim() || null));
   }
 
   async function copyDescription() {
-    const text = buildVintedDescription(article);
+    const text = buildDescription(article, config.descriptionFooter);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -110,26 +155,27 @@ export function VintedSyncBox({ article, onUpdated }: Props) {
   return (
     <div className="card p-5">
       <div className="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
-        <h2 className="display text-lg text-ink">Sincronizza con Vinted</h2>
+        <h2 className="display text-lg text-ink">
+          {config.emoji} Sincronizza con {config.label}
+        </h2>
         <span className={`chip ${STATUS_CHIP[status]}`}>{STATUS_LABEL[status]}</span>
       </div>
 
       <p className="text-sm text-ink-soft mb-4 leading-relaxed">
-        Vinted non offre API pubbliche: la sincronizzazione è assistita.
-        Prepari titolo e descrizione qui, pubblichi su Vinted in un altro tab,
-        poi torni e incolli l&apos;URL del listing. Quando lo segni come
-        <em> Venduto</em>, l&apos;articolo viene marcato <code>SOLD</code> anche
-        nel catalogo.
+        Sincronizzazione assistita: prepari titolo e descrizione qui, pubblichi
+        su {config.label} in un altro tab, poi torni e incolli l&apos;URL del
+        listing. Marcandolo come <em>Venduto</em> l&apos;articolo viene marcato{" "}
+        <code>SOLD</code> anche nel catalogo.
       </p>
 
       <div className="grid sm:grid-cols-2 gap-3 mb-4">
         <a
-          href={VINTED_NEW_URL}
+          href={config.newListingUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="btn btn-primary text-sm justify-center"
         >
-          🛍 Apri Vinted · Nuovo annuncio ↗
+          {config.emoji} Apri {config.label} · Nuovo annuncio ↗
         </a>
         <button
           type="button"
@@ -142,13 +188,17 @@ export function VintedSyncBox({ article, onUpdated }: Props) {
 
       <label className="block mb-3">
         <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
-          URL del listing Vinted
+          URL del listing {config.label}
         </span>
         <input
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://www.vinted.it/items/123456789-…"
+          placeholder={
+            marketplace === "vinted"
+              ? "https://www.vinted.it/items/123456789-…"
+              : "https://www.ebay.it/itm/123456789"
+          }
           className="input mt-1"
         />
       </label>
@@ -159,12 +209,12 @@ export function VintedSyncBox({ article, onUpdated }: Props) {
         </span>
         <select
           value={status}
-          onChange={(e) => setStatus(e.target.value as VintedStatus)}
+          onChange={(e) => setStatus(e.target.value as MarketplaceStatus)}
           className="input mt-1"
         >
           <option value="NOT_LISTED">Non listato</option>
-          <option value="LISTED">Online su Vinted</option>
-          <option value="SOLD">Venduto su Vinted</option>
+          <option value="LISTED">Online su {config.label}</option>
+          <option value="SOLD">Venduto su {config.label}</option>
         </select>
       </label>
 
@@ -177,7 +227,7 @@ export function VintedSyncBox({ article, onUpdated }: Props) {
           onClick={handleSave}
           disabled={busy || !dirty}
         >
-          {busy ? "Salvataggio…" : "Salva sync Vinted"}
+          {busy ? "Salvataggio…" : `Salva sync ${config.label}`}
         </button>
         {status !== "LISTED" && (
           <button
@@ -211,22 +261,22 @@ export function VintedSyncBox({ article, onUpdated }: Props) {
         )}
       </div>
 
-      {article.vinted_synced_at && (
+      {current.syncedAt && (
         <p className="text-xs text-ink-soft mt-3">
           Ultimo aggiornamento:{" "}
-          {new Date(article.vinted_synced_at).toLocaleString("it-IT")}
+          {new Date(current.syncedAt).toLocaleString("it-IT")}
         </p>
       )}
 
-      {article.vinted_url && (
+      {current.url && (
         <p className="text-xs text-ink-soft mt-1">
           <a
-            href={article.vinted_url}
+            href={current.url}
             target="_blank"
             rel="noopener noreferrer"
             className="text-pink-deep underline"
           >
-            Apri il listing su Vinted ↗
+            Apri il listing su {config.label} ↗
           </a>
         </p>
       )}
