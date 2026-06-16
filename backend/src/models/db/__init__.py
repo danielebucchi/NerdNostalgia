@@ -5,6 +5,7 @@ from .base import Base, BaseModel
 from .users import User, UserRole
 from .articles import Article, ArticleCondition, ArticleStatus
 from .inquiries import Inquiry, InquiryStatus
+from .wanted import WantedItem, WantedStatus
 
 __all__ = [
     "Base",
@@ -16,4 +17,6 @@ __all__ = [
     "ArticleStatus",
     "Inquiry",
     "InquiryStatus",
+    "WantedItem",
+    "WantedStatus",
 ]
