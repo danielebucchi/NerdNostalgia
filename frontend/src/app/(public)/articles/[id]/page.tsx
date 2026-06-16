@@ -3,7 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatPrice, getArticle } from "@/lib/api";
 import { ArticleActions } from "@/components/ArticleActions";
+import { ArticleGallery } from "@/components/ArticleGallery";
 import { MarketplaceLogo } from "@/components/MarketplaceLogo";
+import { ShareButtons } from "@/components/ShareButtons";
+import { WishlistButton } from "@/components/WishlistButton";
 import { absUrl, clip, SITE_NAME } from "@/lib/seo";
 
 interface PageProps {
@@ -75,7 +78,6 @@ export default async function ArticleDetailPage({ params }: PageProps) {
   }
 
   const cover = article.images?.[0];
-  const gallery = article.images?.slice(1) ?? [];
 
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -117,29 +119,7 @@ export default async function ArticleDetailPage({ params }: PageProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
         {/* Gallery */}
         <div>
-          <div className="card aspect-square w-full flex items-center justify-center p-4 overflow-hidden">
-            {cover ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={cover}
-                alt={article.title}
-                className="max-w-full max-h-full object-contain"
-              />
-            ) : (
-              <span className="display text-ink-soft text-xl">No photo</span>
-            )}
-          </div>
-
-          {gallery.length > 0 && (
-            <div className="mt-4 grid grid-cols-4 gap-3">
-              {gallery.map((img) => (
-                <div key={img} className="aspect-square card p-1 overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img} alt="" className="w-full h-full object-cover rounded-lg" />
-                </div>
-              ))}
-            </div>
-          )}
+          <ArticleGallery images={article.images ?? []} title={article.title} />
         </div>
 
         {/* Info */}
@@ -213,6 +193,15 @@ export default async function ArticleDetailPage({ params }: PageProps) {
               )}
             </div>
           ) : null}
+
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <WishlistButton articleId={article.id} variant="full" />
+            <ShareButtons
+              url={absUrl(`/articles/${article.id}`)}
+              title={article.title}
+              text={`${article.title} su ${SITE_NAME}`}
+            />
+          </div>
 
           <div className="mt-10">
             <ArticleActions

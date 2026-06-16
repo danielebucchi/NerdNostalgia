@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { Article } from "@/lib/types";
 import { formatPrice } from "@/lib/api";
+import { CardImageCarousel } from "@/components/CardImageCarousel";
 import { MarketplaceLogo } from "@/components/MarketplaceLogo";
+import { WishlistButton } from "@/components/WishlistButton";
+import { thumbUrlsFor } from "@/lib/images";
 
 const CONDITION_LABEL: Record<Article["condition"], string> = {
   NEW: "Nuovo",
@@ -18,7 +21,6 @@ const CATEGORY_CHIP: Record<string, string> = {
 };
 
 export function ArticleCard({ article }: { article: Article }) {
-  const cover = article.images?.[0];
   const topSlug =
     article.parent_category?.slug ??
     (article.category?.parent_id == null ? article.category?.slug : undefined);
@@ -30,24 +32,20 @@ export function ArticleCard({ article }: { article: Article }) {
       className="card card-clickable flex flex-col overflow-hidden h-full"
     >
       <div className="aspect-square w-full bg-cream/40 relative overflow-hidden">
-        {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={cover}
-            alt={article.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-ink-soft">
-            <span className="display text-3xl">?</span>
-            <span className="text-xs uppercase tracking-wider mt-1">No photo</span>
-          </div>
-        )}
+        <CardImageCarousel
+          images={thumbUrlsFor(article.images)}
+          alt={article.title}
+        />
 
         {/* Condizione: in alto a sinistra, compatto come i loghi marketplace */}
         <span className="absolute top-2 left-2 inline-flex items-center h-5 px-2 rounded-full bg-white/90 backdrop-blur ring-1 ring-ink/10 shadow-soft text-[9px] font-semibold uppercase tracking-wider text-ink pointer-events-none">
           {CONDITION_LABEL[article.condition]}
         </span>
+
+        {/* Wishlist: in alto a destra */}
+        <div className="absolute top-2 right-2">
+          <WishlistButton articleId={article.id} variant="icon" />
+        </div>
 
         {/* Marketplace: pillole compatte uniformi in basso a sinistra. */}
         {((article.vinted_status === "LISTED" && article.vinted_url) ||

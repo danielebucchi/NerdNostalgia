@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LogoImage } from "@/components/LogoImage";
+import { WishlistNavLink } from "@/components/WishlistNavLink";
 
 const TOPBAR_MESSAGES = [
   "Compro · Vendo · Scambio",
@@ -50,10 +51,12 @@ export function Header() {
         <nav className="hidden md:flex items-center gap-2 flex-shrink-0">
           <Link href="/" className="btn btn-ghost text-sm">Catalogo</Link>
           <Link href="/cerco-compro" className="btn btn-ghost text-sm">Cerco/Compro</Link>
+          <WishlistNavLink variant="desktop" />
           <Link href="/contatti" className="btn btn-primary text-sm">Contattami</Link>
         </nav>
 
         <nav className="flex md:hidden gap-1.5 flex-shrink-0">
+          <WishlistNavLink variant="mobile" />
           <Link
             href="/cerco-compro"
             className="btn btn-ghost text-xs px-2.5 py-1.5"
