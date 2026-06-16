@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { listArticles, type ListArticlesParams } from "@/lib/api";
+import { useMemo, useState } from "react";
 import { ArticleCard } from "@/components/ArticleCard";
 import type { Article, ArticleCondition } from "@/lib/types";
 
@@ -16,6 +15,7 @@ interface FilterState {
   search: string;
   category: string | null;
   condition: ArticleCondition | null;
+  brand: string | null;
   minPrice: string;
   maxPrice: string;
 }
@@ -24,104 +24,159 @@ const EMPTY: FilterState = {
   search: "",
   category: null,
   condition: null,
+  brand: null,
   minPrice: "",
   maxPrice: "",
 };
+
+type Dim = "search" | "category" | "condition" | "brand" | "price";
 
 interface Props {
   initialArticles: Article[];
 }
 
 export function CatalogSection({ initialArticles }: Props) {
-  const [articles, setArticles] = useState<Article[]>(initialArticles);
-  const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState<FilterState>(EMPTY);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Categorie e brand inferiti dagli articoli iniziali (per popolare le pillole)
-  const { categories, hasAnyFilter } = useMemo(() => {
-    const cats = new Set<string>();
-    for (const a of initialArticles) {
-      if (a.category) cats.add(a.category);
+  /** Match completo, eventualmente escludendo una dimensione (per i counter). */
+  function matches(article: Article, exclude: Dim | null = null): boolean {
+    if (exclude !== "search" && filters.search.trim()) {
+      const q = filters.search.toLowerCase();
+      const hay = [article.title, article.description, article.brand, article.model, article.category]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(q)) return false;
     }
-    return {
-      categories: Array.from(cats).sort(),
-      hasAnyFilter:
-        filters.search !== "" ||
-        filters.category !== null ||
-        filters.condition !== null ||
-        filters.minPrice !== "" ||
-        filters.maxPrice !== "",
-    };
-  }, [initialArticles, filters]);
-
-  // Debounce: aspetta 300ms prima di rifare fetch quando si scrive
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(async () => {
-      // Se nessun filtro attivo, usa direttamente gli initial (no refetch)
-      if (
-        !filters.search &&
-        !filters.category &&
-        !filters.condition &&
-        !filters.minPrice &&
-        !filters.maxPrice
-      ) {
-        setArticles(initialArticles);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
-        const params: ListArticlesParams = {
-          status: "PUBLISHED",
-          limit: 60,
-        };
-        if (filters.search) params.search = filters.search;
-        if (filters.category) params.category = filters.category;
-        if (filters.condition) params.condition = filters.condition;
-        if (filters.minPrice) params.min_price = Number(filters.minPrice);
-        if (filters.maxPrice) params.max_price = Number(filters.maxPrice);
-        const data = await listArticles(params);
-        setArticles(data.items);
-      } catch {
-        setArticles([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [filters, initialArticles]);
-
-  function reset() {
-    setFilters(EMPTY);
+    if (exclude !== "category" && filters.category) {
+      if (article.category !== filters.category) return false;
+    }
+    if (exclude !== "condition" && filters.condition) {
+      if (article.condition !== filters.condition) return false;
+    }
+    if (exclude !== "brand" && filters.brand) {
+      if (article.brand !== filters.brand) return false;
+    }
+    if (exclude !== "price") {
+      const p = Number(article.price);
+      if (filters.minPrice && p < Number(filters.minPrice)) return false;
+      if (filters.maxPrice && p > Number(filters.maxPrice)) return false;
+    }
+    return true;
   }
+
+  /** Articoli che soddisfano TUTTI i filtri correnti. */
+  const filtered = useMemo(
+    () => initialArticles.filter((a) => matches(a, null)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [initialArticles, filters],
+  );
+
+  /**
+   * Per ogni opzione di una dimensione (es. category=videogames) conta gli
+   * articoli che soddisfano TUTTI gli altri filtri + quella opzione.
+   * Questo dà il classico facet count: "Pokemon (3)", "Funko (1)"...
+   */
+  function countFor(dim: Dim, predicate: (a: Article) => boolean): number {
+    let n = 0;
+    for (const a of initialArticles) {
+      if (matches(a, dim) && predicate(a)) n++;
+    }
+    return n;
+  }
+
+  // Faccette ricavate dai dati
+  const facets = useMemo(() => {
+    const categories: Record<string, number> = {};
+    const conditions: Partial<Record<ArticleCondition, number>> = {};
+    const brands: Record<string, number> = {};
+    let minP = Infinity;
+    let maxP = 0;
+
+    for (const a of initialArticles) {
+      if (a.category) categories[a.category] = 0;
+      conditions[a.condition] = 0;
+      if (a.brand) brands[a.brand] = 0;
+      const p = Number(a.price);
+      if (Number.isFinite(p)) {
+        if (p < minP) minP = p;
+        if (p > maxP) maxP = p;
+      }
+    }
+
+    return {
+      categories: Object.keys(categories).sort(),
+      conditions: (Object.keys(conditions) as ArticleCondition[]).sort(),
+      brands: Object.keys(brands).sort(),
+      priceMin: Number.isFinite(minP) ? Math.floor(minP) : 0,
+      priceMax: maxP > 0 ? Math.ceil(maxP) : 0,
+    };
+  }, [initialArticles]);
+
+  const hasAnyFilter =
+    filters.search !== "" ||
+    filters.category !== null ||
+    filters.condition !== null ||
+    filters.brand !== null ||
+    filters.minPrice !== "" ||
+    filters.maxPrice !== "";
 
   function update<K extends keyof FilterState>(key: K, value: FilterState[K]) {
     setFilters((f) => ({ ...f, [key]: value }));
   }
 
+  function reset() {
+    setFilters(EMPTY);
+  }
+
+  // Pre-calcola i count per ogni opzione (così la UI è snella)
+  const catCounts: Record<string, number> = {};
+  for (const c of facets.categories) {
+    catCounts[c] = countFor("category", (a) => a.category === c);
+  }
+  const condCounts: Partial<Record<ArticleCondition, number>> = {};
+  for (const c of facets.conditions) {
+    condCounts[c] = countFor("condition", (a) => a.condition === c);
+  }
+  const brandCounts: Record<string, number> = {};
+  for (const b of facets.brands) {
+    brandCounts[b] = countFor("brand", (a) => a.brand === b);
+  }
+  // Brand: ordino per count desc, mostro top 8
+  const topBrands = facets.brands
+    .filter((b) => brandCounts[b] > 0)
+    .sort((a, b) => brandCounts[b] - brandCounts[a])
+    .slice(0, 8);
+
+  // Conta totale "Tutte" (con ogni dimensione esclusa)
+  const totalAllCats = countFor("category", () => true);
+  const totalAllConds = countFor("condition", () => true);
+  const totalAllBrands = countFor("brand", () => true);
+
   return (
     <>
-      <CatalogFilters
+      <Filters
         filters={filters}
-        categories={categories}
+        catCounts={catCounts}
+        condCounts={condCounts}
+        brandCounts={brandCounts}
+        topBrands={topBrands}
+        conditions={facets.conditions}
+        totalAllCats={totalAllCats}
+        totalAllConds={totalAllConds}
+        totalAllBrands={totalAllBrands}
+        priceMin={facets.priceMin}
+        priceMax={facets.priceMax}
         hasAnyFilter={hasAnyFilter}
         onUpdate={update}
         onReset={reset}
         mobileOpen={mobileOpen}
         onToggleMobile={() => setMobileOpen((v) => !v)}
+        resultsCount={filtered.length}
       />
 
-      {loading && (
-        <p className="text-ink-soft text-sm mb-4">Aggiorno il catalogo…</p>
-      )}
-
-      {!loading && articles.length === 0 && (
+      {filtered.length === 0 ? (
         <div className="card p-10 text-center">
           <p className="display text-xl text-ink mb-2">Nessun articolo</p>
           <p className="text-ink-soft text-sm">
@@ -135,11 +190,9 @@ export function CatalogSection({ initialArticles }: Props) {
             </button>
           )}
         </div>
-      )}
-
-      {articles.length > 0 && (
+      ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6">
-          {articles.map((article) => (
+          {filtered.map((article) => (
             <ArticleCard key={article.id} article={article} />
           ))}
         </div>
@@ -150,22 +203,42 @@ export function CatalogSection({ initialArticles }: Props) {
 
 interface FiltersProps {
   filters: FilterState;
-  categories: string[];
+  catCounts: Record<string, number>;
+  condCounts: Partial<Record<ArticleCondition, number>>;
+  brandCounts: Record<string, number>;
+  topBrands: string[];
+  conditions: ArticleCondition[];
+  totalAllCats: number;
+  totalAllConds: number;
+  totalAllBrands: number;
+  priceMin: number;
+  priceMax: number;
   hasAnyFilter: boolean;
   onUpdate: <K extends keyof FilterState>(key: K, value: FilterState[K]) => void;
   onReset: () => void;
   mobileOpen: boolean;
   onToggleMobile: () => void;
+  resultsCount: number;
 }
 
-function CatalogFilters({
+function Filters({
   filters,
-  categories,
+  catCounts,
+  condCounts,
+  brandCounts,
+  topBrands,
+  conditions,
+  totalAllCats,
+  totalAllConds,
+  totalAllBrands,
+  priceMin,
+  priceMax,
   hasAnyFilter,
   onUpdate,
   onReset,
   mobileOpen,
   onToggleMobile,
+  resultsCount,
 }: FiltersProps) {
   return (
     <div className="mb-6 sm:mb-8">
@@ -207,23 +280,26 @@ function CatalogFilters({
         )}
       </div>
 
-      {/* Pillole filtri: sempre visibili da sm+, collassabili su mobile */}
+      {/* Pannello filtri: sempre visibile da sm+, collassabile su mobile */}
       <div className={`${mobileOpen ? "block" : "hidden"} sm:block`}>
         <div className="card p-4 sm:p-5 space-y-4">
           {/* Categoria */}
-          {categories.length > 0 && (
+          {Object.keys(catCounts).length > 0 && (
             <FilterRow label="Categoria">
               <FilterPill
                 active={filters.category === null}
                 onClick={() => onUpdate("category", null)}
+                count={totalAllCats}
               >
                 Tutte
               </FilterPill>
-              {categories.map((c) => (
+              {Object.keys(catCounts).map((c) => (
                 <FilterPill
                   key={c}
                   active={filters.category === c}
                   onClick={() => onUpdate("category", c)}
+                  count={catCounts[c]}
+                  disabled={catCounts[c] === 0 && filters.category !== c}
                 >
                   {c.replace(/-/g, " ")}
                 </FilterPill>
@@ -232,60 +308,99 @@ function CatalogFilters({
           )}
 
           {/* Condizione */}
-          <FilterRow label="Condizione">
-            <FilterPill
-              active={filters.condition === null}
-              onClick={() => onUpdate("condition", null)}
-            >
-              Tutte
-            </FilterPill>
-            {(Object.keys(CONDITION_LABEL) as ArticleCondition[]).map((c) => (
+          {conditions.length > 0 && (
+            <FilterRow label="Condizione">
               <FilterPill
-                key={c}
-                active={filters.condition === c}
-                onClick={() => onUpdate("condition", c)}
+                active={filters.condition === null}
+                onClick={() => onUpdate("condition", null)}
+                count={totalAllConds}
               >
-                {CONDITION_LABEL[c]}
+                Tutte
               </FilterPill>
-            ))}
-          </FilterRow>
+              {conditions.map((c) => (
+                <FilterPill
+                  key={c}
+                  active={filters.condition === c}
+                  onClick={() => onUpdate("condition", c)}
+                  count={condCounts[c] ?? 0}
+                  disabled={(condCounts[c] ?? 0) === 0 && filters.condition !== c}
+                >
+                  {CONDITION_LABEL[c]}
+                </FilterPill>
+              ))}
+            </FilterRow>
+          )}
+
+          {/* Brand */}
+          {topBrands.length > 0 && (
+            <FilterRow label="Marca">
+              <FilterPill
+                active={filters.brand === null}
+                onClick={() => onUpdate("brand", null)}
+                count={totalAllBrands}
+              >
+                Tutte
+              </FilterPill>
+              {topBrands.map((b) => (
+                <FilterPill
+                  key={b}
+                  active={filters.brand === b}
+                  onClick={() => onUpdate("brand", b)}
+                  count={brandCounts[b]}
+                  disabled={brandCounts[b] === 0 && filters.brand !== b}
+                >
+                  {b}
+                </FilterPill>
+              ))}
+            </FilterRow>
+          )}
 
           {/* Prezzo */}
-          <FilterRow label="Prezzo">
-            <div className="flex items-center gap-2 flex-1">
-              <input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                placeholder="Min €"
-                value={filters.minPrice}
-                onChange={(e) => onUpdate("minPrice", e.target.value)}
-                className="filter-input w-24 sm:w-28"
-              />
-              <span className="text-ink-soft">–</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                placeholder="Max €"
-                value={filters.maxPrice}
-                onChange={(e) => onUpdate("maxPrice", e.target.value)}
-                className="filter-input w-24 sm:w-28"
-              />
-            </div>
-          </FilterRow>
+          {priceMax > 0 && (
+            <FilterRow label="Prezzo">
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  placeholder={`Min €${priceMin}`}
+                  value={filters.minPrice}
+                  onChange={(e) => onUpdate("minPrice", e.target.value)}
+                  className="filter-input w-28 sm:w-32"
+                />
+                <span className="text-ink-soft">–</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  placeholder={`Max €${priceMax}`}
+                  value={filters.maxPrice}
+                  onChange={(e) => onUpdate("maxPrice", e.target.value)}
+                  className="filter-input w-28 sm:w-32"
+                />
+                <span className="text-xs text-ink-soft hidden md:inline ml-2">
+                  range catalogo: €{priceMin}–€{priceMax}
+                </span>
+              </div>
+            </FilterRow>
+          )}
 
-          {hasAnyFilter && (
-            <div className="sm:hidden pt-1">
+          {/* Riassunto risultati + reset mobile */}
+          <div className="flex items-center justify-between pt-3 border-t border-ink/8">
+            <span className="text-xs text-ink-soft">
+              <strong className="text-ink">{resultsCount}</strong>{" "}
+              risultat{resultsCount === 1 ? "o" : "i"}
+            </span>
+            {hasAnyFilter && (
               <button
                 type="button"
                 onClick={onReset}
-                className="btn btn-ghost text-sm w-full justify-center"
+                className="btn btn-ghost text-xs sm:hidden"
               >
-                ✕ Azzera tutti i filtri
+                ✕ Azzera
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
@@ -333,24 +448,41 @@ function FilterRow({
 function FilterPill({
   active,
   onClick,
+  count,
+  disabled,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  count: number;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={
-        "px-3 py-1.5 rounded-full text-xs font-semibold transition-all " +
+        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all " +
         (active
           ? "bg-gradient-to-br from-pink to-lilac-deep text-white shadow-soft"
-          : "bg-white/70 text-ink ring-1 ring-ink/10 hover:bg-white")
+          : disabled
+            ? "bg-white/40 text-ink-soft ring-1 ring-ink/5 cursor-not-allowed opacity-50"
+            : "bg-white/70 text-ink ring-1 ring-ink/10 hover:bg-white hover:ring-ink/20")
       }
     >
-      {children}
+      <span>{children}</span>
+      <span
+        className={
+          "text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full " +
+          (active
+            ? "bg-white/25"
+            : "bg-ink/8 text-ink-soft")
+        }
+      >
+        {count}
+      </span>
     </button>
   );
 }

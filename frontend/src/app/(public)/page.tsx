@@ -13,7 +13,9 @@ export default async function HomePage() {
   let error: string | null = null;
 
   try {
-    const data = await listArticles({ status: "PUBLISHED", limit: 24 });
+    // Carichiamo TUTTO il catalogo cosi' i filtri client-side hanno il dataset completo
+    // (per scalare oltre qualche centinaio servira' pagination + facet API lato server).
+    const data = await listArticles({ status: "PUBLISHED", limit: 200 });
     articles = data.items;
   } catch (err) {
     error = err instanceof Error ? err.message : "Errore sconosciuto";
