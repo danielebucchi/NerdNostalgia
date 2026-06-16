@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ArticleForm } from "@/components/admin/ArticleForm";
 import { Sortable } from "@/components/admin/Sortable";
+import { VintedSyncBox } from "@/components/admin/VintedSyncBox";
 import { adminApi } from "@/lib/admin-api";
 import type { Article } from "@/lib/types";
 
@@ -287,6 +288,11 @@ export default function AdminArticleEditPage({ params }: PageProps) {
             <p className="text-xs text-ink-soft mt-2">
               Formati: JPEG / PNG / WebP / GIF. Dimensione max 5 MB.
             </p>
+          </div>
+
+          {/* Vinted sync */}
+          <div className="mb-6">
+            <VintedSyncBox article={article} onUpdated={(a) => setArticle(a)} />
           </div>
 
           {/* Edit form */}
