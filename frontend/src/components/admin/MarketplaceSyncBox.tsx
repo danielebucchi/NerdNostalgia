@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/admin-api";
 import { formatPrice } from "@/lib/api";
+import { getMarkupsFromFees, useMarketplaceFees } from "@/lib/useMarketplaceFees";
 import type { Article, MarketplaceStatus } from "@/lib/types";
 
 export type MarketplaceKey = "vinted" | "ebay";
@@ -35,34 +36,6 @@ const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
       "Altri pezzi nerd su nerdnostalgia.it",
   },
 };
-
-/**
- * Markup percentuali eBay per categoria del catalogo NerdNostalgia.
- * Sono valori indicativi che riflettono la final value fee tipica
- * della categoria su ebay.it (varia: 8-17%). Aggiorna qui per regolare.
- */
-const EBAY_MARKUPS_BY_CATEGORY: Record<string, number[]> = {
-  videogames: [10, 11],
-  "pokemon-cards": [12, 13],
-  "funko-pop": [12],
-  books: [10],
-  fashion: [17],
-};
-const DEFAULT_EBAY_MARKUPS = [11];
-
-/** Vinted: fee a carico buyer, di norma non si maggiora. Lasciato uguale. */
-const DEFAULT_VINTED_MARKUPS = [0, 5];
-
-export function getMarkups(
-  marketplace: MarketplaceKey,
-  category: string | null,
-): number[] {
-  if (marketplace === "vinted") return DEFAULT_VINTED_MARKUPS;
-  if (category && EBAY_MARKUPS_BY_CATEGORY[category]) {
-    return EBAY_MARKUPS_BY_CATEGORY[category];
-  }
-  return DEFAULT_EBAY_MARKUPS;
-}
 
 export function calcMarkup(basePrice: string | number, percent: number): string {
   const base = typeof basePrice === "string" ? Number(basePrice) : basePrice;
@@ -139,7 +112,8 @@ interface Props {
 export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
   const config = CONFIGS[marketplace];
   const current = getMarketplaceData(article, marketplace);
-  const markups = getMarkups(marketplace, article.category);
+  const { fees } = useMarketplaceFees();
+  const markups = getMarkupsFromFees(fees, marketplace, article.category);
 
   const [status, setStatus] = useState<MarketplaceStatus>(current.status);
   const [url, setUrl] = useState<string>(current.url ?? "");

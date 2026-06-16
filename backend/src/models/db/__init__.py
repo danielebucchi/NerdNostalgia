@@ -11,6 +11,7 @@ from .articles import (
     VintedStatus,
 )
 from .inquiries import Inquiry, InquiryStatus
+from .marketplace_fees import MarketplaceFee
 from .wanted import WantedItem, WantedStatus
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "InquiryStatus",
     "WantedItem",
     "WantedStatus",
+    "MarketplaceFee",
 ]
