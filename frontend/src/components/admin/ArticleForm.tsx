@@ -19,16 +19,21 @@ interface MarketplaceSeed {
   url: string;
 }
 
-const MARKETPLACE_META: Record<MarketplaceKey, { label: string; emoji: string; urlPlaceholder: string }> = {
+const MARKETPLACE_META: Record<
+  MarketplaceKey,
+  { label: string; emoji: string; urlPlaceholder: string; newListingUrl: string }
+> = {
   vinted: {
     label: "Vinted",
     emoji: "🛍",
     urlPlaceholder: "https://www.vinted.it/items/123456789-…",
+    newListingUrl: "https://www.vinted.it/items/new",
   },
   ebay: {
     label: "eBay",
     emoji: "🏷",
     urlPlaceholder: "https://www.ebay.it/itm/123456789",
+    newListingUrl: "https://www.ebay.it/sl/sell",
   },
 };
 
@@ -507,7 +512,8 @@ export function ArticleForm({ initial, onSaved }: Props) {
           </h3>
           <p className="text-xs text-ink-soft mb-4">
             Spunta solo se hai già pubblicato (o stai per pubblicare) l&apos;annuncio
-            altrove. Puoi anche fare tutto dopo dalla pagina di edit.
+            altrove. Cliccando <strong>Apri ↗</strong> da mobile si apre direttamente
+            l&apos;app Vinted / eBay (se installata).
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4">
@@ -623,22 +629,34 @@ function MarketplacePicker({
         (state.enabled ? "border-pink-deep bg-pink-soft" : "border-ink/15 bg-white")
       }
     >
-      <label className="flex items-start gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={state.enabled}
-          onChange={(e) => onChange({ ...state, enabled: e.target.checked })}
-          className="mt-1 accent-pink-deep w-4 h-4"
-        />
-        <span className="flex-1">
-          <span className="display text-base text-ink block">
-            {meta.emoji} Anche su {meta.label}
+      <div className="flex items-start justify-between gap-2">
+        <label className="flex items-start gap-2 cursor-pointer flex-1">
+          <input
+            type="checkbox"
+            checked={state.enabled}
+            onChange={(e) => onChange({ ...state, enabled: e.target.checked })}
+            className="mt-1 accent-pink-deep w-4 h-4"
+          />
+          <span className="flex-1">
+            <span className="display text-base text-ink block">
+              {meta.emoji} Anche su {meta.label}
+            </span>
+            <span className="text-xs text-ink-soft">
+              Spunta se vuoi tracciare il listing su {meta.label}.
+            </span>
           </span>
-          <span className="text-xs text-ink-soft">
-            Spunta se vuoi tracciare il listing su {meta.label}.
-          </span>
-        </span>
-      </label>
+        </label>
+        <a
+          href={meta.newListingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-xs font-bold text-pink-deep underline whitespace-nowrap flex-shrink-0 mt-1"
+          title={`Apri ${meta.label} (app se installata su mobile)`}
+        >
+          Apri ↗
+        </a>
+      </div>
 
       {state.enabled && (
         <div className="mt-3 space-y-2">
