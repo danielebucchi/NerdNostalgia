@@ -1,10 +1,37 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatMaxPrice, getWantedItem } from "@/lib/api";
 import { WantedActions } from "@/components/WantedActions";
+import { absUrl, clip, SITE_NAME } from "@/lib/seo";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const item = await getWantedItem(id).catch(() => null);
+  if (!item) {
+    return { title: "Richiesta non trovata" };
+  }
+  const desc =
+    clip(item.description) || `Sto cercando ${item.title}. Te lo propongo su ${SITE_NAME}?`;
+  return {
+    title: `Cerco: ${item.title}`,
+    description: desc,
+    alternates: { canonical: `/cerco-compro/${item.id}` },
+    openGraph: {
+      title: `Cerco: ${item.title}`,
+      description: desc,
+      url: absUrl(`/cerco-compro/${item.id}`),
+    },
+    twitter: {
+      card: "summary",
+      title: `Cerco: ${item.title}`,
+      description: desc,
+    },
+  };
 }
 
 const CONDITION_LABEL: Record<string, string> = {
