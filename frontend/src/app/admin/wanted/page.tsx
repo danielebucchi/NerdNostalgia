@@ -131,7 +131,7 @@ function WantedListContent() {
               <div className="flex-1 min-w-0">
                 <p className="display text-base text-ink truncate">{w.title}</p>
                 <p className="text-xs text-ink-soft truncate">
-                  #{w.id} · {w.category ?? "—"}
+                  #{w.id} · {w.category?.name ?? "—"}
                   {w.preferred_condition ? ` · ${w.preferred_condition}` : ""}
                 </p>
               </div>

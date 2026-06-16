@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
+import { CategoryPicker } from "@/components/admin/CategoryPicker";
 import { Sortable } from "@/components/admin/Sortable";
 import { calcMarkup } from "@/components/admin/MarketplaceSyncBox";
+import { useCategories } from "@/lib/useCategories";
 import { getMarkupsFromFees, useMarketplaceFees } from "@/lib/useMarketplaceFees";
 import type {
   Article,
@@ -66,7 +68,7 @@ interface FormState {
   description: string;
   price: string;
   currency: string;
-  category: string;
+  category_id: number | null;
   condition: ArticleCondition;
   status: ArticleStatus;
   quantity: string;
@@ -82,7 +84,7 @@ const empty: FormState = {
   description: "",
   price: "",
   currency: "EUR",
-  category: "",
+  category_id: null,
   condition: "USED",
   status: "DRAFT",
   quantity: "1",
@@ -99,7 +101,7 @@ function toForm(article: Article): FormState {
     description: article.description ?? "",
     price: String(article.price ?? ""),
     currency: article.currency ?? "EUR",
-    category: article.category ?? "",
+    category_id: article.category_id ?? null,
     condition: article.condition,
     status: article.status,
     quantity: String(article.quantity ?? 1),
@@ -179,7 +181,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
         description: state.description.trim() || null,
         price: Number(state.price),
         currency: state.currency.trim().toUpperCase(),
-        category: state.category.trim() || null,
+        category_id: state.category_id,
         condition: state.condition,
         quantity: Number(state.quantity),
         sku: state.sku.trim() || null,
@@ -308,16 +310,16 @@ export function ArticleForm({ initial, onSaved }: Props) {
         </Field>
       </Row>
 
-      <Row cols={3}>
-        <Field label="Categoria">
-          <input
-            type="text"
-            value={state.category}
-            onChange={(e) => set("category", e.target.value)}
-            placeholder="videogames"
-            className="input"
+      <Row>
+        <div className="col-span-full">
+          <CategoryPicker
+            value={state.category_id}
+            onChange={(next) => set("category_id", next)}
           />
-        </Field>
+        </div>
+      </Row>
+
+      <Row cols={2}>
         <Field label="Condizione">
           <select
             value={state.condition}
@@ -534,14 +536,14 @@ export function ArticleForm({ initial, onSaved }: Props) {
               state={vinted}
               onChange={setVinted}
               basePrice={state.price}
-              category={state.category}
+              categoryId={state.category_id}
             />
             <MarketplacePicker
               marketplace="ebay"
               state={ebay}
               onChange={setEbay}
               basePrice={state.price}
-              category={state.category}
+              categoryId={state.category_id}
             />
           </div>
         </div>
@@ -632,18 +634,20 @@ function MarketplacePicker({
   state,
   onChange,
   basePrice,
-  category,
+  categoryId,
 }: {
   marketplace: MarketplaceKey;
   state: MarketplaceSeed;
   onChange: (next: MarketplaceSeed) => void;
   basePrice: string;
-  category: string;
+  categoryId: number | null;
 }) {
   const meta = MARKETPLACE_META[marketplace];
   const hasBase = basePrice.trim() !== "" && Number(basePrice) > 0;
   const { fees } = useMarketplaceFees();
-  const markups = getMarkupsFromFees(fees, marketplace, category.trim() || null);
+  const { byId } = useCategories();
+  const parentId = categoryId != null ? byId[categoryId]?.parent_id ?? null : null;
+  const markups = getMarkupsFromFees(fees, marketplace, categoryId, parentId);
 
   return (
     <div

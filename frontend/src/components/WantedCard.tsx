@@ -10,14 +10,17 @@ const CONDITION_LABEL: Record<string, string> = {
 };
 
 const CATEGORY_CHIP: Record<string, string> = {
-  "pokemon-cards": "chip-pink",
-  videogames: "chip-sky",
-  "funko-pop": "chip-lilac",
+  carte: "chip-pink",
+  videogiochi: "chip-sky",
+  nerdate: "chip-lilac",
 };
 
 export function WantedCard({ item }: { item: WantedItem }) {
   const maxPrice = formatMaxPrice(item);
-  const categoryClass = item.category ? CATEGORY_CHIP[item.category] ?? "chip-mint" : "chip-mint";
+  const topSlug =
+    item.parent_category?.slug ??
+    (item.category?.parent_id == null ? item.category?.slug : undefined);
+  const categoryClass = topSlug ? CATEGORY_CHIP[topSlug] ?? "chip-mint" : "chip-mint";
   const urgent = item.priority >= 50;
 
   return (
@@ -30,7 +33,11 @@ export function WantedCard({ item }: { item: WantedItem }) {
           <span className="chip chip-star whitespace-nowrap">🔥 con urgenza</span>
         )}
         {item.category && (
-          <span className={`chip ${categoryClass}`}>{item.category.replace(/-/g, " ")}</span>
+          <span className={`chip ${categoryClass}`}>
+            {item.parent_category
+              ? `${item.parent_category.name} › ${item.category.name}`
+              : item.category.name}
+          </span>
         )}
       </div>
 

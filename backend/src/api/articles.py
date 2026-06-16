@@ -8,15 +8,18 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 
 from helpers.article import ArticleHelper, get_article_helper
 from helpers.auth import require_admin
+from helpers.category import CategoryHelper, get_category_helper
 from helpers.user import UserHelper, get_user_helper
 from models.db import (
     Article,
     ArticleCondition,
     ArticleStatus,
+    Category,
     EbayStatus,
     User,
     VintedStatus,
 )
+from models.entities.category import CategoryResponse
 from models.entities.article import (
     ArticleCreate,
     ArticleImageAdd,
@@ -48,7 +51,20 @@ def reorder_articles(
     return None
 
 
+def _category_to_response(cat: Optional[Category]) -> Optional[CategoryResponse]:
+    if cat is None:
+        return None
+    return CategoryResponse(
+        id=cat.id,
+        name=cat.name,
+        slug=cat.slug,
+        parent_id=cat.parent_id,
+        display_order=cat.display_order,
+    )
+
+
 def _to_response(article: Article) -> ArticleResponse:
+    parent_cat = article.category.parent if article.category and article.category.parent else None
     return ArticleResponse(
         id=article.id,
         user_id=article.user_id,
@@ -56,7 +72,9 @@ def _to_response(article: Article) -> ArticleResponse:
         description=article.description,
         price=article.price,
         currency=article.currency,
-        category=article.category,
+        category_id=article.category_id,
+        category=_category_to_response(article.category),
+        parent_category=_category_to_response(parent_cat),
         condition=article.condition.value,
         status=article.status.value,
         quantity=article.quantity,
@@ -112,7 +130,7 @@ def create_article(
         description=article_data.description,
         price=article_data.price,
         currency=article_data.currency,
-        category=article_data.category,
+        category_id=article_data.category_id,
         condition=ArticleCondition(article_data.condition.value),
         status=ArticleStatus(article_data.status.value),
         quantity=article_data.quantity,
@@ -133,7 +151,10 @@ def list_articles(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     status_filter: Optional[ArticleStatus] = Query(None, alias="status"),
-    category: Optional[str] = None,
+    category_id: Optional[int] = Query(
+        None,
+        description="Filtra per categoria. Se la categoria ha figli, include anche gli articoli delle sottocategorie.",
+    ),
     condition: Optional[ArticleCondition] = None,
     brand: Optional[str] = None,
     user_id: Optional[int] = None,
@@ -141,16 +162,21 @@ def list_articles(
     max_price: Optional[Decimal] = Query(None, ge=0),
     search: Optional[str] = Query(None, description="Ricerca full-text su titolo e descrizione"),
     article_helper: ArticleHelper = Depends(get_article_helper),
+    category_helper: CategoryHelper = Depends(get_category_helper),
 ):
     """Lista articoli con paginazione, filtri e ricerca full-text."""
     db_status = ArticleStatus(status_filter.value) if status_filter else None
     db_condition = ArticleCondition(condition.value) if condition else None
 
+    category_ids = None
+    if category_id is not None:
+        category_ids = category_helper.get_descendant_ids(category_id)
+
     items, total = article_helper.gets(
         skip=skip,
         limit=limit,
         status=db_status,
-        category=category,
+        category_ids=category_ids,
         condition=db_condition,
         brand=brand,
         user_id=user_id,

@@ -3,6 +3,7 @@ Database models package.
 """
 from .base import Base, BaseModel
 from .users import User, UserRole
+from .categories import Category
 from .articles import (
     Article,
     ArticleCondition,
@@ -19,6 +20,7 @@ __all__ = [
     "BaseModel",
     "User",
     "UserRole",
+    "Category",
     "Article",
     "ArticleCondition",
     "ArticleStatus",

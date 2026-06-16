@@ -12,7 +12,7 @@ export const PUBLIC_API_BASE = API_BASE;
 
 export interface ListArticlesParams {
   status?: string;
-  category?: string;
+  category_id?: number;
   condition?: string;
   search?: string;
   min_price?: number;
@@ -72,7 +72,7 @@ export async function submitInquiry(payload: InquiryCreate): Promise<Inquiry> {
 
 export interface ListWantedParams {
   status?: string;
-  category?: string;
+  category_id?: number;
   search?: string;
   max_budget?: number;
   skip?: number;

@@ -8,6 +8,7 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from models.entities.article import ArticleCondition
+from models.entities.category import CategoryResponse
 
 
 class WantedStatus(str, enum.Enum):
@@ -19,7 +20,7 @@ class WantedStatus(str, enum.Enum):
 class WantedItemCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    category: Optional[str] = Field(None, max_length=100)
+    category_id: Optional[int] = None
     brand: Optional[str] = Field(None, max_length=100)
     model: Optional[str] = Field(None, max_length=100)
     preferred_condition: Optional[ArticleCondition] = None
@@ -33,7 +34,7 @@ class WantedItemCreate(BaseModel):
 class WantedItemUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
-    category: Optional[str] = Field(None, max_length=100)
+    category_id: Optional[int] = None
     brand: Optional[str] = Field(None, max_length=100)
     model: Optional[str] = Field(None, max_length=100)
     preferred_condition: Optional[ArticleCondition] = None
@@ -50,7 +51,9 @@ class WantedItemResponse(BaseModel):
     id: int
     title: str
     description: Optional[str]
-    category: Optional[str]
+    category_id: Optional[int] = None
+    category: Optional[CategoryResponse] = None
+    parent_category: Optional[CategoryResponse] = None
     brand: Optional[str]
     model: Optional[str]
     preferred_condition: Optional[ArticleCondition]

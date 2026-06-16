@@ -77,7 +77,12 @@ class Article(BaseModel):
     currency = Column(String(3), default="EUR")
 
     # Classificazione
-    category = Column(String(100), index=True)
+    category_id = Column(
+        Integer,
+        ForeignKey("categories.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     condition = Column(Enum(ArticleCondition), default=ArticleCondition.USED, nullable=False, index=True)
     status = Column(Enum(ArticleStatus), default=ArticleStatus.DRAFT, nullable=False, index=True)
 
@@ -126,6 +131,7 @@ class Article(BaseModel):
 
     # Relationship
     user = relationship("User", backref="articles")
+    category = relationship("Category", foreign_keys=[category_id])
 
     def __repr__(self):
         return f"<Article(id={self.id}, title='{self.title}', status='{self.status.value if self.status else None}')>"
@@ -147,7 +153,7 @@ class Article(BaseModel):
             "description": self.description,
             "price": float(self.price) if self.price else None,
             "currency": self.currency,
-            "category": self.category,
+            "category_id": self.category_id,
             "condition": self.condition.value if self.condition else None,
             "status": self.status.value if self.status else None,
             "quantity": self.quantity,

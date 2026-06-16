@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
+import { CategoryPicker } from "@/components/admin/CategoryPicker";
 import type { ArticleCondition, WantedItem, WantedStatus } from "@/lib/types";
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
 interface FormState {
   title: string;
   description: string;
-  category: string;
+  category_id: number | null;
   brand: string;
   model: string;
   preferred_condition: "" | ArticleCondition;
@@ -27,7 +28,7 @@ interface FormState {
 const empty: FormState = {
   title: "",
   description: "",
-  category: "",
+  category_id: null,
   brand: "",
   model: "",
   preferred_condition: "",
@@ -42,7 +43,7 @@ function toForm(item: WantedItem): FormState {
   return {
     title: item.title,
     description: item.description ?? "",
-    category: item.category ?? "",
+    category_id: item.category_id ?? null,
     brand: item.brand ?? "",
     model: item.model ?? "",
     preferred_condition: item.preferred_condition ?? "",
@@ -74,7 +75,7 @@ export function WantedForm({ initial, onSaved }: Props) {
       const payload: Record<string, unknown> = {
         title: state.title.trim(),
         description: state.description.trim() || null,
-        category: state.category.trim() || null,
+        category_id: state.category_id,
         brand: state.brand.trim() || null,
         model: state.model.trim() || null,
         preferred_condition: state.preferred_condition || null,
@@ -120,15 +121,12 @@ export function WantedForm({ initial, onSaved }: Props) {
         />
       </Field>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Categoria">
-          <input
-            type="text"
-            value={state.category}
-            onChange={(e) => set("category", e.target.value)}
-            className="input"
-          />
-        </Field>
+      <CategoryPicker
+        value={state.category_id}
+        onChange={(next) => set("category_id", next)}
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Marca">
           <input
             type="text"

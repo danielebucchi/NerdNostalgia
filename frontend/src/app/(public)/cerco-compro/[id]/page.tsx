@@ -79,7 +79,11 @@ export default async function WantedDetailPage({ params }: PageProps) {
               <span className="chip chip-star">🔥 con urgenza</span>
             )}
             {item.category && (
-              <span className="chip chip-lilac">{item.category.replace(/-/g, " ")}</span>
+              <span className="chip chip-lilac">
+                {item.parent_category
+                  ? `${item.parent_category.name} › ${item.category.name}`
+                  : item.category.name}
+              </span>
             )}
             {item.preferred_condition && (
               <span className="chip chip-sky">
@@ -114,7 +118,16 @@ export default async function WantedDetailPage({ params }: PageProps) {
                 value={CONDITION_LABEL[item.preferred_condition] ?? item.preferred_condition}
               />
             )}
-            {item.category && <Row label="Categoria" value={item.category.replace(/-/g, " ")} />}
+            {item.category && (
+              <Row
+                label="Categoria"
+                value={
+                  item.parent_category
+                    ? `${item.parent_category.name} › ${item.category.name}`
+                    : item.category.name
+                }
+              />
+            )}
           </dl>
         </div>
 

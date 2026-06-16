@@ -48,29 +48,41 @@ export function useMarketplaceFees(): State {
   return { fees, loading, error, reload: () => setBump((b) => b + 1) };
 }
 
+/**
+ * Risolve i markup per (marketplace, category) cercando in ordine:
+ *   1) match esatto su category_id
+ *   2) match sulla categoria padre (per le sottocategorie)
+ *   3) default del marketplace (category_id NULL)
+ *   4) fallback hardcoded
+ */
 export function getMarkupsFromFees(
   fees: MarketplaceFee[],
   marketplace: string,
-  category: string | null,
+  categoryId: number | null,
+  parentCategoryId: number | null = null,
 ): number[] {
   if (fees.length === 0) {
     return FALLBACK[marketplace] ?? [];
   }
-  const cat = category && category.trim() ? category.trim() : null;
-  const specific = fees.filter(
-    (f) => f.marketplace === marketplace && f.category === cat,
-  );
-  if (specific.length > 0) {
-    return specific.map((f) => Number(f.markup_percent));
-  }
-  if (cat !== null) {
-    // Fallback al markup default per quel marketplace
-    const defaults = fees.filter(
-      (f) => f.marketplace === marketplace && f.category === null,
+
+  if (categoryId != null) {
+    const specific = fees.filter(
+      (f) => f.marketplace === marketplace && f.category_id === categoryId,
     );
-    if (defaults.length > 0) {
-      return defaults.map((f) => Number(f.markup_percent));
-    }
+    if (specific.length > 0) return specific.map((f) => Number(f.markup_percent));
   }
+
+  if (parentCategoryId != null) {
+    const parent = fees.filter(
+      (f) => f.marketplace === marketplace && f.category_id === parentCategoryId,
+    );
+    if (parent.length > 0) return parent.map((f) => Number(f.markup_percent));
+  }
+
+  const defaults = fees.filter(
+    (f) => f.marketplace === marketplace && f.category_id == null,
+  );
+  if (defaults.length > 0) return defaults.map((f) => Number(f.markup_percent));
+
   return FALLBACK[marketplace] ?? [];
 }

@@ -3,8 +3,9 @@ Modello WantedItem per SQLAlchemy.
 """
 import enum
 
-from sqlalchemy import Column, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy import Enum as PgEnum
+from sqlalchemy.orm import relationship
 
 from .articles import ArticleCondition
 from .base import BaseModel
@@ -21,9 +22,16 @@ class WantedItem(BaseModel):
 
     title = Column(String(255), nullable=False)
     description = Column(Text)
-    category = Column(String(100), index=True)
+    category_id = Column(
+        Integer,
+        ForeignKey("categories.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     brand = Column(String(100))
     model = Column(String(100))
+
+    category = relationship("Category", foreign_keys=[category_id])
 
     preferred_condition = Column(
         PgEnum(ArticleCondition, name="article_condition", create_type=False),

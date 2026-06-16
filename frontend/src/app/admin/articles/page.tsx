@@ -139,7 +139,7 @@ function ArticlesListContent() {
               <div className="flex-1 min-w-0">
                 <p className="display text-base text-ink truncate">{a.title}</p>
                 <p className="text-xs text-ink-soft truncate">
-                  #{a.id} · {a.category ?? "—"} · {a.condition}
+                  #{a.id} · {a.category?.name ?? "—"} · {a.condition}
                   {a.sku ? ` · ${a.sku}` : ""}
                 </p>
               </div>

@@ -10,18 +10,19 @@ const CONDITION_LABEL: Record<Article["condition"], string> = {
   FOR_PARTS: "Per pezzi",
 };
 
-// Chip uniformi (stile bottone ghost: bianco glassmorphism)
-const NEUTRAL_CHIP = "chip-ghost";
-
+// Chip colorate per top-level (parent slug se sub, altrimenti slug stesso)
 const CATEGORY_CHIP: Record<string, string> = {
-  "pokemon-cards": "chip-pink",
-  "videogames": "chip-sky",
-  "funko-pop": "chip-lilac",
+  carte: "chip-pink",
+  videogiochi: "chip-sky",
+  nerdate: "chip-lilac",
 };
 
 export function ArticleCard({ article }: { article: Article }) {
   const cover = article.images?.[0];
-  const categoryClass = article.category ? CATEGORY_CHIP[article.category] ?? "chip-mint" : "chip-mint";
+  const topSlug =
+    article.parent_category?.slug ??
+    (article.category?.parent_id == null ? article.category?.slug : undefined);
+  const categoryClass = topSlug ? CATEGORY_CHIP[topSlug] ?? "chip-mint" : "chip-mint";
 
   return (
     <Link
@@ -81,7 +82,11 @@ export function ArticleCard({ article }: { article: Article }) {
 
         <div className="flex flex-wrap gap-2">
           {article.category && (
-            <span className={`chip ${categoryClass}`}>{article.category.replace(/-/g, " ")}</span>
+            <span className={`chip ${categoryClass}`}>
+              {article.parent_category
+                ? `${article.parent_category.name} › ${article.category.name}`
+                : article.category.name}
+            </span>
           )}
           {article.brand && <span className="chip">{article.brand}</span>}
         </div>

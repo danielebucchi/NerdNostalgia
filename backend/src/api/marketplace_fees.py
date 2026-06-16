@@ -22,7 +22,7 @@ def _to_response(fee: MarketplaceFee) -> MarketplaceFeeResponse:
     return MarketplaceFeeResponse(
         id=fee.id,
         marketplace=fee.marketplace,
-        category=fee.category,
+        category_id=fee.category_id,
         markup_percent=fee.markup_percent,
         note=fee.note,
         created_at=fee.created_at.isoformat() if fee.created_at else None,
@@ -52,7 +52,7 @@ def create_fee(
     """Crea un nuovo markup (admin)."""
     fee = MarketplaceFee(
         marketplace=payload.marketplace.strip().lower(),
-        category=payload.category.strip() if payload.category else None,
+        category_id=payload.category_id,
         markup_percent=payload.markup_percent,
         note=payload.note.strip() if payload.note else None,
     )

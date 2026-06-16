@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { adminApi } from "@/lib/admin-api";
-import type { MarketplaceFee } from "@/lib/types";
+import { useCategories } from "@/lib/useCategories";
+import type { Category, MarketplaceFee } from "@/lib/types";
 
 interface FeeListResp {
   items: MarketplaceFee[];
@@ -13,14 +14,15 @@ interface FeeListResp {
 const MARKETPLACES = ["vinted", "ebay"] as const;
 
 export default function AdminMarkupsPage() {
+  const { flat: categories, byId: catById } = useCategories();
   const [fees, setFees] = useState<MarketplaceFee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Form state for new fee
+  // Form state per nuovo markup
   const [marketplace, setMarketplace] = useState<string>("ebay");
-  const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState<string>(""); // "" = default (NULL)
   const [percent, setPercent] = useState("");
   const [note, setNote] = useState("");
 
@@ -48,11 +50,11 @@ export default function AdminMarkupsPage() {
     try {
       await adminApi.post("/api/marketplace-fees/", {
         marketplace,
-        category: category.trim() || null,
+        category_id: categoryId === "" ? null : Number(categoryId),
         markup_percent: Number(percent),
         note: note.trim() || null,
       });
-      setCategory("");
+      setCategoryId("");
       setPercent("");
       setNote("");
       await reload();
@@ -63,14 +65,10 @@ export default function AdminMarkupsPage() {
     }
   }
 
-  async function handleUpdate(id: number, field: keyof MarketplaceFee, value: string) {
+  async function handleUpdate(id: number, payload: Record<string, unknown>) {
     setBusy(true);
     setError(null);
     try {
-      const payload: Record<string, unknown> = {};
-      if (field === "markup_percent") payload.markup_percent = Number(value);
-      else if (field === "category") payload.category = value.trim() || null;
-      else if (field === "note") payload.note = value.trim() || null;
       await adminApi.patch(`/api/marketplace-fees/${id}`, payload);
       await reload();
     } catch (err) {
@@ -93,7 +91,6 @@ export default function AdminMarkupsPage() {
     }
   }
 
-  // Raggruppa per marketplace
   const grouped: Record<string, MarketplaceFee[]> = {};
   for (const f of fees) {
     (grouped[f.marketplace] ??= []).push(f);
@@ -132,13 +129,14 @@ export default function AdminMarkupsPage() {
             <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
               Categoria
             </span>
-            <input
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="vuoto = default"
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
               className="input mt-1"
-            />
+            >
+              <option value="">— default (tutte) —</option>
+              {renderCategoryOptions(categories)}
+            </select>
           </label>
           <label className="block">
             <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
@@ -164,7 +162,7 @@ export default function AdminMarkupsPage() {
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="es: commissione finale eBay categoria collezioni"
+              placeholder="es: commissione finale eBay collezioni"
               className="input mt-1"
             />
           </label>
@@ -188,7 +186,9 @@ export default function AdminMarkupsPage() {
                   key={f.id}
                   fee={f}
                   busy={busy}
-                  onUpdate={(field, value) => handleUpdate(f.id, field, value)}
+                  categories={categories}
+                  catById={catById}
+                  onSave={(payload) => handleUpdate(f.id, payload)}
                   onDelete={() => handleDelete(f.id)}
                 />
               ))}
@@ -218,41 +218,84 @@ export default function AdminMarkupsPage() {
   );
 }
 
+function renderCategoryOptions(flat: Category[]) {
+  const tops = flat.filter((c) => c.parent_id == null);
+  return tops.flatMap((top) => [
+    <option key={top.id} value={top.id}>
+      {top.name}
+    </option>,
+    ...flat
+      .filter((c) => c.parent_id === top.id)
+      .map((sub) => (
+        <option key={sub.id} value={sub.id}>
+          {"  ↳ "} {sub.name}
+        </option>
+      )),
+  ]);
+}
+
+function categoryLabel(catById: Record<number, Category>, id: number | null): string {
+  if (id == null) return "— default —";
+  const cat = catById[id];
+  if (!cat) return `#${id}`;
+  if (cat.parent_id == null) return cat.name;
+  const parent = catById[cat.parent_id];
+  return parent ? `${parent.name} › ${cat.name}` : cat.name;
+}
+
 function FeeRow({
   fee,
   busy,
-  onUpdate,
+  categories,
+  catById,
+  onSave,
   onDelete,
 }: {
   fee: MarketplaceFee;
   busy: boolean;
-  onUpdate: (field: keyof MarketplaceFee, value: string) => void;
+  categories: Category[];
+  catById: Record<number, Category>;
+  onSave: (payload: Record<string, unknown>) => void;
   onDelete: () => void;
 }) {
-  const [category, setCategory] = useState(fee.category ?? "");
+  const [categoryId, setCategoryId] = useState<string>(
+    fee.category_id != null ? String(fee.category_id) : "",
+  );
   const [percent, setPercent] = useState(fee.markup_percent);
   const [note, setNote] = useState(fee.note ?? "");
 
-  const dirtyCat = (category.trim() || null) !== fee.category;
+  const currentCatId = categoryId === "" ? null : Number(categoryId);
+  const dirtyCat = currentCatId !== fee.category_id;
   const dirtyPercent = percent !== fee.markup_percent;
   const dirtyNote = (note.trim() || null) !== fee.note;
   const anyDirty = dirtyCat || dirtyPercent || dirtyNote;
 
-  async function saveAll() {
-    if (dirtyCat) await onUpdate("category", category);
-    if (dirtyPercent) await onUpdate("markup_percent", percent);
-    if (dirtyNote) await onUpdate("note", note);
+  const labelPreview = useMemo(
+    () => categoryLabel(catById, currentCatId),
+    [catById, currentCatId],
+  );
+
+  function saveAll() {
+    const payload: Record<string, unknown> = {};
+    if (dirtyCat) payload.category_id = currentCatId;
+    if (dirtyPercent) payload.markup_percent = Number(percent);
+    if (dirtyNote) payload.note = note.trim() || null;
+    onSave(payload);
   }
 
   return (
-    <div className="card p-3 grid sm:grid-cols-[1fr_1fr_2fr_auto] items-center gap-2">
-      <input
-        type="text"
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
-        placeholder="default"
-        className="input"
-      />
+    <div className="card p-3 grid sm:grid-cols-[1.5fr_1fr_2fr_auto] items-center gap-2">
+      <div>
+        <select
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          className="input"
+          title={labelPreview}
+        >
+          <option value="">— default (tutte) —</option>
+          {renderCategoryOptions(categories)}
+        </select>
+      </div>
       <div className="flex items-center gap-1">
         <input
           type="number"

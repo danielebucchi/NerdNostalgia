@@ -4,10 +4,31 @@ export type MarketplaceStatus = "NOT_LISTED" | "LISTED" | "SOLD";
 export type VintedStatus = MarketplaceStatus;
 export type EbayStatus = MarketplaceStatus;
 
+export interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  parent_id: number | null;
+  display_order: number;
+}
+
+export interface CategoryNode extends Category {
+  children: CategoryNode[];
+}
+
+export interface CategoryListResponse {
+  items: Category[];
+  total: number;
+}
+
+export interface CategoryTreeResponse {
+  items: CategoryNode[];
+}
+
 export interface MarketplaceFee {
   id: number;
   marketplace: string;
-  category: string | null;
+  category_id: number | null;
   markup_percent: string;
   note: string | null;
   created_at: string;
@@ -21,7 +42,9 @@ export interface Article {
   description: string | null;
   price: string;
   currency: string;
-  category: string | null;
+  category_id: number | null;
+  category: Category | null;
+  parent_category: Category | null;
   condition: ArticleCondition;
   status: ArticleStatus;
   quantity: number;
@@ -86,7 +109,9 @@ export interface WantedItem {
   id: number;
   title: string;
   description: string | null;
-  category: string | null;
+  category_id: number | null;
+  category: Category | null;
+  parent_category: Category | null;
   brand: string | null;
   model: string | null;
   preferred_condition: ArticleCondition | null;

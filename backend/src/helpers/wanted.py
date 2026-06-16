@@ -37,7 +37,7 @@ class WantedItemHelper(BaseHelper):
         skip: int = 0,
         limit: int = 50,
         status: Optional[WantedStatus] = None,
-        category: Optional[str] = None,
+        category_ids: Optional[List[int]] = None,
         condition: Optional[ArticleCondition] = None,
         max_budget: Optional[Decimal] = None,
         search: Optional[str] = None,
@@ -46,8 +46,8 @@ class WantedItemHelper(BaseHelper):
 
         if status is not None:
             query = query.filter(WantedItem.status == status)
-        if category:
-            query = query.filter(WantedItem.category == category)
+        if category_ids:
+            query = query.filter(WantedItem.category_id.in_(category_ids))
         if condition is not None:
             query = query.filter(WantedItem.preferred_condition == condition)
         if max_budget is not None:
