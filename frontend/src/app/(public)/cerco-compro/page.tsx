@@ -33,22 +33,15 @@ export default async function CercoCompoPage() {
   return (
     <section>
       <div className="hero-blob p-6 sm:p-10 md:p-12 mb-10 sm:mb-12">
-        <div className="grid gap-4 md:grid-cols-[2fr_1fr] md:items-end">
-          <div className="text-center md:text-left">
-            <span className="chip chip-mint mb-4 inline-flex">Sto cercando</span>
-            <h1 className="display text-3xl sm:text-4xl md:text-5xl text-ink leading-tight">
-              Cerco questi <span className="text-pink-deep">pezzi nerd</span>.
-            </h1>
-            <p className="text-ink-soft text-base sm:text-lg mt-4 max-w-xl mx-auto md:mx-0">
-              Hai una di queste cose in cantina? Scrivimi e ne parliamo. Pago in
-              fretta, ritiro o spedizione a mio carico.
-            </p>
-          </div>
-          <div className="text-center md:text-right">
-            {!error && (
-              <span className="chip chip-pink">{total} richieste attive</span>
-            )}
-          </div>
+        <div className="text-center md:text-left">
+          <span className="chip chip-ghost mb-4 inline-flex">Sto cercando</span>
+          <h1 className="display text-3xl sm:text-4xl md:text-5xl text-ink leading-tight">
+            Cerco questi <span className="text-pink-deep">pezzi nerd</span>.
+          </h1>
+          <p className="text-ink-soft text-base sm:text-lg mt-4 max-w-xl mx-auto md:mx-0">
+            Hai una di queste cose in cantina? Scrivimi e ne parliamo. Pago in
+            fretta, ritiro o spedizione a mio carico.
+          </p>
         </div>
       </div>
 

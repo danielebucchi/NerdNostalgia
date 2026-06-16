@@ -9,12 +9,8 @@ const CONDITION_LABEL: Record<Article["condition"], string> = {
   FOR_PARTS: "Per pezzi",
 };
 
-const CONDITION_CHIP: Record<Article["condition"], string> = {
-  NEW: "chip-mint",
-  USED: "chip-sky",
-  REFURBISHED: "chip-star",
-  FOR_PARTS: "chip-lilac",
-};
+// Chip uniformi (stile bottone ghost: bianco glassmorphism)
+const NEUTRAL_CHIP = "chip-ghost";
 
 const CATEGORY_CHIP: Record<string, string> = {
   "pokemon-cards": "chip-pink",
@@ -24,7 +20,6 @@ const CATEGORY_CHIP: Record<string, string> = {
 
 export function ArticleCard({ article }: { article: Article }) {
   const cover = article.images?.[0];
-  const conditionClass = CONDITION_CHIP[article.condition] ?? "chip-mint";
   const categoryClass = article.category ? CATEGORY_CHIP[article.category] ?? "chip-mint" : "chip-mint";
 
   return (
@@ -44,17 +39,17 @@ export function ArticleCard({ article }: { article: Article }) {
           </div>
         )}
 
-        {/* Riga unica di chip in alto, scorrevole se non ci stanno */}
+        {/* Riga unica di chip in alto, uniformi stile ghost */}
         <div className="absolute top-2 left-2 right-2 flex items-start gap-1 flex-wrap pointer-events-none">
-          <span className={`chip ${conditionClass} text-[10px]`}>
+          <span className={`chip ${NEUTRAL_CHIP} text-[10px]`}>
             {CONDITION_LABEL[article.condition]}
           </span>
           <span className="ml-auto flex gap-1 flex-wrap justify-end">
             {article.vinted_status === "LISTED" && article.vinted_url && (
-              <span className="chip chip-pink text-[10px]">🛍</span>
+              <span className={`chip ${NEUTRAL_CHIP} text-[10px]`}>🛍 Vinted</span>
             )}
             {article.ebay_status === "LISTED" && article.ebay_url && (
-              <span className="chip chip-mint text-[10px]">🏷</span>
+              <span className={`chip ${NEUTRAL_CHIP} text-[10px]`}>🏷 eBay</span>
             )}
           </span>
         </div>
