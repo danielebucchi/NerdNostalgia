@@ -24,7 +24,10 @@ export function ArticleCard({ article }: { article: Article }) {
   const categoryClass = article.category ? CATEGORY_CHIP[article.category] ?? "chip-mint" : "chip-mint";
 
   return (
-    <Link href={`/articles/${article.id}`} className="card card-clickable block overflow-hidden">
+    <Link
+      href={`/articles/${article.id}`}
+      className="card card-clickable flex flex-col overflow-hidden h-full"
+    >
       <div className="aspect-square w-full bg-cream/40 relative overflow-hidden">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -73,7 +76,7 @@ export function ArticleCard({ article }: { article: Article }) {
         )}
       </div>
 
-      <div className="p-4 flex flex-col gap-2">
+      <div className="p-4 flex flex-col gap-2 flex-1">
         <h3 className="display text-base sm:text-lg text-ink leading-snug line-clamp-2 min-h-[48px]">
           {article.title}
         </h3>
@@ -82,37 +85,40 @@ export function ArticleCard({ article }: { article: Article }) {
           {article.category && (
             <span className={`chip ${categoryClass}`}>{article.category.replace(/-/g, " ")}</span>
           )}
-          {article.brand && (
-            <span className="chip">{article.brand}</span>
-          )}
+          {article.brand && <span className="chip">{article.brand}</span>}
         </div>
 
-        <div className="flex items-end justify-between mt-2 pt-2 border-t-2 border-dashed border-ink/15">
-          <span className="display text-2xl text-pink-deep">{formatPrice(article)}</span>
-          <span className="text-xs text-ink-soft">vedi →</span>
-        </div>
-        {(article.vinted_price || article.ebay_price) && (
-          <div className="text-[11px] text-ink-soft flex flex-wrap items-center gap-x-3 gap-y-1">
-            {article.vinted_price && (
-              <span className="inline-flex items-center gap-1.5">
-                <MarketplaceLogo marketplace="vinted" height={12} />
-                {formatPrice({
-                  price: article.vinted_price,
-                  currency: article.currency,
-                })}
-              </span>
-            )}
-            {article.ebay_price && (
-              <span className="inline-flex items-center gap-1.5">
-                <MarketplaceLogo marketplace="ebay" height={12} />
-                {formatPrice({
-                  price: article.ebay_price,
-                  currency: article.currency,
-                })}
-              </span>
-            )}
+        {/* Footer prezzi: sempre ancorato in basso grazie a mt-auto */}
+        <div className="mt-auto pt-3 border-t border-dashed border-ink/15">
+          <div className="flex items-end justify-between">
+            <span className="display text-2xl text-pink-deep leading-none">
+              {formatPrice(article)}
+            </span>
+            <span className="text-xs text-ink-soft">vedi →</span>
           </div>
-        )}
+          {(article.vinted_price || article.ebay_price) && (
+            <div className="mt-2 text-[11px] text-ink-soft flex flex-wrap items-center gap-x-3 gap-y-1">
+              {article.vinted_price && (
+                <span className="inline-flex items-center gap-1.5">
+                  <MarketplaceLogo marketplace="vinted" height={12} />
+                  {formatPrice({
+                    price: article.vinted_price,
+                    currency: article.currency,
+                  })}
+                </span>
+              )}
+              {article.ebay_price && (
+                <span className="inline-flex items-center gap-1.5">
+                  <MarketplaceLogo marketplace="ebay" height={12} />
+                  {formatPrice({
+                    price: article.ebay_price,
+                    currency: article.currency,
+                  })}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </Link>
   );
