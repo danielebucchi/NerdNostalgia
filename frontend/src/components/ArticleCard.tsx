@@ -48,6 +48,12 @@ export function ArticleCard({ article }: { article: Article }) {
           {CONDITION_LABEL[article.condition]}
         </span>
 
+        {article.vinted_status === "LISTED" && article.vinted_url && (
+          <span className="chip chip-pink absolute top-3 right-3 text-[10px]">
+            🛍 Vinted
+          </span>
+        )}
+
         {article.status === "SOLD" && (
           <div className="absolute inset-0 bg-ink/70 flex items-center justify-center">
             <span className="display text-2xl text-pink rotate-[-6deg] border-2 border-pink rounded-chonk px-4 py-1 bg-ink">

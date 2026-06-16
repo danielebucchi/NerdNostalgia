@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from helpers.article import ArticleHelper, get_article_helper
 from helpers.auth import require_admin
 from helpers.user import UserHelper, get_user_helper
-from models.db import Article, ArticleCondition, ArticleStatus, User
+from models.db import Article, ArticleCondition, ArticleStatus, User, VintedStatus
 from models.entities.article import (
     ArticleCreate,
     ArticleImageAdd,
@@ -17,6 +17,7 @@ from models.entities.article import (
     ArticleResponse,
     ArticleUpdate,
     ReorderRequest,
+    VintedSyncUpdate,
 )
 from utils.storage import (
     UploadValidationError,
@@ -59,6 +60,9 @@ def _to_response(article: Article) -> ArticleResponse:
         images=article.images or [],
         article_metadata=article.article_metadata or {},
         display_order=article.display_order or 0,
+        vinted_status=article.vinted_status.value if article.vinted_status else "NOT_LISTED",
+        vinted_url=article.vinted_url,
+        vinted_synced_at=article.vinted_synced_at.isoformat() if article.vinted_synced_at else None,
         created_at=article.created_at.isoformat() if article.created_at else None,
         updated_at=article.updated_at.isoformat() if article.updated_at else None,
         published_at=article.published_at.isoformat() if article.published_at else None,
@@ -273,6 +277,29 @@ def archive_article(
             detail=f"Articolo con ID {article_id} non trovato",
         )
     article_helper.set_status(article, ArticleStatus.ARCHIVED)
+    return _to_response(article)
+
+
+@router.patch("/{article_id}/vinted", response_model=ArticleResponse)
+def update_vinted_sync(
+    article_id: int,
+    payload: VintedSyncUpdate,
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Aggiorna stato e URL Vinted dell'articolo. Se vinted_status=SOLD,
+    l'articolo viene marcato come SOLD anche nel catalogo principale."""
+    article = article_helper.get("id", article_id)
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Articolo con ID {article_id} non trovato",
+        )
+    article_helper.set_vinted(
+        article,
+        VintedStatus(payload.vinted_status.value),
+        payload.vinted_url,
+    )
     return _to_response(article)
 
 
