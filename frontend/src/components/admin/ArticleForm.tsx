@@ -4,7 +4,33 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
 import { Sortable } from "@/components/admin/Sortable";
-import type { Article, ArticleCondition, ArticleStatus } from "@/lib/types";
+import type {
+  Article,
+  ArticleCondition,
+  ArticleStatus,
+  MarketplaceStatus,
+} from "@/lib/types";
+
+type MarketplaceKey = "vinted" | "ebay";
+
+interface MarketplaceSeed {
+  enabled: boolean;
+  status: MarketplaceStatus;
+  url: string;
+}
+
+const MARKETPLACE_META: Record<MarketplaceKey, { label: string; emoji: string; urlPlaceholder: string }> = {
+  vinted: {
+    label: "Vinted",
+    emoji: "🛍",
+    urlPlaceholder: "https://www.vinted.it/items/123456789-…",
+  },
+  ebay: {
+    label: "eBay",
+    emoji: "🏷",
+    urlPlaceholder: "https://www.ebay.it/itm/123456789",
+  },
+};
 
 interface PendingFile {
   id: string;
@@ -79,6 +105,16 @@ export function ArticleForm({ initial, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [vinted, setVinted] = useState<MarketplaceSeed>({
+    enabled: false,
+    status: "LISTED",
+    url: "",
+  });
+  const [ebay, setEbay] = useState<MarketplaceSeed>({
+    enabled: false,
+    status: "LISTED",
+    url: "",
+  });
 
   const isEdit = Boolean(initial);
 
@@ -161,6 +197,30 @@ export function ArticleForm({ initial, onSaved }: Props) {
           );
         }
         setPendingFiles([]);
+      }
+
+      // Sync iniziale Vinted / eBay (solo in create)
+      if (!isEdit) {
+        if (vinted.enabled) {
+          setUploadProgress("Sincronizzo Vinted…");
+          result = await adminApi.patch<Article>(
+            `/api/articles/${result.id}/vinted`,
+            {
+              vinted_status: vinted.status,
+              vinted_url: vinted.url.trim() || null,
+            },
+          );
+        }
+        if (ebay.enabled) {
+          setUploadProgress("Sincronizzo eBay…");
+          result = await adminApi.patch<Article>(
+            `/api/articles/${result.id}/ebay`,
+            {
+              ebay_status: ebay.status,
+              ebay_url: ebay.url.trim() || null,
+            },
+          );
+        }
         setUploadProgress(null);
       }
 
@@ -440,6 +500,31 @@ export function ArticleForm({ initial, onSaved }: Props) {
         </div>
       )}
 
+      {!isEdit && (
+        <div className="border-2 border-dashed border-ink/25 rounded-big p-4">
+          <h3 className="display text-base text-ink mb-1">
+            Sincronizza subito su marketplace
+          </h3>
+          <p className="text-xs text-ink-soft mb-4">
+            Spunta solo se hai già pubblicato (o stai per pubblicare) l&apos;annuncio
+            altrove. Puoi anche fare tutto dopo dalla pagina di edit.
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <MarketplacePicker
+              marketplace="vinted"
+              state={vinted}
+              onChange={setVinted}
+            />
+            <MarketplacePicker
+              marketplace="ebay"
+              state={ebay}
+              onChange={setEbay}
+            />
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-pink-deep font-semibold">⚠ {error}</p>}
       {uploadProgress && <p className="text-ink-soft text-sm">{uploadProgress}</p>}
 
@@ -449,9 +534,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
             ? uploadProgress ?? "Salvataggio…"
             : isEdit
               ? "Salva modifiche"
-              : pendingFiles.length > 0
-                ? `Crea articolo (+${pendingFiles.length} ${pendingFiles.length === 1 ? "foto" : "foto"})`
-                : "Crea articolo"}
+              : buildCreateLabel(pendingFiles.length, vinted.enabled, ebay.enabled)}
         </button>
         <button
           type="button"
@@ -505,5 +588,89 @@ function Field({
       <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">{label}</span>
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+function buildCreateLabel(
+  fileCount: number,
+  vintedOn: boolean,
+  ebayOn: boolean,
+): string {
+  const extras: string[] = [];
+  if (fileCount > 0) extras.push(`+${fileCount} foto`);
+  if (vintedOn) extras.push("Vinted");
+  if (ebayOn) extras.push("eBay");
+  return extras.length > 0
+    ? `Crea articolo (${extras.join(" · ")})`
+    : "Crea articolo";
+}
+
+function MarketplacePicker({
+  marketplace,
+  state,
+  onChange,
+}: {
+  marketplace: MarketplaceKey;
+  state: MarketplaceSeed;
+  onChange: (next: MarketplaceSeed) => void;
+}) {
+  const meta = MARKETPLACE_META[marketplace];
+
+  return (
+    <div
+      className={
+        "rounded-xl border-2 p-3 transition-colors " +
+        (state.enabled ? "border-pink-deep bg-pink-soft" : "border-ink/15 bg-white")
+      }
+    >
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={state.enabled}
+          onChange={(e) => onChange({ ...state, enabled: e.target.checked })}
+          className="mt-1 accent-pink-deep w-4 h-4"
+        />
+        <span className="flex-1">
+          <span className="display text-base text-ink block">
+            {meta.emoji} Anche su {meta.label}
+          </span>
+          <span className="text-xs text-ink-soft">
+            Spunta se vuoi tracciare il listing su {meta.label}.
+          </span>
+        </span>
+      </label>
+
+      {state.enabled && (
+        <div className="mt-3 space-y-2">
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+              Stato
+            </span>
+            <select
+              value={state.status}
+              onChange={(e) =>
+                onChange({ ...state, status: e.target.value as MarketplaceStatus })
+              }
+              className="input mt-1"
+            >
+              <option value="NOT_LISTED">Da listare</option>
+              <option value="LISTED">Online (ho già pubblicato)</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+              URL listing (opzionale)
+            </span>
+            <input
+              type="url"
+              value={state.url}
+              onChange={(e) => onChange({ ...state, url: e.target.value })}
+              placeholder={meta.urlPlaceholder}
+              className="input mt-1"
+            />
+          </label>
+        </div>
+      )}
+    </div>
   );
 }
