@@ -88,38 +88,38 @@ export function ArticleCard({ article }: { article: Article }) {
           {article.brand && <span className="chip">{article.brand}</span>}
         </div>
 
-        {/* Wrapper footer: marketplace prices + linea + prezzo, ancorato in basso. */}
-        <div className="mt-auto">
-          {/* Slot prezzi marketplace: altezza riservata anche se vuoto, cosi'
-              il prezzo principale resta sempre alla stessa Y tra card diverse. */}
-          <div className="text-[11px] text-ink-soft flex flex-wrap items-center gap-x-3 gap-y-1 min-h-[18px] mb-1.5">
-            {article.vinted_price && (
-              <span className="inline-flex items-center gap-1.5">
-                <MarketplaceLogo marketplace="vinted" height={12} />
-                {formatPrice({
-                  price: article.vinted_price,
-                  currency: article.currency,
-                })}
-              </span>
-            )}
-            {article.ebay_price && (
-              <span className="inline-flex items-center gap-1.5">
-                <MarketplaceLogo marketplace="ebay" height={12} />
-                {formatPrice({
-                  price: article.ebay_price,
-                  currency: article.currency,
-                })}
-              </span>
-            )}
-          </div>
+        {/* Filler: spinge il footer in basso mantenendo prezzo alla stessa Y */}
+        <div className="flex-1 min-h-2" aria-hidden="true" />
 
-          {/* Linea + prezzo principale: stessa Y per tutte le card. */}
-          <div className="pt-3 border-t-2 border-dashed border-ink/15 flex items-end justify-between">
-            <span className="display text-2xl text-pink-deep leading-none">
-              {formatPrice(article)}
+        {/* Linea + prezzo principale: stessa Y in tutte le card */}
+        <div className="pt-3 border-t-2 border-dashed border-ink/15 flex items-end justify-between">
+          <span className="display text-2xl text-pink-deep leading-none">
+            {formatPrice(article)}
+          </span>
+          <span className="text-xs text-ink-soft">vedi →</span>
+        </div>
+
+        {/* Slot prezzi marketplace SOTTO al prezzo: altezza riservata
+            anche se vuoto, cosi' tutte le card terminano alla stessa Y. */}
+        <div className="text-[11px] text-ink-soft flex flex-wrap items-center gap-x-3 gap-y-1 min-h-[18px]">
+          {article.vinted_price && (
+            <span className="inline-flex items-center gap-1.5">
+              <MarketplaceLogo marketplace="vinted" height={12} />
+              {formatPrice({
+                price: article.vinted_price,
+                currency: article.currency,
+              })}
             </span>
-            <span className="text-xs text-ink-soft">vedi →</span>
-          </div>
+          )}
+          {article.ebay_price && (
+            <span className="inline-flex items-center gap-1.5">
+              <MarketplaceLogo marketplace="ebay" height={12} />
+              {formatPrice({
+                price: article.ebay_price,
+                currency: article.currency,
+              })}
+            </span>
+          )}
         </div>
       </div>
     </Link>
