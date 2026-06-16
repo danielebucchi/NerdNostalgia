@@ -71,9 +71,11 @@ def _to_response(article: Article) -> ArticleResponse:
         vinted_status=article.vinted_status.value if article.vinted_status else "NOT_LISTED",
         vinted_url=article.vinted_url,
         vinted_synced_at=article.vinted_synced_at.isoformat() if article.vinted_synced_at else None,
+        vinted_price=article.vinted_price,
         ebay_status=article.ebay_status.value if article.ebay_status else "NOT_LISTED",
         ebay_url=article.ebay_url,
         ebay_synced_at=article.ebay_synced_at.isoformat() if article.ebay_synced_at else None,
+        ebay_price=article.ebay_price,
         created_at=article.created_at.isoformat() if article.created_at else None,
         updated_at=article.updated_at.isoformat() if article.updated_at else None,
         published_at=article.published_at.isoformat() if article.published_at else None,
@@ -310,6 +312,7 @@ def update_vinted_sync(
         article,
         VintedStatus(payload.vinted_status.value),
         payload.vinted_url,
+        payload.vinted_price,
     )
     return _to_response(article)
 
@@ -333,6 +336,7 @@ def update_ebay_sync(
         article,
         EbayStatus(payload.ebay_status.value),
         payload.ebay_url,
+        payload.ebay_price,
     )
     return _to_response(article)
 

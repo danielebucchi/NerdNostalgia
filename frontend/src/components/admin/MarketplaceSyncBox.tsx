@@ -54,16 +54,22 @@ function getMarketplaceData(article: Article, key: MarketplaceKey) {
       status: article.vinted_status,
       url: article.vinted_url,
       syncedAt: article.vinted_synced_at,
+      price: article.vinted_price,
     };
   }
   return {
     status: article.ebay_status,
     url: article.ebay_url,
     syncedAt: article.ebay_synced_at,
+    price: article.ebay_price,
   };
 }
 
-function buildDescription(article: Article, footer: string): string {
+function buildDescription(
+  article: Article,
+  footer: string,
+  overridePrice: string | null,
+): string {
   const lines: string[] = [];
   lines.push(article.title);
   lines.push("");
@@ -81,7 +87,10 @@ function buildDescription(article: Article, footer: string): string {
     lines.push(...meta);
     lines.push("");
   }
-  lines.push(`Prezzo indicativo: ${formatPrice(article)}`);
+  const priceStr = overridePrice
+    ? formatPrice({ price: overridePrice, currency: article.currency })
+    : formatPrice(article);
+  lines.push(`Prezzo indicativo: ${priceStr}`);
   lines.push("");
   lines.push(footer);
   return lines.join("\n");
@@ -99,6 +108,7 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
 
   const [status, setStatus] = useState<MarketplaceStatus>(current.status);
   const [url, setUrl] = useState<string>(current.url ?? "");
+  const [price, setPrice] = useState<string>(current.price ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -106,15 +116,20 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
   useEffect(() => {
     setStatus(current.status);
     setUrl(current.url ?? "");
+    setPrice(current.price ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [article.id, current.status, current.url]);
+  }, [article.id, current.status, current.url, current.price]);
 
-  const dirty = status !== current.status || (url || null) !== (current.url || null);
+  const dirty =
+    status !== current.status ||
+    (url || null) !== (current.url || null) ||
+    (price.trim() || null) !== (current.price || null);
 
-  function buildPayload(s: MarketplaceStatus, u: string | null) {
+  function buildPayload(s: MarketplaceStatus, u: string | null, p: string) {
+    const priceNum = p.trim() ? Number(p) : null;
     return marketplace === "vinted"
-      ? { vinted_status: s, vinted_url: u }
-      : { ebay_status: s, ebay_url: u };
+      ? { vinted_status: s, vinted_url: u, vinted_price: priceNum }
+      : { ebay_status: s, ebay_url: u, ebay_price: priceNum };
   }
 
   async function patch(payload: Record<string, unknown>) {
@@ -134,15 +149,16 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
   }
 
   async function handleSave() {
-    await patch(buildPayload(status, url.trim() || null));
+    await patch(buildPayload(status, url.trim() || null, price));
   }
 
   async function quickAction(next: MarketplaceStatus) {
-    await patch(buildPayload(next, url.trim() || null));
+    await patch(buildPayload(next, url.trim() || null, price));
   }
 
   async function copyDescription() {
-    const text = buildDescription(article, config.descriptionFooter);
+    const overridePrice = price.trim() || current.price;
+    const text = buildDescription(article, config.descriptionFooter, overridePrice);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -184,6 +200,26 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
         >
           {copied ? "✓ Copiato!" : "📋 Copia descrizione formattata"}
         </button>
+      </div>
+
+      <div className="grid sm:grid-cols-[1fr_auto] gap-3 mb-3">
+        <label className="block">
+          <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+            Prezzo su {config.label} ({article.currency})
+          </span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder={`default: ${article.price}`}
+            className="input mt-1"
+          />
+          <span className="text-[10px] text-ink-soft block mt-1">
+            Vuoto = usa il prezzo del catalogo ({article.price} {article.currency}).
+          </span>
+        </label>
       </div>
 
       <label className="block mb-3">

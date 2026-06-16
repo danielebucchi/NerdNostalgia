@@ -99,9 +99,11 @@ class ArticleResponse(BaseModel):
     vinted_status: VintedStatus = VintedStatus.NOT_LISTED
     vinted_url: Optional[str] = None
     vinted_synced_at: Optional[str] = None
+    vinted_price: Optional[Decimal] = None
     ebay_status: EbayStatus = EbayStatus.NOT_LISTED
     ebay_url: Optional[str] = None
     ebay_synced_at: Optional[str] = None
+    ebay_price: Optional[Decimal] = None
     created_at: str
     updated_at: str
     published_at: Optional[str]
@@ -122,8 +124,10 @@ class ReorderRequest(BaseModel):
 class VintedSyncUpdate(BaseModel):
     vinted_status: VintedStatus
     vinted_url: Optional[str] = Field(None, max_length=500)
+    vinted_price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
 
 
 class EbaySyncUpdate(BaseModel):
     ebay_status: EbayStatus
     ebay_url: Optional[str] = Field(None, max_length=500)
+    ebay_price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
