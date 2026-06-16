@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
 import { Sortable } from "@/components/admin/Sortable";
-import { calcMarkup } from "@/components/admin/MarketplaceSyncBox";
+import { calcMarkup, getMarkups } from "@/components/admin/MarketplaceSyncBox";
 import type {
   Article,
   ArticleCondition,
@@ -28,7 +28,6 @@ const MARKETPLACE_META: Record<
     emoji: string;
     urlPlaceholder: string;
     newListingUrl: string;
-    markups: number[];
   }
 > = {
   vinted: {
@@ -36,14 +35,12 @@ const MARKETPLACE_META: Record<
     emoji: "🛍",
     urlPlaceholder: "https://www.vinted.it/items/123456789-…",
     newListingUrl: "https://www.vinted.it/items/new",
-    markups: [0, 5],
   },
   ebay: {
     label: "eBay",
     emoji: "🏷",
     urlPlaceholder: "https://www.ebay.it/itm/123456789",
     newListingUrl: "https://www.ebay.it/sl/sell",
-    markups: [11],
   },
 };
 
@@ -536,12 +533,14 @@ export function ArticleForm({ initial, onSaved }: Props) {
               state={vinted}
               onChange={setVinted}
               basePrice={state.price}
+              category={state.category}
             />
             <MarketplacePicker
               marketplace="ebay"
               state={ebay}
               onChange={setEbay}
               basePrice={state.price}
+              category={state.category}
             />
           </div>
         </div>
@@ -632,14 +631,17 @@ function MarketplacePicker({
   state,
   onChange,
   basePrice,
+  category,
 }: {
   marketplace: MarketplaceKey;
   state: MarketplaceSeed;
   onChange: (next: MarketplaceSeed) => void;
   basePrice: string;
+  category: string;
 }) {
   const meta = MARKETPLACE_META[marketplace];
   const hasBase = basePrice.trim() !== "" && Number(basePrice) > 0;
+  const markups = getMarkups(marketplace, category.trim() || null);
 
   return (
     <div
@@ -712,7 +714,7 @@ function MarketplacePicker({
                 <span className="text-[10px] uppercase tracking-wider text-ink-soft self-center mr-1">
                   Da catalogo:
                 </span>
-                {meta.markups.map((m) => (
+                {markups.map((m) => (
                   <button
                     key={m}
                     type="button"
