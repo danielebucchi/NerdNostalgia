@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Article } from "@/lib/types";
 import { formatPrice } from "@/lib/api";
+import { MarketplaceLogo } from "@/components/MarketplaceLogo";
 
 const CONDITION_LABEL: Record<Article["condition"], string> = {
   NEW: "Nuovo",
@@ -39,20 +40,29 @@ export function ArticleCard({ article }: { article: Article }) {
           </div>
         )}
 
-        {/* Riga unica di chip in alto, uniformi stile ghost */}
-        <div className="absolute top-2 left-2 right-2 flex items-start gap-1 flex-wrap pointer-events-none">
-          <span className={`chip ${NEUTRAL_CHIP} text-[10px]`}>
-            {CONDITION_LABEL[article.condition]}
-          </span>
-          <span className="ml-auto flex gap-1 flex-wrap justify-end">
+        {/* Condizione: in alto a sinistra */}
+        <span
+          className={`chip ${NEUTRAL_CHIP} text-[10px] absolute top-2 left-2 pointer-events-none`}
+        >
+          {CONDITION_LABEL[article.condition]}
+        </span>
+
+        {/* Marketplace: solo loghi, in basso a sinistra. Pillole uniformi. */}
+        {((article.vinted_status === "LISTED" && article.vinted_url) ||
+          (article.ebay_status === "LISTED" && article.ebay_url)) && (
+          <div className="absolute bottom-2 left-2 flex gap-1.5 pointer-events-none">
             {article.vinted_status === "LISTED" && article.vinted_url && (
-              <span className={`chip ${NEUTRAL_CHIP} text-[10px]`}>🛍 Vinted</span>
+              <span className="inline-flex items-center bg-white/85 backdrop-blur rounded-full h-7 px-2.5 ring-1 ring-ink/10 shadow-soft">
+                <MarketplaceLogo marketplace="vinted" height={14} />
+              </span>
             )}
             {article.ebay_status === "LISTED" && article.ebay_url && (
-              <span className={`chip ${NEUTRAL_CHIP} text-[10px]`}>🏷 eBay</span>
+              <span className="inline-flex items-center bg-white/85 backdrop-blur rounded-full h-7 px-2.5 ring-1 ring-ink/10 shadow-soft">
+                <MarketplaceLogo marketplace="ebay" height={14} />
+              </span>
             )}
-          </span>
-        </div>
+          </div>
+        )}
 
         {article.status === "SOLD" && (
           <div className="absolute inset-0 bg-ink/55 backdrop-blur-[2px] flex items-center justify-center">
