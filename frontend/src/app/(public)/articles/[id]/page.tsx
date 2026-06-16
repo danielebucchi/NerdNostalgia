@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatPrice, getArticle } from "@/lib/api";
 import { ArticleActions } from "@/components/ArticleActions";
+import { MarketplaceLogo } from "@/components/MarketplaceLogo";
 import { absUrl, clip, SITE_NAME } from "@/lib/seo";
 
 interface PageProps {
@@ -178,28 +179,36 @@ export default async function ArticleDetailPage({ params }: PageProps) {
             {article.dimensions_cm && <Row label="Dimensioni" value={article.dimensions_cm} />}
           </dl>
 
-          <div className="mt-6 flex flex-wrap gap-2">
-            {article.vinted_status === "LISTED" && article.vinted_url && (
-              <a
-                href={article.vinted_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="chip chip-pink"
-              >
-                🛍 Anche su Vinted ↗
-              </a>
-            )}
-            {article.ebay_status === "LISTED" && article.ebay_url && (
-              <a
-                href={article.ebay_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="chip chip-mint"
-              >
-                🏷 Anche su eBay ↗
-              </a>
-            )}
-          </div>
+          {(article.vinted_status === "LISTED" && article.vinted_url) ||
+          (article.ebay_status === "LISTED" && article.ebay_url) ? (
+            <div className="mt-6 flex items-center gap-3">
+              <span className="text-xs uppercase tracking-wider text-ink-soft">
+                Anche su
+              </span>
+              {article.vinted_status === "LISTED" && article.vinted_url && (
+                <a
+                  href={article.vinted_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Apri il listing su Vinted"
+                  className="inline-flex items-center bg-white/85 backdrop-blur rounded-full h-10 px-4 ring-1 ring-ink/10 shadow-soft hover:shadow-hover transition-shadow"
+                >
+                  <MarketplaceLogo marketplace="vinted" height={20} />
+                </a>
+              )}
+              {article.ebay_status === "LISTED" && article.ebay_url && (
+                <a
+                  href={article.ebay_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Apri il listing su eBay"
+                  className="inline-flex items-center bg-white/85 backdrop-blur rounded-full h-10 px-4 ring-1 ring-ink/10 shadow-soft hover:shadow-hover transition-shadow"
+                >
+                  <MarketplaceLogo marketplace="ebay" height={20} />
+                </a>
+              )}
+            </div>
+          ) : null}
 
           <div className="mt-10">
             <ArticleActions
