@@ -26,9 +26,11 @@ export interface Article {
   vinted_status: VintedStatus;
   vinted_url: string | null;
   vinted_synced_at: string | null;
+  vinted_price: string | null;
   ebay_status: EbayStatus;
   ebay_url: string | null;
   ebay_synced_at: string | null;
+  ebay_price: string | null;
   created_at: string;
   updated_at: string;
   published_at: string | null;

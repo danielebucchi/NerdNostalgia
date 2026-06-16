@@ -17,6 +17,7 @@ interface MarketplaceSeed {
   enabled: boolean;
   status: MarketplaceStatus;
   url: string;
+  price: string;
 }
 
 const MARKETPLACE_META: Record<
@@ -114,11 +115,13 @@ export function ArticleForm({ initial, onSaved }: Props) {
     enabled: false,
     status: "LISTED",
     url: "",
+    price: "",
   });
   const [ebay, setEbay] = useState<MarketplaceSeed>({
     enabled: false,
     status: "LISTED",
     url: "",
+    price: "",
   });
 
   const isEdit = Boolean(initial);
@@ -213,6 +216,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
             {
               vinted_status: vinted.status,
               vinted_url: vinted.url.trim() || null,
+              vinted_price: vinted.price.trim() ? Number(vinted.price) : null,
             },
           );
         }
@@ -223,6 +227,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
             {
               ebay_status: ebay.status,
               ebay_url: ebay.url.trim() || null,
+              ebay_price: ebay.price.trim() ? Number(ebay.price) : null,
             },
           );
         }
@@ -674,6 +679,20 @@ function MarketplacePicker({
               <option value="NOT_LISTED">Da listare</option>
               <option value="LISTED">Online (ho già pubblicato)</option>
             </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+              Prezzo su {meta.label} (opzionale)
+            </span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={state.price}
+              onChange={(e) => onChange({ ...state, price: e.target.value })}
+              placeholder="vuoto = usa prezzo catalogo"
+              className="input mt-1"
+            />
           </label>
           <label className="block">
             <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">

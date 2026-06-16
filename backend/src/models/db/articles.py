@@ -107,6 +107,7 @@ class Article(BaseModel):
     )
     vinted_url = Column(String(500))
     vinted_synced_at = Column(DateTime)
+    vinted_price = Column(Numeric(10, 2))
 
     # eBay sync (manuale assistito)
     ebay_status = Column(
@@ -117,6 +118,7 @@ class Article(BaseModel):
     )
     ebay_url = Column(String(500))
     ebay_synced_at = Column(DateTime)
+    ebay_price = Column(Numeric(10, 2))
 
     # Timestamp aggiuntivi
     published_at = Column(DateTime)
