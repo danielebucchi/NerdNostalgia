@@ -1,7 +1,7 @@
 """
 Modello Article per SQLAlchemy.
 """
-from sqlalchemy import Column, String, Integer, Numeric, Text, Enum, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, Numeric, Text, Enum, Date, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 import enum
@@ -75,6 +75,22 @@ class Article(BaseModel):
     # Pricing
     price = Column(Numeric(10, 2), nullable=False)
     currency = Column(String(3), default="EUR")
+
+    # Inventory tracking (clone foglio "Flipping Inventario" / "Carte Pokemon Inventario")
+    lotto = Column(String(50), index=True)
+    purchase_date = Column(Date, index=True)
+    cost = Column(Numeric(10, 2))
+    purchase_platform = Column(String(50), index=True)
+    bought_by = Column(String(20))
+    sold_by = Column(String(20))
+    fee_amount = Column(Numeric(10, 2))
+    shipping_cost = Column(Numeric(10, 2))
+    quantity_sold = Column(Integer, nullable=False, default=0)
+
+    # Campi specifici carte
+    card_collection = Column(String(100))
+    card_number = Column(String(50))
+    card_finish = Column(String(50))
 
     # Classificazione
     category_id = Column(

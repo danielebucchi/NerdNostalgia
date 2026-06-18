@@ -77,6 +77,19 @@ interface FormState {
   model: string;
   weight_kg: string;
   dimensions_cm: string;
+  // Inventario
+  lotto: string;
+  purchase_date: string;
+  cost: string;
+  purchase_platform: string;
+  bought_by: string;
+  sold_by: string;
+  fee_amount: string;
+  shipping_cost: string;
+  quantity_sold: string;
+  card_collection: string;
+  card_number: string;
+  card_finish: string;
 }
 
 const empty: FormState = {
@@ -93,6 +106,18 @@ const empty: FormState = {
   model: "",
   weight_kg: "",
   dimensions_cm: "",
+  lotto: "",
+  purchase_date: "",
+  cost: "",
+  purchase_platform: "",
+  bought_by: "",
+  sold_by: "",
+  fee_amount: "",
+  shipping_cost: "",
+  quantity_sold: "0",
+  card_collection: "",
+  card_number: "",
+  card_finish: "",
 };
 
 function toForm(article: Article): FormState {
@@ -110,6 +135,18 @@ function toForm(article: Article): FormState {
     model: article.model ?? "",
     weight_kg: article.weight_kg ?? "",
     dimensions_cm: article.dimensions_cm ?? "",
+    lotto: article.lotto ?? "",
+    purchase_date: article.purchase_date ?? "",
+    cost: article.cost ?? "",
+    purchase_platform: article.purchase_platform ?? "",
+    bought_by: article.bought_by ?? "",
+    sold_by: article.sold_by ?? "",
+    fee_amount: article.fee_amount ?? "",
+    shipping_cost: article.shipping_cost ?? "",
+    quantity_sold: String(article.quantity_sold ?? 0),
+    card_collection: article.card_collection ?? "",
+    card_number: article.card_number ?? "",
+    card_finish: article.card_finish ?? "",
   };
 }
 
@@ -189,6 +226,19 @@ export function ArticleForm({ initial, onSaved }: Props) {
         model: state.model.trim() || null,
         weight_kg: state.weight_kg.trim() ? Number(state.weight_kg) : null,
         dimensions_cm: state.dimensions_cm.trim() || null,
+        // Inventario
+        lotto: state.lotto.trim() || null,
+        purchase_date: state.purchase_date || null,
+        cost: state.cost.trim() ? Number(state.cost) : null,
+        purchase_platform: state.purchase_platform.trim() || null,
+        bought_by: state.bought_by.trim() || null,
+        sold_by: state.sold_by.trim() || null,
+        fee_amount: state.fee_amount.trim() ? Number(state.fee_amount) : null,
+        shipping_cost: state.shipping_cost.trim() ? Number(state.shipping_cost) : null,
+        quantity_sold: state.quantity_sold.trim() ? Number(state.quantity_sold) : 0,
+        card_collection: state.card_collection.trim() || null,
+        card_number: state.card_number.trim() || null,
+        card_finish: state.card_finish.trim() || null,
       };
       if (!isEdit) {
         payload.user_id = 1; // admin id
@@ -394,6 +444,156 @@ export function ArticleForm({ initial, onSaved }: Props) {
           />
         </Field>
       </Row>
+
+      <div className="border border-dashed border-ink/20 rounded-big p-4 bg-white/40 space-y-3">
+        <div>
+          <h3 className="display text-base text-ink">📊 Inventario (foglio Cate)</h3>
+          <p className="text-xs text-ink-soft">
+            Costo acquisto, fee, spedizione → vengono usati per calcolare il
+            profitto reale nella pagina <code>/admin/inventario</code> e nei totali della dashboard.
+          </p>
+        </div>
+
+        <Row cols={3}>
+          <Field label="Lotto">
+            <input
+              type="text"
+              value={state.lotto}
+              onChange={(e) => set("lotto", e.target.value)}
+              placeholder="es. L01"
+              className="input"
+            />
+          </Field>
+          <Field label="Data acquisto">
+            <input
+              type="date"
+              value={state.purchase_date}
+              onChange={(e) => set("purchase_date", e.target.value)}
+              className="input"
+            />
+          </Field>
+          <Field label="Costo (€)">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={state.cost}
+              onChange={(e) => set("cost", e.target.value)}
+              className="input"
+            />
+          </Field>
+        </Row>
+
+        <Row cols={3}>
+          <Field label="Piattaforma acquisto">
+            <select
+              value={state.purchase_platform}
+              onChange={(e) => set("purchase_platform", e.target.value)}
+              className="input"
+            >
+              <option value="">—</option>
+              {["Vinted", "mercato", "Subito", "eBay", "Wallapop", "Regalo", "Altro"].map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Chi compra">
+            <select
+              value={state.bought_by}
+              onChange={(e) => set("bought_by", e.target.value)}
+              className="input"
+            >
+              <option value="">—</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+            </select>
+          </Field>
+          <Field label="Chi vende">
+            <select
+              value={state.sold_by}
+              onChange={(e) => set("sold_by", e.target.value)}
+              className="input"
+            >
+              <option value="">—</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+            </select>
+          </Field>
+        </Row>
+
+        <Row cols={3}>
+          <Field label="Fee marketplace (€)">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={state.fee_amount}
+              onChange={(e) => set("fee_amount", e.target.value)}
+              className="input"
+            />
+          </Field>
+          <Field label="Costo spedizione (€)">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={state.shipping_cost}
+              onChange={(e) => set("shipping_cost", e.target.value)}
+              className="input"
+            />
+          </Field>
+          <Field label="Quantità venduta">
+            <input
+              type="number"
+              min="0"
+              value={state.quantity_sold}
+              onChange={(e) => set("quantity_sold", e.target.value)}
+              className="input"
+            />
+          </Field>
+        </Row>
+
+        <div className="pt-2 border-t border-ink/10">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-ink-soft mb-2">
+            Solo per carte (Pokemon, Magic, ecc)
+          </h4>
+          <Row cols={3}>
+            <Field label="Collezione">
+              <input
+                type="text"
+                value={state.card_collection}
+                onChange={(e) => set("card_collection", e.target.value)}
+                placeholder="es. Base Set"
+                className="input"
+              />
+            </Field>
+            <Field label="Numero">
+              <input
+                type="text"
+                value={state.card_number}
+                onChange={(e) => set("card_number", e.target.value)}
+                placeholder="4/102"
+                className="input"
+              />
+            </Field>
+            <Field label="Finitura">
+              <select
+                value={state.card_finish}
+                onChange={(e) => set("card_finish", e.target.value)}
+                className="input"
+              >
+                <option value="">—</option>
+                <option value="normal">normal</option>
+                <option value="holo">holo</option>
+                <option value="reverse">reverse</option>
+                <option value="full art">full art</option>
+                <option value="textured">textured</option>
+                <option value="rainbow">rainbow</option>
+              </select>
+            </Field>
+          </Row>
+        </div>
+      </div>
 
       {!isEdit && (
         <div className="border border-dashed border-ink/20 rounded-big p-4 bg-white/40">

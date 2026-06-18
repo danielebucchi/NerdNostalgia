@@ -11,8 +11,10 @@ from .articles import (
     EbayStatus,
     VintedStatus,
 )
+from .card_purchases import CardPurchase
 from .inquiries import Inquiry, InquiryStatus
 from .marketplace_fees import MarketplaceFee
+from .misc_sales import MiscSale
 from .wanted import WantedItem, WantedStatus
 
 __all__ = [
@@ -26,8 +28,10 @@ __all__ = [
     "ArticleStatus",
     "VintedStatus",
     "EbayStatus",
+    "CardPurchase",
     "Inquiry",
     "InquiryStatus",
+    "MiscSale",
     "WantedItem",
     "WantedStatus",
     "MarketplaceFee",

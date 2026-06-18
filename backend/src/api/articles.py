@@ -2,7 +2,7 @@
 API endpoint per gli articoli.
 """
 from decimal import Decimal
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 
@@ -63,8 +63,28 @@ def _category_to_response(cat: Optional[Category]) -> Optional[CategoryResponse]
     )
 
 
+def _calc_inventory_metrics(article: Article) -> dict:
+    """Calcola ricavo netto, profitto e fondi immobilizzati seguendo la
+    stessa logica del foglio "Flipping Inventario"."""
+    price = article.price or Decimal("0")
+    fee = article.fee_amount or Decimal("0")
+    ship = article.shipping_cost or Decimal("0")
+    cost = article.cost or Decimal("0")
+
+    sold = article.status.value == "SOLD" if article.status else False
+    net_revenue = (price - fee - ship) if sold else Decimal("0")
+    profit = (net_revenue - cost) if sold else Decimal("0")
+    immobilizzato = cost if (not sold and cost > 0) else Decimal("0")
+    return {
+        "net_revenue": net_revenue,
+        "profit": profit,
+        "immobilizzato": immobilizzato,
+    }
+
+
 def _to_response(article: Article) -> ArticleResponse:
     parent_cat = article.category.parent if article.category and article.category.parent else None
+    metrics = _calc_inventory_metrics(article)
     return ArticleResponse(
         id=article.id,
         user_id=article.user_id,
@@ -72,6 +92,21 @@ def _to_response(article: Article) -> ArticleResponse:
         description=article.description,
         price=article.price,
         currency=article.currency,
+        lotto=article.lotto,
+        purchase_date=article.purchase_date,
+        cost=article.cost,
+        purchase_platform=article.purchase_platform,
+        bought_by=article.bought_by,
+        sold_by=article.sold_by,
+        fee_amount=article.fee_amount,
+        shipping_cost=article.shipping_cost,
+        quantity_sold=article.quantity_sold or 0,
+        card_collection=article.card_collection,
+        card_number=article.card_number,
+        card_finish=article.card_finish,
+        net_revenue=metrics["net_revenue"],
+        profit=metrics["profit"],
+        immobilizzato=metrics["immobilizzato"],
         category_id=article.category_id,
         category=_category_to_response(article.category),
         parent_category=_category_to_response(parent_cat),
@@ -130,6 +165,18 @@ def create_article(
         description=article_data.description,
         price=article_data.price,
         currency=article_data.currency,
+        lotto=article_data.lotto,
+        purchase_date=article_data.purchase_date,
+        cost=article_data.cost,
+        purchase_platform=article_data.purchase_platform,
+        bought_by=article_data.bought_by,
+        sold_by=article_data.sold_by,
+        fee_amount=article_data.fee_amount,
+        shipping_cost=article_data.shipping_cost,
+        quantity_sold=article_data.quantity_sold or 0,
+        card_collection=article_data.card_collection,
+        card_number=article_data.card_number,
+        card_finish=article_data.card_finish,
         category_id=article_data.category_id,
         condition=ArticleCondition(article_data.condition.value),
         status=ArticleStatus(article_data.status.value),
