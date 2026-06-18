@@ -30,55 +30,14 @@ INSERT INTO vinted_settings (vinted_user_id, enabled, sync_hour)
 SELECT 95521831, TRUE, 4
 WHERE NOT EXISTS (SELECT 1 FROM vinted_settings);
 
--- ---------------------------------------------------------------------------
--- 2) vinted_category_mappings: catalog Vinted → categoria NerdNostalgia
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS vinted_category_mappings (
-    id SERIAL PRIMARY KEY,
-    vinted_catalog_id INTEGER NOT NULL,
-    vinted_catalog_name VARCHAR(200) NOT NULL,
-    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-    enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_vinted_catalog UNIQUE (vinted_catalog_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_vinted_mappings_enabled
-    ON vinted_category_mappings(enabled);
-
-DROP TRIGGER IF EXISTS update_vinted_mappings_updated_at ON vinted_category_mappings;
-CREATE TRIGGER update_vinted_mappings_updated_at
-    BEFORE UPDATE ON vinted_category_mappings
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-COMMENT ON TABLE vinted_category_mappings IS
-    'Solo gli annunci Vinted nei catalog mappati e abilitati vengono importati';
-
--- Seed iniziale dei rami "Elettronica" e "Hobby e collezionismo" Vinted IT
--- (catalog_id principali — la sync filtra anche per branch_title contenente
--- "elettronica" o "collezionismo", quindi anche se gli ID cambiano la
--- whitelist resta valida sui macro-rami).
--- I category_id NerdNostalgia target sono "videogiochi" / "carte" / "nerdate".
-INSERT INTO vinted_category_mappings (vinted_catalog_id, vinted_catalog_name, category_id, enabled)
-SELECT v.vinted_id, v.vinted_name, c.id, TRUE
-FROM (VALUES
-    -- Elettronica → Videogiochi (top-level)
-    (3025, 'Elettronica · Videogiochi', 'videogiochi'),
-    (1187, 'Elettronica', 'videogiochi'),
-    -- Hobby e collezionismo → Nerdate
-    (82,   'Giocattoli e modellini', 'nerdate'),
-    (1452, 'Funko Pop / Action figure', 'nerdate'),
-    -- Hobby > Carte da gioco → Carte
-    (1453, 'Carte da gioco collezionabili', 'carte'),
-    (2312, 'Carte Pokémon', 'carte')
-) AS v(vinted_id, vinted_name, slug)
-JOIN categories c ON c.slug = v.slug
-ON CONFLICT (vinted_catalog_id) DO NOTHING;
+-- NOTA: la tabella vinted_category_mappings e' stata rimossa (NN-016).
+-- Vinted nelle response del profilo non espone catalog_id, quindi le
+-- categorie vengono assegnate via keyword detection in
+-- backend/utils/vinted_sync.py::CATEGORY_RULES.
+DROP TABLE IF EXISTS vinted_category_mappings;
 
 -- ---------------------------------------------------------------------------
--- 3) vinted_sync_logs: storico delle sync
+-- 2) vinted_sync_logs: storico delle sync
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS vinted_sync_logs (
     id SERIAL PRIMARY KEY,
@@ -89,8 +48,15 @@ CREATE TABLE IF NOT EXISTS vinted_sync_logs (
     items_imported INTEGER NOT NULL DEFAULT 0,
     items_updated INTEGER NOT NULL DEFAULT 0,
     items_skipped INTEGER NOT NULL DEFAULT 0,
-    error_message TEXT
+    error_message TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Per installazioni preesistenti dove le colonne mancano:
+ALTER TABLE vinted_sync_logs
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 CREATE INDEX IF NOT EXISTS idx_vinted_logs_started
     ON vinted_sync_logs(started_at DESC);

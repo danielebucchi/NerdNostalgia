@@ -15,16 +15,18 @@ export function ArticleActions({ articleId, articleTitle, sold }: ArticleActions
   return (
     <>
       <div className="flex flex-wrap gap-3">
-        <button type="button" className="btn btn-primary" disabled>
-          {sold ? "Venduto" : "Aggiungi al carrello"}
-        </button>
-        <button type="button" className="btn btn-ghost" onClick={() => setOpen(true)}>
-          Chiedi info
-        </button>
+        {sold ? (
+          <span className="chip chip-pink text-sm">Venduto</span>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setOpen(true)}
+          >
+            Chiedi info
+          </button>
+        )}
       </div>
-      <p className="mt-3 text-xs text-ink-soft">
-        Carrello in arrivo — per ora scrivimi dal bottone &laquo;Chiedi info&raquo;.
-      </p>
 
       <InquiryDialog
         open={open}
