@@ -15,7 +15,9 @@ from api.inquiries import router as inquiries_router
 from api.marketplace_fees import router as marketplace_fees_router
 from api.misc_sales import router as misc_sales_router
 from api.users import router as users_router
+from api.vinted import router as vinted_router
 from api.wanted import router as wanted_router
+from utils.scheduler import start_scheduler, stop_scheduler
 from utils.storage import UPLOADS_DIR, ensure_dirs
 
 # Create FastAPI app
@@ -45,6 +47,17 @@ app.include_router(marketplace_fees_router)
 app.include_router(card_purchases_router)
 app.include_router(misc_sales_router)
 app.include_router(dashboard_router)
+app.include_router(vinted_router)
+
+
+@app.on_event("startup")
+def _on_startup():
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def _on_shutdown():
+    stop_scheduler()
 
 # Static files (uploaded images)
 ensure_dirs()

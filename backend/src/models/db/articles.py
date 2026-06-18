@@ -1,7 +1,7 @@
 """
 Modello Article per SQLAlchemy.
 """
-from sqlalchemy import Column, String, Integer, Numeric, Text, Enum, Date, DateTime, ForeignKey
+from sqlalchemy import BigInteger, Column, String, Integer, Numeric, Text, Enum, Date, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 import enum
@@ -119,7 +119,7 @@ class Article(BaseModel):
     # Ordinamento manuale del catalogo (piu' basso = prima)
     display_order = Column(Integer, nullable=False, default=0, index=True)
 
-    # Vinted sync (manuale assistito)
+    # Vinted sync (manuale assistito + sync automatica da profilo)
     vinted_status = Column(
         Enum(VintedStatus, name="vinted_status", create_type=False),
         nullable=False,
@@ -129,6 +129,7 @@ class Article(BaseModel):
     vinted_url = Column(String(500))
     vinted_synced_at = Column(DateTime)
     vinted_price = Column(Numeric(10, 2))
+    vinted_item_id = Column(BigInteger, unique=True)
 
     # eBay sync (manuale assistito)
     ebay_status = Column(

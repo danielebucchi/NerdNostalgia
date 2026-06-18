@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: "/admin/inquiries", label: "Richieste", icon: "✉" },
   { href: "/admin/wanted", label: "Cerco/Compro", icon: "🔍" },
   { href: "/admin/categories", label: "Categorie", icon: "🏷" },
+  { href: "/admin/import-vinted", label: "Sync Vinted", icon: "🛍" },
   { href: "/admin/markups", label: "Commissioni", icon: "💸" },
 ];
 
