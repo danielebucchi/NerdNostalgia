@@ -2,6 +2,7 @@
 Entities Pydantic per gli articoli.
 """
 import enum
+from datetime import date
 from decimal import Decimal
 from typing import List, Optional
 
@@ -36,7 +37,23 @@ class EbayStatus(str, enum.Enum):
     SOLD = "SOLD"
 
 
-class ArticleCreate(BaseModel):
+class ArticleInventoryFields(BaseModel):
+    """Campi inventario condivisi tra Create e Update."""
+    lotto: Optional[str] = Field(None, max_length=50)
+    purchase_date: Optional[date] = None
+    cost: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
+    purchase_platform: Optional[str] = Field(None, max_length=50)
+    bought_by: Optional[str] = Field(None, max_length=20)
+    sold_by: Optional[str] = Field(None, max_length=20)
+    fee_amount: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
+    shipping_cost: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
+    quantity_sold: Optional[int] = Field(None, ge=0)
+    card_collection: Optional[str] = Field(None, max_length=100)
+    card_number: Optional[str] = Field(None, max_length=50)
+    card_finish: Optional[str] = Field(None, max_length=50)
+
+
+class ArticleCreate(ArticleInventoryFields):
     user_id: int = Field(..., description="ID utente proprietario")
     title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
@@ -55,7 +72,7 @@ class ArticleCreate(BaseModel):
     article_metadata: dict = Field(default_factory=dict)
 
 
-class ArticleUpdate(BaseModel):
+class ArticleUpdate(ArticleInventoryFields):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
@@ -86,6 +103,24 @@ class ArticleResponse(BaseModel):
     description: Optional[str]
     price: Decimal
     currency: str
+    # Inventory fields
+    lotto: Optional[str] = None
+    purchase_date: Optional[date] = None
+    cost: Optional[Decimal] = None
+    purchase_platform: Optional[str] = None
+    bought_by: Optional[str] = None
+    sold_by: Optional[str] = None
+    fee_amount: Optional[Decimal] = None
+    shipping_cost: Optional[Decimal] = None
+    quantity_sold: int = 0
+    card_collection: Optional[str] = None
+    card_number: Optional[str] = None
+    card_finish: Optional[str] = None
+    # Derived (calcolati in _to_response)
+    net_revenue: Optional[Decimal] = None
+    profit: Optional[Decimal] = None
+    immobilizzato: Optional[Decimal] = None
+    # Categoria
     category_id: Optional[int] = None
     category: Optional[CategoryResponse] = None
     parent_category: Optional[CategoryResponse] = None

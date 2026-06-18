@@ -42,6 +42,23 @@ export interface Article {
   description: string | null;
   price: string;
   currency: string;
+  // Inventory tracking
+  lotto: string | null;
+  purchase_date: string | null;
+  cost: string | null;
+  purchase_platform: string | null;
+  bought_by: string | null;
+  sold_by: string | null;
+  fee_amount: string | null;
+  shipping_cost: string | null;
+  quantity_sold: number;
+  card_collection: string | null;
+  card_number: string | null;
+  card_finish: string | null;
+  // Derived
+  net_revenue: string | null;
+  profit: string | null;
+  immobilizzato: string | null;
   category_id: number | null;
   category: Category | null;
   parent_category: Category | null;
@@ -75,6 +92,72 @@ export interface ArticleListResponse {
   total: number;
   skip: number;
   limit: number;
+}
+
+export interface CardPurchase {
+  id: number;
+  purchase_date: string | null;
+  item: string;
+  amount: string;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CardPurchaseListResponse {
+  items: CardPurchase[];
+  total: number;
+  total_amount: string;
+}
+
+export interface MiscSale {
+  id: number;
+  sale_date: string | null;
+  item: string;
+  amount: string;
+  seller: string | null;
+  platform: string | null;
+  paid_by_buyer: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MiscSaleListResponse {
+  items: MiscSale[];
+  total: number;
+  total_amount: string;
+  total_paid: string;
+  total_unpaid: string;
+}
+
+export interface DashboardTotals {
+  year: number;
+  revenue_by_group: Record<string, string>;
+  cost_by_group: Record<string, string>;
+  profit_by_group: Record<string, string>;
+  total_revenue: string;
+  total_cost: string;
+  total_profit: string;
+  total_immobilizzato: string;
+  by_category: Record<
+    string,
+    {
+      revenue: string;
+      cost: string;
+      fees: string;
+      shipping: string;
+      net_revenue: string;
+      profit: string;
+      immobilizzato: string;
+      items_sold: number;
+      items_available: number;
+    }
+  >;
+  articles_sold: number;
+  articles_available: number;
+  misc_sales_count: number;
+  card_purchases_count: number;
 }
 
 export type InquiryStatus = "NEW" | "READ" | "REPLIED" | "CLOSED";
