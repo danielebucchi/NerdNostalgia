@@ -9,11 +9,17 @@ import os
 from api.articles import router as articles_router
 from api.auth import router as auth_router
 from api.card_purchases import router as card_purchases_router
+from api.consignment_sales import router as consignment_sales_router
+from api.expenses import router as expenses_router
 from api.categories import router as categories_router
 from api.dashboard import router as dashboard_router
 from api.inquiries import router as inquiries_router
+from api.inventory import router as inventory_router
+from api.lots import router as lots_router
 from api.marketplace_fees import router as marketplace_fees_router
+from api.platforms import router as platforms_router
 from api.misc_sales import router as misc_sales_router
+from api.personal_cards import router as personal_cards_router
 from api.users import router as users_router
 from api.vinted import router as vinted_router
 from api.wanted import router as wanted_router
@@ -44,8 +50,14 @@ app.include_router(articles_router)
 app.include_router(inquiries_router)
 app.include_router(wanted_router)
 app.include_router(marketplace_fees_router)
+app.include_router(platforms_router)
 app.include_router(card_purchases_router)
+app.include_router(consignment_sales_router)
+app.include_router(expenses_router)
 app.include_router(misc_sales_router)
+app.include_router(personal_cards_router)
+app.include_router(inventory_router)
+app.include_router(lots_router)
 app.include_router(dashboard_router)
 app.include_router(vinted_router)
 
