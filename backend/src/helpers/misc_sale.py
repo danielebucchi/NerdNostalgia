@@ -27,6 +27,7 @@ class MiscSaleHelper(BaseHelper):
         self,
         year: Optional[int] = None,
         seller: Optional[str] = None,
+        kind: Optional[str] = None,
     ) -> List[MiscSale]:
         query = self.db.query(MiscSale)
         if year is not None:
@@ -34,6 +35,8 @@ class MiscSaleHelper(BaseHelper):
             query = query.filter(extract("year", MiscSale.sale_date) == year)
         if seller:
             query = query.filter(MiscSale.seller == seller)
+        if kind:
+            query = query.filter(MiscSale.kind == kind)
         return query.order_by(
             nulls_last(desc(MiscSale.sale_date)),
             desc(MiscSale.id),

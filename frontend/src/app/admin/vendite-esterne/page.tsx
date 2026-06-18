@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function VenditeIndex() {
+export default function VenditeEsterneRedirect() {
   redirect("/admin/vendite/esterne");
 }

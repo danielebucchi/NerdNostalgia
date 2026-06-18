@@ -1,6 +1,8 @@
 """
-API endpoint per le vendite generiche.
+API endpoint per le vendite generiche e creazioni handmade.
+Entrambe in misc_sales con kind diverso.
 """
+from collections import defaultdict
 from decimal import Decimal
 from typing import Optional
 
@@ -29,8 +31,10 @@ def _to_response(item: MiscSale) -> MiscSaleResponse:
         platform=item.platform,
         paid_by_buyer=item.paid_by_buyer,
         note=item.note,
-        created_at=item.created_at.isoformat() if item.created_at else None,
-        updated_at=item.updated_at.isoformat() if item.updated_at else None,
+        kind=item.kind or "external",
+        material_cost=item.material_cost,
+        created_at=item.created_at.isoformat() if item.created_at else "",
+        updated_at=item.updated_at.isoformat() if item.updated_at else "",
     )
 
 
@@ -38,13 +42,16 @@ def _to_response(item: MiscSale) -> MiscSaleResponse:
 def list_sales(
     year: Optional[int] = Query(None, ge=2000, le=2100),
     seller: Optional[str] = None,
+    kind: Optional[str] = Query(None),
     helper: MiscSaleHelper = Depends(get_misc_sale_helper),
     _admin: User = Depends(require_admin),
 ):
-    items = helper.gets(year=year, seller=seller)
+    items = helper.gets(year=year, seller=seller, kind=kind)
     total_amount = Decimal("0")
     total_paid = Decimal("0")
     total_unpaid = Decimal("0")
+    total_material = Decimal("0")
+    by_kind: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
     for s in items:
         amt = s.amount or Decimal("0")
         total_amount += amt
@@ -52,12 +59,16 @@ def list_sales(
             total_paid += amt
         else:
             total_unpaid += amt
+        total_material += s.material_cost or Decimal("0")
+        by_kind[s.kind or "external"] += amt
     return MiscSaleListResponse(
         items=[_to_response(i) for i in items],
         total=len(items),
         total_amount=total_amount,
         total_paid=total_paid,
         total_unpaid=total_unpaid,
+        total_material_cost=total_material,
+        by_kind=dict(by_kind),
     )
 
 
@@ -75,6 +86,8 @@ def create_sale(
         platform=payload.platform.strip() if payload.platform else None,
         paid_by_buyer=payload.paid_by_buyer,
         note=payload.note.strip() if payload.note else None,
+        kind=payload.kind,
+        material_cost=payload.material_cost,
     )
     helper.save(item)
     return _to_response(item)

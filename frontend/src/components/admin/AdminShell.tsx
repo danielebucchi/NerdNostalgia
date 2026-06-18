@@ -6,14 +6,14 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/admin/AuthProvider";
 
 const NAV_ITEMS = [
-  { href: "/admin", label: "Dashboard", icon: "✨", exact: true },
+  { href: "/admin", label: "Dashboard", icon: "📊", exact: true },
   { href: "/admin/articles", label: "Articoli", icon: "🎮" },
-  { href: "/admin/inventario", label: "Inventario", icon: "📊" },
+  { href: "/admin/lotti", label: "Lotti (interno)", icon: "📦" },
   { href: "/admin/vendite", label: "Vendite", icon: "💰" },
-  { href: "/admin/spese-carte", label: "Spese carte", icon: "🃏" },
+  { href: "/admin/spese", label: "Spese", icon: "💰" },
   { href: "/admin/inquiries", label: "Richieste", icon: "✉" },
   { href: "/admin/wanted", label: "Cerco/Compro", icon: "🔍" },
-  { href: "/admin/categories", label: "Categorie", icon: "🏷" },
+  { href: "/admin/tassonomia", label: "Tassonomia", icon: "🏷" },
   { href: "/admin/import-vinted", label: "Sync Vinted", icon: "🛍" },
   { href: "/admin/markups", label: "Commissioni", icon: "💸" },
 ];

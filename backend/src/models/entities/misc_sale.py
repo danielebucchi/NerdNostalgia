@@ -3,9 +3,12 @@ Entities Pydantic per le vendite generiche.
 """
 from datetime import date
 from decimal import Decimal
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+MiscSaleKindLiteral = Literal["external", "creation"]
 
 
 class MiscSaleCreate(BaseModel):
@@ -16,6 +19,8 @@ class MiscSaleCreate(BaseModel):
     platform: Optional[str] = Field(None, max_length=50)
     paid_by_buyer: bool = True
     note: Optional[str] = Field(None, max_length=255)
+    kind: MiscSaleKindLiteral = "external"
+    material_cost: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
 
 
 class MiscSaleUpdate(BaseModel):
@@ -26,6 +31,8 @@ class MiscSaleUpdate(BaseModel):
     platform: Optional[str] = Field(None, max_length=50)
     paid_by_buyer: Optional[bool] = None
     note: Optional[str] = Field(None, max_length=255)
+    kind: Optional[MiscSaleKindLiteral] = None
+    material_cost: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
 
 
 class MiscSaleResponse(BaseModel):
@@ -39,6 +46,8 @@ class MiscSaleResponse(BaseModel):
     platform: Optional[str]
     paid_by_buyer: bool
     note: Optional[str]
+    kind: MiscSaleKindLiteral
+    material_cost: Optional[Decimal]
     created_at: str
     updated_at: str
 
@@ -49,3 +58,5 @@ class MiscSaleListResponse(BaseModel):
     total_amount: Decimal
     total_paid: Decimal
     total_unpaid: Decimal
+    total_material_cost: Decimal = Decimal("0")
+    by_kind: dict[str, Decimal] = Field(default_factory=dict)
