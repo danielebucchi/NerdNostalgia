@@ -6,12 +6,10 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
-    ForeignKey,
     Integer,
     String,
     Text,
 )
-from sqlalchemy.orm import relationship
 
 from .base import BaseModel
 
@@ -23,21 +21,6 @@ class VintedSettings(BaseModel):
     enabled = Column(Boolean, nullable=False, default=True)
     sync_hour = Column(Integer, nullable=False, default=4)
     last_run_at = Column(DateTime)
-
-
-class VintedCategoryMapping(BaseModel):
-    __tablename__ = "vinted_category_mappings"
-
-    vinted_catalog_id = Column(Integer, nullable=False, unique=True)
-    vinted_catalog_name = Column(String(200), nullable=False)
-    category_id = Column(
-        Integer,
-        ForeignKey("categories.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    enabled = Column(Boolean, nullable=False, default=True)
-
-    category = relationship("Category", foreign_keys=[category_id])
 
 
 class VintedSyncLog(BaseModel):

@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { adminApi } from "@/lib/admin-api";
-import { useCategories } from "@/lib/useCategories";
-import type { Category } from "@/lib/types";
 
 interface VintedSettings {
   id: number;
@@ -12,14 +10,6 @@ interface VintedSettings {
   enabled: boolean;
   sync_hour: number;
   last_run_at: string | null;
-}
-
-interface VintedMapping {
-  id: number;
-  vinted_catalog_id: number;
-  vinted_catalog_name: string;
-  category_id: number | null;
-  enabled: boolean;
 }
 
 interface VintedSyncLog {
@@ -58,28 +48,19 @@ function duration(start: string, end: string | null): string {
 }
 
 export default function AdminImportVintedPage() {
-  const { flat: categories } = useCategories();
   const [settings, setSettings] = useState<VintedSettings | null>(null);
-  const [mappings, setMappings] = useState<VintedMapping[]>([]);
   const [logs, setLogs] = useState<VintedSyncLog[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form nuovo mapping
-  const [newCatalogId, setNewCatalogId] = useState("");
-  const [newCatalogName, setNewCatalogName] = useState("");
-  const [newCategoryId, setNewCategoryId] = useState("");
-
   async function reload() {
     setError(null);
     try {
-      const [s, m, l] = await Promise.all([
+      const [s, l] = await Promise.all([
         adminApi.get<VintedSettings>("/api/vinted/settings"),
-        adminApi.get<VintedMapping[]>("/api/vinted/mappings"),
         adminApi.get<VintedSyncLog[]>("/api/vinted/logs?limit=10"),
       ]);
       setSettings(s);
-      setMappings(m);
       setLogs(l);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -91,13 +72,13 @@ export default function AdminImportVintedPage() {
   }, []);
 
   async function handleTriggerSync() {
-    if (!confirm("Avviare ora una sync dal profilo Vinted? Può richiedere 10-30 secondi.")) return;
+    if (!confirm("Avviare ora una sync dal profilo Vinted? Può richiedere 1-3 minuti (apre browser headless per ogni articolo).")) return;
     setBusy(true);
     setError(null);
     try {
       const log = await adminApi.post<VintedSyncLog>("/api/vinted/sync");
       await reload();
-      if (log.error_message) {
+      if (log.error_message && !log.error_message.startsWith("Eliminati")) {
         setError(`Sync completata con errore: ${log.error_message}`);
       }
     } catch (err) {
@@ -122,52 +103,6 @@ export default function AdminImportVintedPage() {
     }
   }
 
-  async function handleMappingSave(id: number, patch: Partial<VintedMapping>) {
-    setBusy(true);
-    try {
-      await adminApi.patch(`/api/vinted/mappings/${id}`, patch);
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleMappingDelete(id: number) {
-    if (!confirm("Eliminare questo mapping?")) return;
-    setBusy(true);
-    try {
-      await adminApi.delete(`/api/vinted/mappings/${id}`);
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleMappingCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await adminApi.post("/api/vinted/mappings", {
-        vinted_catalog_id: Number(newCatalogId),
-        vinted_catalog_name: newCatalogName.trim(),
-        category_id: newCategoryId === "" ? null : Number(newCategoryId),
-        enabled: true,
-      });
-      setNewCatalogId("");
-      setNewCatalogName("");
-      setNewCategoryId("");
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <AdminShell>
       <div className="flex items-end justify-between mb-6 gap-3 flex-wrap">
@@ -175,7 +110,8 @@ export default function AdminImportVintedPage() {
           <h1 className="display text-3xl text-ink">🛍 Sync Vinted</h1>
           <p className="text-ink-soft mt-1 text-sm">
             Importa automaticamente gli annunci del tuo profilo Vinted come
-            articoli DRAFT. Solo i catalog mappati e abilitati vengono importati.
+            articoli pubblicati. Le categorie vengono assegnate dal titolo
+            via keyword detection. Articoli scomparsi da Vinted vengono cancellati.
           </p>
         </div>
         <button
@@ -192,7 +128,6 @@ export default function AdminImportVintedPage() {
         <div className="card p-4 mb-4 text-pink-deep font-semibold">⚠ {error}</div>
       )}
 
-      {/* Settings */}
       {settings && (
         <div className="card p-5 mb-6">
           <h2 className="display text-lg text-ink mb-3">Configurazione</h2>
@@ -258,78 +193,6 @@ export default function AdminImportVintedPage() {
         </div>
       )}
 
-      {/* Mappings */}
-      <div className="card p-5 mb-6">
-        <h2 className="display text-lg text-ink mb-3">Mapping categorie Vinted → NerdNostalgia</h2>
-        <p className="text-xs text-ink-soft mb-3 leading-relaxed">
-          Vengono importati solo gli annunci nei catalog mappati ed abilitati. Il fallback
-          su keyword (elettronica, collezionismo, pokemon, ecc) cattura nuovi catalog non
-          ancora mappati: in quel caso l&apos;articolo viene creato con categoria NULL e tu
-          la imposti dopo.
-        </p>
-
-        <form onSubmit={handleMappingCreate} className="grid sm:grid-cols-4 gap-2 mb-4">
-          <input
-            type="number"
-            required
-            placeholder="catalog_id Vinted"
-            value={newCatalogId}
-            onChange={(e) => setNewCatalogId(e.target.value)}
-            className="input"
-          />
-          <input
-            type="text"
-            required
-            placeholder="Nome leggibile"
-            value={newCatalogName}
-            onChange={(e) => setNewCatalogName(e.target.value)}
-            className="input"
-          />
-          <select
-            value={newCategoryId}
-            onChange={(e) => setNewCategoryId(e.target.value)}
-            className="input"
-          >
-            <option value="">— categoria NN —</option>
-            {renderCategoryOptions(categories)}
-          </select>
-          <button
-            type="submit"
-            disabled={busy}
-            className="btn btn-primary text-sm"
-          >
-            ➕ Aggiungi
-          </button>
-        </form>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="border-b border-ink/10 text-ink-soft text-[11px] uppercase tracking-wider">
-              <tr>
-                <th className="text-left py-2 px-2">Catalog ID</th>
-                <th className="text-left py-2 px-2">Nome</th>
-                <th className="text-left py-2 px-2">Categoria NN</th>
-                <th className="text-center py-2 px-2">Abilitato</th>
-                <th className="py-2 px-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {mappings.map((m) => (
-                <MappingRow
-                  key={m.id}
-                  mapping={m}
-                  categories={categories}
-                  busy={busy}
-                  onSave={(patch) => handleMappingSave(m.id, patch)}
-                  onDelete={() => handleMappingDelete(m.id)}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Logs */}
       <div className="card p-5">
         <h2 className="display text-lg text-ink mb-3">Ultime sync</h2>
         {logs.length === 0 ? (
@@ -345,10 +208,10 @@ export default function AdminImportVintedPage() {
                   <th className="text-left py-2 px-2">Tipo</th>
                   <th className="text-right py-2 px-2">Durata</th>
                   <th className="text-right py-2 px-2">Letti</th>
-                  <th className="text-right py-2 px-2">Importati</th>
+                  <th className="text-right py-2 px-2">Nuovi</th>
                   <th className="text-right py-2 px-2">Aggiornati</th>
                   <th className="text-right py-2 px-2">Saltati</th>
-                  <th className="text-left py-2 px-2">Errore</th>
+                  <th className="text-left py-2 px-2">Note / errori</th>
                 </tr>
               </thead>
               <tbody>
@@ -377,8 +240,16 @@ export default function AdminImportVintedPage() {
                     <td className="py-2 px-2 text-right tabular-nums text-ink-soft">
                       {l.items_skipped || "—"}
                     </td>
-                    <td className="py-2 px-2 text-pink-deep text-xs">
-                      {l.error_message ? `⚠ ${l.error_message}` : "—"}
+                    <td className="py-2 px-2 text-xs">
+                      {l.error_message ? (
+                        <span className={
+                          l.error_message.startsWith("Eliminati")
+                            ? "text-ink-soft"
+                            : "text-pink-deep"
+                        }>
+                          {l.error_message.startsWith("Eliminati") ? "✓" : "⚠"} {l.error_message}
+                        </span>
+                      ) : "—"}
                     </td>
                   </tr>
                 ))}
@@ -408,107 +279,4 @@ export default function AdminImportVintedPage() {
       `}</style>
     </AdminShell>
   );
-}
-
-function MappingRow({
-  mapping,
-  categories,
-  busy,
-  onSave,
-  onDelete,
-}: {
-  mapping: VintedMapping;
-  categories: Category[];
-  busy: boolean;
-  onSave: (p: Partial<VintedMapping>) => void;
-  onDelete: () => void;
-}) {
-  const [name, setName] = useState(mapping.vinted_catalog_name);
-  const [catId, setCatId] = useState<string>(
-    mapping.category_id != null ? String(mapping.category_id) : "",
-  );
-  const [enabled, setEnabled] = useState(mapping.enabled);
-
-  const dirty =
-    name !== mapping.vinted_catalog_name ||
-    (catId === "" ? null : Number(catId)) !== mapping.category_id ||
-    enabled !== mapping.enabled;
-
-  function save() {
-    onSave({
-      vinted_catalog_name: name.trim(),
-      category_id: catId === "" ? null : Number(catId),
-      enabled,
-    });
-  }
-
-  return (
-    <tr className="border-b border-ink/5 hover:bg-pink-soft/30">
-      <td className="py-2 px-2 font-mono text-xs">{mapping.vinted_catalog_id}</td>
-      <td className="py-2 px-2">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="input"
-        />
-      </td>
-      <td className="py-2 px-2">
-        <select
-          value={catId}
-          onChange={(e) => setCatId(e.target.value)}
-          className="input"
-        >
-          <option value="">— nessuna —</option>
-          {renderCategoryOptions(categories)}
-        </select>
-      </td>
-      <td className="py-2 px-2 text-center">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
-          className="w-4 h-4 accent-pink-deep"
-        />
-      </td>
-      <td className="py-2 px-2 whitespace-nowrap">
-        <div className="flex gap-1">
-          {dirty && (
-            <button
-              type="button"
-              className="btn btn-primary text-xs px-3 py-1"
-              onClick={save}
-              disabled={busy}
-            >
-              Salva
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-ghost text-xs px-3 py-1"
-            onClick={onDelete}
-            disabled={busy}
-          >
-            🗑
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-function renderCategoryOptions(flat: Category[]) {
-  const tops = flat.filter((c) => c.parent_id == null);
-  return tops.flatMap((top) => [
-    <option key={top.id} value={top.id}>
-      {top.name}
-    </option>,
-    ...flat
-      .filter((c) => c.parent_id === top.id)
-      .map((sub) => (
-        <option key={sub.id} value={sub.id}>
-          {"  ↳ "} {sub.name}
-        </option>
-      )),
-  ]);
 }

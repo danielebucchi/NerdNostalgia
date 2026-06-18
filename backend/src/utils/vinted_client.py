@@ -1,29 +1,31 @@
 """
-Client minimale per l'endpoint interno (non documentato) di Vinted.
+Client Vinted basato su Playwright + Chromium headless.
 
-Vinted NON espone un'API pubblica. Questo modulo parla con l'endpoint
-gateway /api/v2/users/{id}/items che il loro frontend usa per il profilo.
+Strategia: apriamo la pagina profilo Vinted in un vero browser; il loro JS
+fa le chiamate /api/v2/users/{id}/items con i token corretti (loro lo
+sanno fare, noi no). Intercettiamo le response XHR e leggiamo i JSON.
 
-Strategie anti-bot:
-  * UA realistico Chrome
-  * Sessione persistente con cookie (la prima GET sulla homepage Vinted
-    setta i cookie anti-CSRF/cloudflare)
-  * Random sleep tra le pagine
-  * Retry exponenziale su 429/5xx
-
-Failure model:
-  * Solleva VintedClientError con il dettaglio HTTP
-  * Il chiamante (sync service) cattura, logga su DB, non rompe la app
+Mainteinance:
+  * Se Vinted cambia la struttura JSON degli items → aggiorna _parse_item
+  * Se cambia l'URL pattern dell'endpoint → aggiorna ITEMS_URL_PATTERN
+  * Se introducono captcha → ci accorgiamo dal timeout, log esplicito
 """
 from __future__ import annotations
 
 import logging
 import random
+import re
 import time
 from dataclasses import dataclass
 from typing import Iterator, List, Optional
 
 import requests
+from playwright.sync_api import (
+    Playwright,
+    Response as PWResponse,
+    TimeoutError as PlaywrightTimeoutError,
+    sync_playwright,
+)
 
 LOGGER = logging.getLogger("vinted_client")
 
@@ -32,12 +34,18 @@ USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
-DEFAULT_TIMEOUT = 20
-MAX_RETRIES = 3
+NAV_TIMEOUT_MS = 30_000  # 30s per la navigazione iniziale
+LOAD_MORE_WAIT_MS = 5_000
+
+# Match dell'URL dell'endpoint XHR: cattura sia "/users/<id>/items" che
+# eventuali variazioni future "/wardrobe/<id>/items" o "/catalog/items?user_id=..."
+ITEMS_URL_PATTERN = re.compile(
+    r"/api/v2/(?:users|wardrobe)/\d+/items|/api/v2/catalog/items"
+)
 
 
 class VintedClientError(Exception):
-    """Errore parlando con Vinted (HTTP, parsing, blocco anti-bot)."""
+    """Errore parlando con Vinted (navigazione, intercept, parsing)."""
 
 
 @dataclass
@@ -56,81 +64,25 @@ class VintedItem:
     raw: dict
 
 
-def _new_session() -> requests.Session:
-    """Crea una session con headers realistici e cookie Vinted preimpostati
-    tramite una GET sulla homepage."""
-    s = requests.Session()
-    s.headers.update({
-        "User-Agent": USER_AGENT,
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": BASE_HOST + "/",
-        "Origin": BASE_HOST,
-        "DNT": "1",
-        "Connection": "keep-alive",
-    })
-    # Warmup: ottiene cookie anti-CSRF / sessione
-    try:
-        s.get(BASE_HOST + "/", timeout=DEFAULT_TIMEOUT)
-    except requests.RequestException as exc:
-        raise VintedClientError(f"Warmup fallito: {exc}") from exc
-    return s
-
-
-def _request_with_retry(
-    session: requests.Session,
-    url: str,
-    *,
-    params: Optional[dict] = None,
-) -> dict:
-    """GET con retry exponenziale su 429/5xx. Solleva VintedClientError."""
-    last_exc: Optional[Exception] = None
-    for attempt in range(MAX_RETRIES):
-        try:
-            resp = session.get(url, params=params, timeout=DEFAULT_TIMEOUT)
-            if resp.status_code in (429, 500, 502, 503, 504):
-                # Backoff progressivo + jitter
-                sleep = (2 ** attempt) + random.uniform(0, 1)
-                LOGGER.warning(
-                    "Vinted %s on %s, retry in %.1fs (attempt %d)",
-                    resp.status_code, url, sleep, attempt + 1,
-                )
-                time.sleep(sleep)
-                continue
-            if resp.status_code == 403:
-                raise VintedClientError(
-                    f"403 Forbidden: probabile blocco anti-bot. "
-                    f"Body: {resp.text[:200]}"
-                )
-            resp.raise_for_status()
-            return resp.json()
-        except requests.RequestException as exc:
-            last_exc = exc
-            sleep = (2 ** attempt) + random.uniform(0, 1)
-            LOGGER.warning("Vinted request error %s, retry in %.1fs", exc, sleep)
-            time.sleep(sleep)
-    raise VintedClientError(
-        f"Esauriti i retry su {url}: {last_exc}"
-    ) from last_exc
-
-
 def _parse_item(item: dict) -> VintedItem:
-    """Normalizza il JSON Vinted nel nostro VintedItem."""
-    photos = []
+    """Normalizza il JSON di un singolo item Vinted nel nostro dataclass."""
+    photos: List[str] = []
     for photo in item.get("photos") or []:
         url = photo.get("full_size_url") or photo.get("url")
         if url:
             photos.append(url)
 
-    # Catalog tree: Vinted usa "catalog_id" + "catalog_branch_title"
-    # (es. "Elettronica · Videogiochi · Console")
-    branch_title = item.get("catalog_branch_title") or item.get("catalog", {}).get("title")
+    branch_title = item.get("catalog_branch_title") or (
+        item.get("catalog", {}) or {}
+    ).get("title")
 
     price_amount = None
     price = item.get("price")
     if isinstance(price, dict):
-        price_amount = float(price.get("amount") or 0) or None
+        try:
+            price_amount = float(price.get("amount") or 0) or None
+        except (TypeError, ValueError):
+            price_amount = None
         currency = price.get("currency_code") or "EUR"
     else:
         try:
@@ -157,47 +109,295 @@ def _parse_item(item: dict) -> VintedItem:
 def fetch_user_items(
     vinted_user_id: int,
     *,
-    per_page: int = 50,
-    max_pages: int = 10,
-    sleep_between_pages: float = 1.5,
+    max_items: int = 200,
+    headless: bool = True,
+    scroll_attempts: int = 6,
+    enrich_with_details: bool = True,
 ) -> Iterator[VintedItem]:
-    """Itera tutti gli annunci di un profilo Vinted.
+    """Itera tutti gli annunci di un profilo Vinted usando Chromium headless.
 
-    Solleva VintedClientError se la chiamata fallisce.
+    Se enrich_with_details=True (default) per ogni item fa una seconda
+    chiamata a /api/v2/items/{id} riusando i cookie del browser, per
+    ottenere la descrizione completa e il catalog_id (che il listing
+    sintetico del profilo non include).
+
+    Solleva VintedClientError se la navigazione fallisce, Vinted mostra
+    captcha o non si intercetta nessuna response.
     """
-    session = _new_session()
-    url = f"{BASE_HOST}/api/v2/users/{vinted_user_id}/items"
+    collected_raw: List[dict] = []
+    seen_ids: set[int] = set()
+    error: Optional[str] = None
 
-    for page in range(1, max_pages + 1):
-        params = {
-            "per_page": per_page,
-            "page": page,
-            "order": "newest_first",
-        }
-        data = _request_with_retry(session, url, params=params)
-
-        items = data.get("items") or []
-        if not items:
-            break
-
-        for raw in items:
+    def on_response(response: PWResponse) -> None:
+        if not ITEMS_URL_PATTERN.search(response.url):
+            return
+        if response.status != 200:
+            return
+        try:
+            payload = response.json()
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("Risposta intercettata non JSON: %s", exc)
+            return
+        new_items = payload.get("items") or []
+        for raw in new_items:
             try:
-                yield _parse_item(raw)
-            except (KeyError, ValueError) as exc:
-                LOGGER.warning("Skip item (parse error): %s", exc)
+                item_id = int(raw["id"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            if item_id in seen_ids:
+                continue
+            seen_ids.add(item_id)
+            collected_raw.append(raw)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=headless,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-blink-features=AutomationControlled",
+                ],
+            )
+            context = browser.new_context(
+                user_agent=USER_AGENT,
+                locale="it-IT",
+                viewport={"width": 1366, "height": 900},
+                extra_http_headers={
+                    "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
+                },
+            )
+            page = context.new_page()
+            page.on("response", on_response)
+
+            profile_url = f"{BASE_HOST}/member/{vinted_user_id}"
+            try:
+                page.goto(profile_url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
+            except PlaywrightTimeoutError as exc:
+                raise VintedClientError(
+                    f"Timeout navigazione su {profile_url}: {exc}"
+                ) from exc
+
+            try:
+                page.wait_for_load_state("networkidle", timeout=LOAD_MORE_WAIT_MS)
+            except PlaywrightTimeoutError:
+                pass
+
+            # Scroll progressivo per caricare piu items (infinite scroll)
+            last_count = len(collected_raw)
+            stagnant_rounds = 0
+            for i in range(scroll_attempts):
+                if len(collected_raw) >= max_items:
+                    break
+                page.mouse.wheel(0, 4000)
+                try:
+                    page.wait_for_load_state("networkidle", timeout=LOAD_MORE_WAIT_MS)
+                except PlaywrightTimeoutError:
+                    pass
+                time.sleep(1.2)
+                if len(collected_raw) == last_count:
+                    stagnant_rounds += 1
+                    if stagnant_rounds >= 2:
+                        break
+                else:
+                    stagnant_rounds = 0
+                    last_count = len(collected_raw)
+
+            # Arricchimento: per ogni item navigamo alla sua pagina pubblica
+            # e leggiamo og:description. Restart del browser ogni 8 items per
+            # evitare il rate-limit cumulativo di Vinted (testato empiricamente).
+            if enrich_with_details:
+                ids = [raw["id"] for raw in collected_raw[:max_items] if raw.get("id")]
+                LOGGER.info("Fetch detail per %d items via item pages", len(ids))
+
+                details_map: dict = {}
+
+                def _fresh_browser():
+                    """Crea browser+page nuovi (chiude i precedenti se passati)."""
+                    b = p.chromium.launch(
+                        headless=headless,
+                        args=[
+                            "--no-sandbox",
+                            "--disable-dev-shm-usage",
+                            "--disable-blink-features=AutomationControlled",
+                        ],
+                    )
+                    ctx = b.new_context(
+                        user_agent=USER_AGENT,
+                        locale="it-IT",
+                        viewport={"width": 1366, "height": 900},
+                    )
+                    pg = ctx.new_page()
+                    try:
+                        pg.goto(BASE_HOST + "/", wait_until="domcontentloaded", timeout=20_000)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    time.sleep(1.0)
+                    return b, pg
+
+                # Chiudo il browser corrente (che era per il profilo) e ne
+                # apro uno fresco dedicato al backfill.
+                browser.close()
+                browser, page = _fresh_browser()
+
+                for idx, item_id in enumerate(ids[:200]):
+                    if idx > 0 and idx % 8 == 0:
+                        browser.close()
+                        time.sleep(2.0)
+                        browser, page = _fresh_browser()
+
+                    item_url = f"{BASE_HOST}/items/{item_id}"
+                    try:
+                        page.goto(item_url, wait_until="domcontentloaded", timeout=15_000)
+                        descr = page.evaluate(
+                            """() => {
+                                const meta = document.querySelector('meta[property="og:description"]');
+                                return meta ? meta.content : null;
+                            }"""
+                        )
+                        if descr and len(descr.strip()) > 5:
+                            details_map[item_id] = {"description": descr.strip()}
+                    except Exception as exc:  # noqa: BLE001
+                        LOGGER.warning("Item %s fail: %s", item_id, exc)
+                        continue
+                    time.sleep(1.2 + random.uniform(0, 0.7))
+
+                # Applica i details
+                non_null_descr = 0
+                for raw in collected_raw[:max_items]:
+                    detail = details_map.get(raw.get("id"))
+                    if detail and detail.get("description"):
+                        raw["description"] = detail["description"]
+                        non_null_descr += 1
+                LOGGER.info("Descrizioni popolate: %d/%d", non_null_descr, len(ids))
+
+            browser.close()
+    except VintedClientError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        error = str(exc)
+        LOGGER.exception("Errore Playwright")
+        raise VintedClientError(f"Playwright fallito: {exc}") from exc
+
+    if not collected_raw and error is None:
+        raise VintedClientError(
+            "Nessuna risposta API intercettata. Vinted potrebbe mostrare "
+            "captcha o aver cambiato la struttura della pagina."
+        )
+
+    LOGGER.info("Vinted: %d items intercettati dal profilo %d",
+                len(collected_raw), vinted_user_id)
+
+    for raw in collected_raw[:max_items]:
+        try:
+            yield _parse_item(raw)
+        except (KeyError, ValueError, TypeError) as exc:
+            LOGGER.warning("Skip item (parse error): %s", exc)
+            continue
+
+
+def verify_items_missing(item_ids: list[int]) -> set[int]:
+    """Per ogni item_id, verifica navigando a /items/{id} se l'annuncio
+    e' davvero scomparso su Vinted. Ritorna set degli ID che NON esistono
+    piu'. Usato per evitare cancellazioni accidentali quando lo scroll
+    del profilo non carica tutti gli items.
+
+    Detection criteri:
+      - Pagina restituisce 404 o 410
+      - Redirect verso pagina di errore (URL contiene 'not-found' o '404')
+      - Titolo pagina contiene "Pagina non trovata" / "Page not found"
+    """
+    if not item_ids:
+        return set()
+
+    missing: set[int] = set()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ],
+        )
+        context = browser.new_context(
+            user_agent=USER_AGENT,
+            locale="it-IT",
+            viewport={"width": 1366, "height": 900},
+        )
+        page = context.new_page()
+        try:
+            page.goto(BASE_HOST + "/", wait_until="domcontentloaded", timeout=20_000)
+            time.sleep(1.0)
+        except Exception:  # noqa: BLE001
+            pass
+
+        for i, item_id in enumerate(item_ids):
+            # Restart browser ogni 8 per stare sotto rate-limit
+            if i > 0 and i % 8 == 0:
+                browser.close()
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage"],
+                )
+                context = browser.new_context(
+                    user_agent=USER_AGENT,
+                    locale="it-IT",
+                    viewport={"width": 1366, "height": 900},
+                )
+                page = context.new_page()
+                try:
+                    page.goto(BASE_HOST + "/", timeout=20_000)
+                    time.sleep(1.0)
+                except Exception:  # noqa: BLE001
+                    pass
+
+            url = f"{BASE_HOST}/items/{item_id}"
+            try:
+                resp = page.goto(url, wait_until="domcontentloaded", timeout=15_000)
+                final_url = page.url
+                status = resp.status if resp else None
+
+                is_missing = False
+                if status in (404, 410):
+                    is_missing = True
+                elif final_url and ("not-found" in final_url or "/404" in final_url):
+                    is_missing = True
+                else:
+                    # Check titolo pagina per messaggi di errore
+                    title = page.title() or ""
+                    title_lower = title.lower()
+                    if any(s in title_lower for s in (
+                        "pagina non trovata",
+                        "page not found",
+                        "404",
+                        "non disponibile",
+                    )):
+                        is_missing = True
+
+                if is_missing:
+                    missing.add(item_id)
+                    LOGGER.info("Item %d confermato MISSING su Vinted", item_id)
+                time.sleep(0.8 + random.uniform(0, 0.5))
+            except Exception as exc:  # noqa: BLE001
+                # In caso di errore NON marchiamo missing (safety)
+                LOGGER.warning("verify_items_missing #%d fail: %s", item_id, exc)
                 continue
 
-        # Se la pagina è stata l'ultima, esci
-        if len(items) < per_page:
-            break
+        browser.close()
 
-        time.sleep(sleep_between_pages + random.uniform(0, 0.5))
+    return missing
 
 
 def download_photo(url: str, max_bytes: int = 10 * 1024 * 1024) -> bytes:
-    """Scarica una foto Vinted. max_bytes protegge da file enormi."""
-    session = _new_session()
-    resp = session.get(url, timeout=DEFAULT_TIMEOUT, stream=True)
+    """Scarica una foto Vinted via requests semplice. Le foto sono su CDN
+    pubblico, niente auth necessaria."""
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "image/avif,image/webp,*/*",
+        "Referer": BASE_HOST + "/",
+    }
+    resp = requests.get(url, headers=headers, timeout=20, stream=True)
     resp.raise_for_status()
     chunks = bytearray()
     for chunk in resp.iter_content(chunk_size=64 * 1024):

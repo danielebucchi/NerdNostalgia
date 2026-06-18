@@ -3,15 +3,13 @@ Sync service Vinted → NerdNostalgia.
 
 Pipeline:
   1) Legge vinted_settings (user_id, enabled)
-  2) Fetcha tutti gli items del profilo (utils.vinted_client)
-  3) Filtra solo gli items il cui catalog_id e' presente e abilitato
-     in vinted_category_mappings (oppure il cui branch_title contiene
-     parole-chiave da fallback)
-  4) Per ogni item:
-        - se vinted_item_id già esistente → aggiorna prezzo/titolo
-        - altrimenti crea Article DRAFT mappato alla nostra categoria
-  5) Scarica le foto via vinted_client + le converte in WebP locali
-  6) Scrive vinted_sync_logs con counters
+  2) Fetcha gli items del profilo (utils.vinted_client, Playwright headless)
+  3) Filtra per keyword NerdNostalgia (NN_KEYWORDS)
+  4) Auto-detect categoria via CATEGORY_RULES (titolo + descrizione)
+  5) Crea Article PUBLISHED (o aggiorna esistente)
+  6) Scarica foto in WebP + thumbnail locale
+  7) Cancella articoli non piu' visti su Vinted (safety: min 10 fetched)
+  8) Scrive vinted_sync_logs con counters
 """
 from __future__ import annotations
 
@@ -31,8 +29,8 @@ from models.db import (
     Article,
     ArticleCondition,
     ArticleStatus,
+    Category,
     User,
-    VintedCategoryMapping,
     VintedSettings,
     VintedStatus,
     VintedSyncLog,
@@ -53,39 +51,144 @@ from utils.vinted_client import (
 
 LOGGER = logging.getLogger("vinted_sync")
 
-# Fallback keywords nel branch_title se il catalog_id non e' mappato.
-# Esempio: nuovo catalog_id sub-categoria che ancora non conosciamo, ma
-# il branch_title contiene "Elettronica" → e' un articolo NN.
-FALLBACK_BRANCH_KEYWORDS = (
+# Keyword di interesse NerdNostalgia. Cerco nel branch_title (se Vinted lo
+# espone) E nel titolo/descrizione (Vinted spesso nel listing del profilo
+# NON include catalog_id, solo titolo+prezzo+foto).
+NN_KEYWORDS = (
+    # Console / piattaforme
+    "gameboy", "game boy", "gba", "nds", "3ds", "switch", "ps1", "ps2", "ps3",
+    "ps4", "ps5", "psp", "psvita", "ps vita", "playstation", "xbox",
+    "nintendo", "sega", "dreamcast", "saturn", "n64", "snes", "wii",
+    "atari", "megadrive", "mega drive",
+    # Categorie generiche videogiochi/elettronica
+    "videogioco", "videogiochi", "videogame", "console", "joypad", "controller",
     "elettronica",
-    "videogioch",  # videogioco/videogiochi
-    "console",
-    "collezionism",
-    "carte",
-    "pokemon",
-    "magic",
-    "yu-gi-oh",
-    "funko",
-    "action figure",
-    "modellini",
+    # Carte
+    "pokemon", "pokémon", "carte", "carta", "card", "tcg", "lorcana",
+    "magic", "mtg", "yu-gi-oh", "yugioh", "one piece", "dragon ball",
+    "dragonball",
+    # Collezionismo / nerdate
+    "collezionism", "funko", "bitty pop", "action figure", "figurine",
+    "modellini", "lego", "playmobil", "kinder", "sorpresa", "stickers",
+    "spilla", "spille", "poster",
+    # Brand/franchise nerd
+    "mario", "zelda", "link", "metroid", "kirby", "sonic", "tetris",
+    "stranger things", "marvel", "harry potter", "disney", "studio ghibli",
+    "naruto", "dragonball", "anime", "manga", "fumetto", "fumetti",
+    "lucca comics", "comicon",
+    # Termini specifici
+    "console retro", "vintage", "console portatile",
 )
 
 
-def _branch_matches_fallback(branch_title: Optional[str]) -> bool:
-    if not branch_title:
-        return False
-    lowered = branch_title.lower()
-    return any(kw in lowered for kw in FALLBACK_BRANCH_KEYWORDS)
+def _matches_nn_keywords(*texts: Optional[str]) -> bool:
+    """True se uno dei testi contiene una keyword NerdNostalgia."""
+    combined = " ".join(t.lower() for t in texts if t)
+    return any(kw in combined for kw in NN_KEYWORDS)
 
 
-def _load_mapping(db: Session) -> dict[int, Optional[int]]:
-    """Ritorna {vinted_catalog_id: nn_category_id} per i mapping enabled."""
-    rows = (
-        db.query(VintedCategoryMapping)
-        .filter(VintedCategoryMapping.enabled.is_(True))
-        .all()
-    )
-    return {r.vinted_catalog_id: r.category_id for r in rows}
+# ─────────────────────────────────────────────────────────────────────────
+# Auto-detect categoria/sottocategoria dal titolo (+ descrizione)
+# ─────────────────────────────────────────────────────────────────────────
+#
+# Match in ordine di specificita': prima le sottocategorie carte, poi
+# console specifiche, poi sottocategorie nerdate, poi top-level fallback.
+# Ogni regola e' (slug_target, tuple di keyword da cercare).
+#
+# Strategia: il primo match vince. Vince la sottocategoria piu' specifica
+# che combacia con qualche keyword del titolo.
+
+CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
+    # ─── PRIORITA' 1: forma fisica/merchandise → Nerdate/Gadget
+    # (vince anche se il franchise e' pokemon/disney/marvel)
+    # Esempio: "Quadro pirografato pokemon" → gadget, NON carte/pokemon
+    ("gadget", (
+        "quadro", "quadretto", "orecchini", "spilla", "spille",
+        "portachiavi", "tappetino", "astuccio", "zainetto",
+        "fiocco nascita", "sticker", "stickers", "tatuaggi",
+        "poster", "campanella", "magnete", "calamita",
+        "borraccia", "tazza", "felpa", "maglietta", "t-shirt", "tshirt",
+        "cosplay", "cover", "pirografat",
+    )),
+
+    # ─── PRIORITA' 2: Funko Pop / Action Figure / Modellini (form fisica)
+    ("funko-pop",     ("funko", "bitty pop")),
+    ("action-figure", ("action figure", "warhammer", "neca",
+                       "mafex", "shf ", "s.h.figuarts")),
+    ("modellini",     ("modellino", "modellini", "lego", "playmobil",
+                       "miniatura", "miniature", "macchinina",
+                       "macchinine", "cars disney")),
+    ("peluche",       ("peluche", "plush")),
+
+    # ─── PRIORITA' 3: Videogame disco/cartuccia (console name in titolo)
+    # Console+game name → videogiochi/giochi (es. "Spiderman 2 PSP")
+    ("giochi", (
+        "psp", "ps vita", "psvita", "ps1", "ps2", "ps3", "ps4", "ps5",
+        "playstation", "xbox", "gamecube", "wii", "gba", "nds", "3ds",
+        "nintendo switch", "nintendo64", "n64", "snes",
+        "sega", "dreamcast", "megadrive", "mega drive", "saturn",
+        "gameboy", "game boy", "atari",
+        "uncharted", "the last of us", "mario kart", "mario party",
+        "zelda", "metroid", "kirby", "tetris", "sonic", "doom", "halo",
+        "fifa", "pes ", "nba 2k", "minecraft", "fortnite",
+        "skyrim", "fallout", "gta ", "call of duty", "battlefield",
+        "ducktales", "robocop", "spiderman", "spider-man",
+        "invizimals", "prince of persia", "mario kart",
+        "mario bros", "super mario", "donkey kong",
+    )),
+
+    # ─── PRIORITA' 4: accessori console
+    ("accessori", (
+        "controller", "joypad", "joystick", "dualshock", "dualsense",
+        "pad nintendo", "memory card", "lente ingrandimento",
+        "base ricarica ps", "dashcam",
+    )),
+
+    # ─── PRIORITA' 5: Carte (franchise specifico nel titolo)
+    ("pokemon",             ("pokemon", "pokémon", "pokeball", "pikachu",
+                             "charizard", "eevee", "mew", "mewtwo")),
+    ("magic-the-gathering", ("magic the gathering", " mtg",)),
+    ("yu-gi-oh",            ("yu-gi-oh", "yugioh", "yu gi oh")),
+    ("dragon-ball",         ("dragon ball", "dragonball")),
+    ("one-piece",           ("one piece",)),
+    ("carte",               ("lorcana", "tcg ", "carte da gioco",
+                             "trading card", "keyforge",
+                             "treasure box", "anthology")),
+
+    # ─── PRIORITA' 6: Gadget franchise (Disney/Marvel/HP senza forma)
+    ("gadget", (
+        "marvel", "harry potter", "stranger things",
+        "studio ghibli", "ghibli", "disney", "topolino",
+        "stitch", "groot", "iron man", "spidey",
+        "minions", "duracel", "kinder", "sorpresa", "uovo kinder",
+        "manga", "fumetto", "fumetti", "lucca comics", "comicon",
+        "naruto", "anime", "figurine", "calciatori", "panini",
+    )),
+
+    # ─── PRIORITA' 7: Top-level generici
+    ("videogiochi", ("videogioco", "videogame", "videogiochi",
+                     "nintendo", "console", "gaming")),
+    ("carte",       (" carta ", " carte ", " card ")),
+    ("nerdate",     ("nerd", "vintage", "retro")),
+]
+
+
+def _detect_category_slug(*texts: Optional[str]) -> Optional[str]:
+    """Ritorna lo slug della categoria piu' specifica che matcha. None se
+    nessuna regola matcha."""
+    combined = " ".join(t.lower() for t in texts if t)
+    # Aggiungi padding per match di parole intere "ps2 " → " ps2 "
+    haystack = " " + combined + " "
+    for slug, keywords in CATEGORY_RULES:
+        if any(kw in haystack for kw in keywords):
+            return slug
+    return None
+
+
+def _resolve_category_id(db: Session, slug: str) -> Optional[int]:
+    """Lookup category_id by slug."""
+    cat = db.query(Category).filter(Category.slug == slug).first()
+    return cat.id if cat else None
 
 
 def _admin_user_id(db: Session) -> int:
@@ -133,27 +236,17 @@ def _save_photo(photo_bytes: bytes, article_id: int) -> Optional[str]:
         return None
 
 
-def _item_passes_filter(
-    item: VintedItem,
-    mapping: dict[int, Optional[int]],
-) -> tuple[bool, Optional[int]]:
-    """Decide se l'item passa il filtro. Ritorna (allowed, nn_category_id)."""
-    # 1) Match diretto su catalog_id
-    if item.catalog_id is not None and item.catalog_id in mapping:
-        return True, mapping[item.catalog_id]
-
-    # 2) Fallback: branch_title contiene keyword di elettronica/collezionismo
-    if _branch_matches_fallback(item.catalog_branch_title):
-        # Categoria non determinabile → lasciamo NULL (admin la setta a mano)
-        return True, None
-
-    return False, None
+def _item_passes_filter(item: VintedItem) -> bool:
+    """Decide se l'item e' pertinente a NerdNostalgia in base alle keyword
+    nel titolo/descrizione/branch_title."""
+    return _matches_nn_keywords(
+        item.title, item.description, item.catalog_branch_title,
+    )
 
 
 def _apply_item_to_article(
     db: Session,
     item: VintedItem,
-    target_category_id: Optional[int],
     user_id: int,
 ) -> tuple[Article, str]:
     """Ritorna (article, op) dove op = 'created' | 'updated' | 'skipped'."""
@@ -163,13 +256,20 @@ def _apply_item_to_article(
         .first()
     )
 
+    # Auto-detect categoria via keyword nel titolo/descrizione/branch
+    target_category_id: Optional[int] = None
+    detected_slug = _detect_category_slug(
+        item.title, item.description, item.catalog_branch_title,
+    )
+    if detected_slug:
+        target_category_id = _resolve_category_id(db, detected_slug)
+
     now = datetime.now(_dt.UTC)
     price = Decimal(str(item.price)) if item.price else Decimal("0")
 
     if existing is not None:
-        # Update soft: solo prezzo + sync time, NON sovrascrivo titolo/descr/foto
-        # (l'admin potrebbe averli editati). Se l'admin ha gia' pubblicato e Vinted
-        # mostra venduto/non listato → aggiorno vinted_status.
+        # Update soft: prezzo + sync time + descrizione/categoria SE prima
+        # erano vuote (popola dati mancanti senza sovrascrivere edit admin).
         changed = False
         if existing.vinted_price != price:
             existing.vinted_price = price
@@ -184,6 +284,12 @@ def _apply_item_to_article(
         if existing.vinted_status != new_status:
             existing.vinted_status = new_status
             changed = True
+        if (not existing.description) and item.description:
+            existing.description = item.description
+            changed = True
+        if existing.category_id is None and target_category_id is not None:
+            existing.category_id = target_category_id
+            changed = True
         existing.vinted_synced_at = now
         if changed:
             db.commit()
@@ -191,7 +297,8 @@ def _apply_item_to_article(
             return existing, "updated"
         return existing, "skipped"
 
-    # Nuovo articolo: bozza
+    # Nuovo articolo: pubblicato direttamente (sync Vinted = catalogo live)
+    sold_on_vinted = (item.status or "").lower() == "sold"
     article = Article(
         user_id=user_id,
         title=item.title or f"Vinted #{item.item_id}",
@@ -199,19 +306,18 @@ def _apply_item_to_article(
         price=price,
         currency=item.currency or "EUR",
         condition=ArticleCondition.USED,
-        status=ArticleStatus.DRAFT,
+        status=ArticleStatus.SOLD if sold_on_vinted else ArticleStatus.PUBLISHED,
         quantity=1,
         category_id=target_category_id,
         images=[],
         vinted_item_id=item.item_id,
         vinted_url=item.url,
         vinted_price=price,
-        vinted_status=(
-            VintedStatus.SOLD if (item.status or "").lower() == "sold"
-            else VintedStatus.LISTED
-        ),
+        vinted_status=VintedStatus.SOLD if sold_on_vinted else VintedStatus.LISTED,
         vinted_synced_at=now,
         purchase_platform="Vinted",
+        published_at=now if not sold_on_vinted else None,
+        sold_at=now if sold_on_vinted else None,
     )
     db.add(article)
     db.commit()
@@ -238,7 +344,14 @@ def _apply_item_to_article(
 
 
 def run_sync(db: Session, triggered_by: str = "cron") -> VintedSyncLog:
-    """Esegue la sync e ritorna il log scritto su DB."""
+    """Esegue la sync e ritorna il log scritto su DB.
+
+    La sync fa SOLO insert/update. NON cancella articoli che spariscono
+    da Vinted (potrebbe esserci uno scroll parziale e cancelleremmo
+    erroneamente articoli ancora online). Per rimuovere un articolo
+    venduto, usa /admin/articles e cambia lo status a SOLD o eliminalo
+    manualmente.
+    """
     settings = db.query(VintedSettings).order_by(VintedSettings.id.asc()).first()
     log = VintedSyncLog(
         started_at=datetime.now(_dt.UTC),
@@ -254,7 +367,6 @@ def run_sync(db: Session, triggered_by: str = "cron") -> VintedSyncLog:
         db.commit()
         return log
 
-    mapping = _load_mapping(db)
     user_id = _admin_user_id(db)
 
     fetched = 0
@@ -265,12 +377,11 @@ def run_sync(db: Session, triggered_by: str = "cron") -> VintedSyncLog:
     try:
         for item in fetch_user_items(settings.vinted_user_id):
             fetched += 1
-            allowed, target_cat = _item_passes_filter(item, mapping)
-            if not allowed:
+            if not _item_passes_filter(item):
                 skipped += 1
                 continue
             try:
-                _, op = _apply_item_to_article(db, item, target_cat, user_id)
+                _, op = _apply_item_to_article(db, item, user_id)
             except Exception as exc:  # noqa: BLE001
                 LOGGER.exception("Errore importando item %s", item.item_id)
                 skipped += 1

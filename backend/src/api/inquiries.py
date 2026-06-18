@@ -5,6 +5,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+import os
+
 from helpers.article import ArticleHelper, get_article_helper
 from helpers.auth import require_admin
 from helpers.inquiry import InquiryHelper, get_inquiry_helper
@@ -15,6 +17,7 @@ from models.entities.inquiry import (
     InquiryResponse,
     InquiryUpdate,
 )
+from utils.email import send_inquiry_notification
 
 router = APIRouter(prefix="/api/inquiries", tags=["inquiries"])
 
@@ -44,6 +47,7 @@ def submit_inquiry(
     article_helper: ArticleHelper = Depends(get_article_helper),
 ):
     """Invia una richiesta di contatto. Endpoint pubblico (nessun auth)."""
+    article = None
     if data.article_id is not None:
         article = article_helper.get("id", data.article_id)
         if not article:
@@ -64,6 +68,23 @@ def submit_inquiry(
         ip_address=client_ip,
     )
     inquiry_helper.save(new_inquiry)
+
+    # Notifica all'admin via email (non-blocking)
+    site_url = os.getenv("SITE_PUBLIC_URL", "").rstrip("/")
+    article_url = (
+        f"{site_url}/articles/{article.id}"
+        if article and site_url else None
+    )
+    try:
+        send_inquiry_notification(
+            new_inquiry,
+            article_title=article.title if article else None,
+            article_url=article_url,
+        )
+    except Exception:  # noqa: BLE001
+        # Mai bloccare la response sull'errore di mail
+        pass
+
     return _to_response(new_inquiry)
 
 
