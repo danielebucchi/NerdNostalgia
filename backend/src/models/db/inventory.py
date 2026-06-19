@@ -11,11 +11,11 @@ from sqlalchemy import (
     Date,
     ForeignKey,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from .base import BaseModel
@@ -86,7 +86,7 @@ class InventoryItem(BaseModel):
     )
     vinted_item_id = Column(BigInteger)
 
-    images = Column(JSONB, nullable=False, default=list)
+    images = Column(JSON, nullable=False, default=list)
     notes = Column(Text)
 
     lot = relationship("Lot", back_populates="items")

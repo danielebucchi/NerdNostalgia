@@ -1,8 +1,7 @@
 """
 Modello Article per SQLAlchemy.
 """
-from sqlalchemy import BigInteger, Column, String, Integer, Numeric, Text, Enum, Date, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import BigInteger, Column, String, Integer, Numeric, Text, Enum, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 import enum
 from datetime import datetime
@@ -113,8 +112,8 @@ class Article(BaseModel):
     dimensions_cm = Column(String(50))
 
     # JSON fields
-    images = Column(JSONB, default=list)
-    article_metadata = Column(JSONB, default=dict)
+    images = Column(JSON, default=list)
+    article_metadata = Column(JSON, default=dict)
 
     # Ordinamento manuale del catalogo (piu' basso = prima)
     display_order = Column(Integer, nullable=False, default=0, index=True)

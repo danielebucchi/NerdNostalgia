@@ -62,12 +62,11 @@ class ArticleHelper(BaseHelper):
         if max_price is not None:
             query = query.filter(Article.price <= max_price)
         if search:
-            tsvector = func.to_tsvector(
-                "italian",
-                func.coalesce(Article.title, "") + " " + func.coalesce(Article.description, ""),
+            pattern = f"%{search}%"
+            query = query.filter(
+                Article.title.ilike(pattern)
+                | Article.description.ilike(pattern)
             )
-            tsquery = func.plainto_tsquery("italian", search)
-            query = query.filter(tsvector.op("@@")(tsquery))
 
         total = query.count()
         items = (

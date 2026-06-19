@@ -11,11 +11,11 @@ from sqlalchemy import (
     Column,
     Date,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 
 from .base import BaseModel
 
@@ -66,7 +66,7 @@ class PersonalCard(BaseModel):
     fee_amount = Column(Numeric(10, 2))
     shipping_cost = Column(Numeric(10, 2))
 
-    images = Column(JSONB, nullable=False, default=list)
+    images = Column(JSON, nullable=False, default=list)
     notes = Column(Text)
 
     def __repr__(self):
