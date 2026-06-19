@@ -38,7 +38,7 @@ USER nextjs
 
 EXPOSE 3737
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget -qO- http://localhost:3737/ >/dev/null 2>&1 || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -q --spider --max-redirect=3 --tries=1 --timeout=3 http://127.0.0.1:3737/ >/dev/null 2>&1 || exit 1
 
 CMD ["node", "server.js"]
