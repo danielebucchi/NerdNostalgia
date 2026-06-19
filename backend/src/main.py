@@ -1,7 +1,7 @@
 """
 Main FastAPI application for NerdNostalgia backend.
 """
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
@@ -29,6 +29,7 @@ from api.users import router as users_router
 from api.vinted import router as vinted_router
 from api.wanted import router as wanted_router
 from utils.scheduler import start_scheduler, stop_scheduler
+from utils.session import get_db
 from utils.storage import UPLOADS_DIR, ensure_dirs
 
 # Create FastAPI app
@@ -98,19 +99,22 @@ def root():
 
 @app.get("/status")
 @app.get("/health")
-def health():
-    """Health check. Verifica connessione DB con SELECT 1."""
+def health(db=Depends(get_db)):
+    """Health check. Verifica connessione DB con SELECT 1.
+
+    Usa la dependency get_db cosi' i test overridano la sessione (in-memory)
+    e CI/prod usano la SessionLocal standard.
+    """
     from sqlalchemy import text
-    from utils.session import SessionLocal
-    db_ok = False
     try:
-        with SessionLocal() as db:
-            db.execute(text("SELECT 1"))
-            db_ok = True
+        db.execute(text("SELECT 1"))
+        db_ok = True
     except Exception:  # noqa: BLE001
         db_ok = False
-    body = {"status": "healthy" if db_ok else "degraded", "database": "ok" if db_ok else "down"}
-    return body
+    return {
+        "status": "healthy" if db_ok else "degraded",
+        "database": "ok" if db_ok else "down",
+    }
 
 
 if __name__ == "__main__":
