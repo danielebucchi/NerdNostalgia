@@ -55,14 +55,11 @@ class WantedItemHelper(BaseHelper):
                 (WantedItem.max_price == None) | (WantedItem.max_price <= max_budget)  # noqa: E711
             )
         if search:
-            tsvector = func.to_tsvector(
-                "italian",
-                func.coalesce(WantedItem.title, "")
-                + " "
-                + func.coalesce(WantedItem.description, ""),
+            pattern = f"%{search}%"
+            query = query.filter(
+                WantedItem.title.ilike(pattern)
+                | WantedItem.description.ilike(pattern)
             )
-            tsquery = func.plainto_tsquery("italian", search)
-            query = query.filter(tsvector.op("@@")(tsquery))
 
         total = query.count()
         items = (

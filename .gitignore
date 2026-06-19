@@ -12,6 +12,9 @@ venv/
 tmp/
 *.log
 
+# SQLite DB locale (non commitato — uso scripts/migrate_pg_to_sqlite.py o backup)
+data/
+
 # IDE
 .idea/
 .vscode/

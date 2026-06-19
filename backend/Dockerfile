@@ -1,8 +1,8 @@
 FROM python:3.13
 
-# Install PostgreSQL client + system deps richieste da Chromium di Playwright
+# SQLite CLI (debug) + system deps richieste da Chromium di Playwright
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    postgresql-client \
+    sqlite3 \
     # Chromium runtime deps (minimal set)
     libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
     libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 \
