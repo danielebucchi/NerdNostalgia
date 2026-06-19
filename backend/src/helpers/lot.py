@@ -43,21 +43,17 @@ class LotHelper(BaseHelper):
         ).all()
 
     def next_code(self) -> str:
-        """Genera prossimo codice sequenziale L0001, L0002, ..."""
-        from sqlalchemy import func, cast, Integer
-        last = (
-            self.db.query(Lot.code)
-            .filter(Lot.code.op("~")("^L[0-9]+$"))
-            .order_by(desc(cast(func.substring(Lot.code, 2), Integer)))
-            .first()
-        )
-        next_seq = 1
-        if last and last[0]:
-            try:
-                next_seq = int(last[0][1:]) + 1
-            except ValueError:
-                next_seq = 1
-        return f"L{next_seq:04d}"
+        """Genera prossimo codice sequenziale L0001, L0002, ...
+        Portable PG/SQLite: filtra LIKE 'L%', poi calcola in Python il max
+        della parte numerica. Volumi attesi: decine/centinaia → trascurabile."""
+        rows = self.db.query(Lot.code).filter(Lot.code.like("L%")).all()
+        max_seq = 0
+        for (code,) in rows:
+            if code and len(code) > 1 and code[1:].isdigit():
+                seq = int(code[1:])
+                if seq > max_seq:
+                    max_seq = seq
+        return f"L{max_seq + 1:04d}"
 
     def save(self, lot: Lot) -> None:
         if not lot.code:
