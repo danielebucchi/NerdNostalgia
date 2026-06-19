@@ -1,0 +1,37 @@
+# Overlay DEV per sviluppo locale.
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#
+# Differenze rispetto al base (prod):
+#  - Backend: bind mount ./backend per hot reload del codice (uvicorn auto-reload? no, ma file aggiornati al restart)
+#  - Frontend: usa Dockerfile (next dev) invece di Dockerfile.prod, bind mount sorgenti, hot reload con polling
+#  - Polling env per file watch su macOS/Docker Desktop
+#
+# Niente loopback bind: in dev su Docker Desktop il loopback funziona uguale,
+# ma se vuoi accedere da altri device sulla LAN (telefono per testare) basta
+# rimuovere il prefix 127.0.0.1: dalle ports del base.
+
+services:
+  backend:
+    volumes:
+      - ./tmp:/tmp/nerdnostalgia
+      - ./backend:/app
+      - ./database:/app/database:ro
+      - ./data:/app/data
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile      # dev: next dev con hot reload
+      args: []
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
+    environment:
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+
+volumes:
+  frontend_node_modules:
+  frontend_next:
