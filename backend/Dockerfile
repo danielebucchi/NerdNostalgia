@@ -1,8 +1,9 @@
 FROM python:3.13
 
-# SQLite CLI (debug) + system deps richieste da Chromium di Playwright
+# SQLite CLI (debug) + curl (healthcheck) + system deps richieste da Chromium di Playwright
 RUN apt-get update && apt-get install -y --no-install-recommends \
     sqlite3 \
+    curl \
     # Chromium runtime deps (minimal set)
     libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
     libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 \
@@ -24,5 +25,8 @@ ENV PYTHONPATH="${PYTHONPATH}:/app/src"
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fs http://localhost:7373/health || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]

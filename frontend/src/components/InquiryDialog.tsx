@@ -32,6 +32,7 @@ export function InquiryDialog({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
+  const [website, setWebsite] = useState(""); // honeypot — utenti veri non vedono il campo
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +73,7 @@ export function InquiryDialog({
         phone: phone.trim() || undefined,
         subject,
         message: message.trim(),
+        website: website.trim() || undefined,
       });
       setDone(true);
       setName("");
@@ -126,6 +128,23 @@ export function InquiryDialog({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
+            {/* Honeypot: nascosto visivamente E ai tab. Solo i bot lo vedono. */}
+            <div
+              aria-hidden="true"
+              style={{ position: "absolute", left: "-10000px", top: "auto", width: 1, height: 1, overflow: "hidden" }}
+            >
+              <label>
+                Sito web (lascia vuoto)
+                <input
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                />
+              </label>
+            </div>
+
             <Field label="Nome" required>
               <input
                 type="text"

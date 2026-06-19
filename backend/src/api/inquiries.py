@@ -18,6 +18,7 @@ from models.entities.inquiry import (
     InquiryUpdate,
 )
 from utils.email import send_inquiry_notification
+from utils.limiter import limiter
 
 router = APIRouter(prefix="/api/inquiries", tags=["inquiries"])
 
@@ -40,13 +41,35 @@ def _to_response(inquiry: Inquiry) -> InquiryResponse:
 
 
 @router.post("/", response_model=InquiryResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute;30/hour")
 def submit_inquiry(
     data: InquiryCreate,
     request: Request,
     inquiry_helper: InquiryHelper = Depends(get_inquiry_helper),
     article_helper: ArticleHelper = Depends(get_article_helper),
 ):
-    """Invia una richiesta di contatto. Endpoint pubblico (nessun auth)."""
+    """Invia una richiesta di contatto. Endpoint pubblico (nessun auth).
+    Rate limit: 5/min e 30/h per IP. Honeypot field 'website' scarta i bot."""
+    # Honeypot: bot riempiono ogni campo, utenti veri lasciano questo vuoto.
+    # Fingiamo successo per non rivelare il meccanismo.
+    if data.website:
+        from datetime import datetime
+        now = datetime.utcnow().isoformat()
+        return InquiryResponse(
+            id=0,
+            article_id=data.article_id,
+            name=data.name,
+            email=str(data.email),
+            phone=data.phone,
+            subject=data.subject,
+            message=data.message,
+            status="NEW",
+            admin_notes=None,
+            created_at=now,
+            updated_at=now,
+            replied_at=None,
+        )
+
     article = None
     if data.article_id is not None:
         article = article_helper.get("id", data.article_id)

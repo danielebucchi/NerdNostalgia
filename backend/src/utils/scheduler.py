@@ -10,15 +10,20 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from models.db import VintedSettings
+from utils.backup import run_backup
 from utils.session import SessionLocal
 from utils.vinted_sync import run_sync
 
 LOGGER = logging.getLogger("scheduler")
+
+APP_TZ_NAME = os.getenv("APP_TIMEZONE", "Europe/Rome")
+APP_TZ = ZoneInfo(APP_TZ_NAME)
 
 _scheduler: BackgroundScheduler | None = None
 
@@ -30,14 +35,12 @@ def _vinted_job():
         settings = db.query(VintedSettings).order_by(VintedSettings.id.asc()).first()
         if settings is None or not settings.enabled:
             return
-        now_hour = datetime.utcnow().hour
-        # Tolleranza 0: gira solo nell'ora esatta
-        if now_hour != settings.sync_hour:
+        now_local = datetime.now(tz=APP_TZ)
+        if now_local.hour != settings.sync_hour:
             return
-        # Dedup giornaliero: se l'ultimo run è di oggi, salta
-        if settings.last_run_at and settings.last_run_at.date() == datetime.utcnow().date():
+        if settings.last_run_at and settings.last_run_at.date() == now_local.date():
             return
-        LOGGER.info("Cron Vinted sync triggered at hour %d", now_hour)
+        LOGGER.info("Cron Vinted sync triggered at hour %d (%s)", now_local.hour, APP_TZ_NAME)
         run_sync(db, triggered_by="cron")
     except Exception as exc:  # noqa: BLE001
         LOGGER.exception("Cron Vinted job error: %s", exc)
@@ -53,7 +56,7 @@ def start_scheduler() -> None:
         return
     if _scheduler is not None:
         return
-    _scheduler = BackgroundScheduler(timezone="UTC")
+    _scheduler = BackgroundScheduler(timezone=APP_TZ)
     # Job orario che decide internamente se eseguire (basato su sync_hour)
     _scheduler.add_job(
         _vinted_job,
@@ -61,8 +64,15 @@ def start_scheduler() -> None:
         id="vinted_sync_hourly_check",
         replace_existing=True,
     )
+    # Backup giornaliero (SQLite snapshot + tar uploads) alle 03:30 locali
+    _scheduler.add_job(
+        run_backup,
+        CronTrigger(hour=3, minute=30),
+        id="daily_backup",
+        replace_existing=True,
+    )
     _scheduler.start()
-    LOGGER.info("Scheduler avviato")
+    LOGGER.info("Scheduler avviato (tz=%s)", APP_TZ_NAME)
 
 
 def stop_scheduler() -> None:

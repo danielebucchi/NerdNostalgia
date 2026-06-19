@@ -4,7 +4,12 @@ Main FastAPI application for NerdNostalgia backend.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 import os
+
+from utils.limiter import limiter
 
 from api.articles import router as articles_router
 from api.auth import router as auth_router
@@ -32,6 +37,11 @@ app = FastAPI(
     version="1.0.0",
     description="API for NerdNostalgia - Manage and publish articles to e-commerce platforms",
 )
+
+# Rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Configure CORS
 app.add_middleware(
@@ -87,13 +97,20 @@ def root():
 
 
 @app.get("/status")
-def status():
-    """Health check endpoint."""
-    db_url = os.getenv("DATABASE_URL", "Not configured")
-    return {
-        "status": "healthy",
-        "database": "connected" if db_url != "Not configured" else "not configured"
-    }
+@app.get("/health")
+def health():
+    """Health check. Verifica connessione DB con SELECT 1."""
+    from sqlalchemy import text
+    from utils.session import SessionLocal
+    db_ok = False
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+            db_ok = True
+    except Exception:  # noqa: BLE001
+        db_ok = False
+    body = {"status": "healthy" if db_ok else "degraded", "database": "ok" if db_ok else "down"}
+    return body
 
 
 if __name__ == "__main__":

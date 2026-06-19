@@ -1,0 +1,44 @@
+# ----- Build stage -----
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+# NEXT_PUBLIC_* vengono baked nel bundle al build-time.
+# Vanno passati come build args dal compose.
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:7373
+ARG NEXT_PUBLIC_SITE_URL=http://localhost:3737
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+
+RUN npm run build
+
+# ----- Runtime stage -----
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3737
+ENV HOSTNAME=0.0.0.0
+
+# User non-root (immagine ufficiale Next.js best practice)
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Copia il bundle standalone + asset statici + public/
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+USER nextjs
+
+EXPOSE 3737
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO- http://localhost:3737/ >/dev/null 2>&1 || exit 1
+
+CMD ["node", "server.js"]
