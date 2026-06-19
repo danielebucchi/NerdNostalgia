@@ -4,7 +4,7 @@ Modello Article per SQLAlchemy.
 from sqlalchemy import BigInteger, Column, String, Integer, Numeric, Text, Enum, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from .base import BaseModel
 
 
@@ -195,13 +195,13 @@ class Article(BaseModel):
         """Marca l'articolo come pubblicato."""
         self.status = ArticleStatus.PUBLISHED
         if not self.published_at:
-            self.published_at = datetime.utcnow()
+            self.published_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     def mark_as_sold(self):
         """Marca l'articolo come venduto."""
         self.status = ArticleStatus.SOLD
         if not self.sold_at:
-            self.sold_at = datetime.utcnow()
+            self.sold_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     def mark_as_archived(self):
         """Marca l'articolo come archiviato."""

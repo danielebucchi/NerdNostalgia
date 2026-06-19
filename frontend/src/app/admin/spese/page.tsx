@@ -58,7 +58,7 @@ export default function SpesePage() {
         </select>
       </div>
 
-      <div className="flex gap-1 mb-4 border-b border-ink/10">
+      <div className="flex gap-1 mb-4 border-b border-ink/10 flex-wrap">
         <button
           type="button"
           onClick={() => setTab("cards")}

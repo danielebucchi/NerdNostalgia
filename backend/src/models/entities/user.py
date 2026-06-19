@@ -1,7 +1,7 @@
 import enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserRole(enum.Enum):
@@ -25,6 +25,8 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     username: str
     email: str
@@ -34,6 +36,3 @@ class UserResponse(BaseModel):
     is_verified: bool
     created_at: str
     updated_at: str
-
-    class Config:
-        from_attributes = True
