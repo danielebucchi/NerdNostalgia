@@ -26,3 +26,5 @@ frontend/tsconfig.tsbuildinfo
 .env
 .env.local
 .env.production
+backend/.coverage
+backend/coverage.xml

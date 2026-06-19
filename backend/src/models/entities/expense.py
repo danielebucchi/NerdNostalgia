@@ -1,7 +1,7 @@
 """
 Entities Pydantic per Expense (spese generiche).
 """
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
 
@@ -42,8 +42,8 @@ class ExpenseResponse(BaseModel):
     related_to_cards: bool
     related_to_creations: bool
     note: Optional[str]
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class ExpenseListResponse(BaseModel):

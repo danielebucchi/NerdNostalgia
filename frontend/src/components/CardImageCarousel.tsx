@@ -75,7 +75,10 @@ export function CardImageCarousel({
           src={src}
           alt={i === 0 ? alt : ""}
           aria-hidden={i !== index}
-          loading={i === 0 ? "eager" : "lazy"}
+          // Sempre lazy: in griglia con N card, l'eager sulla prima moltiplica N richieste subito.
+          // Il browser dara' priorita' alle card visibili comunque.
+          loading="lazy"
+          decoding="async"
           className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
           style={{ opacity: i === index ? 1 : 0 }}
         />

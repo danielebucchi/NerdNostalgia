@@ -255,7 +255,7 @@ function ArticleRow({
         <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl ring-1 ring-ink/8 overflow-hidden bg-white/60 flex-shrink-0">
           {a.images?.[0] && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={a.images[0]} alt="" className="w-full h-full object-cover" />
+            <img src={a.images[0]} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
           )}
         </div>
         <div className="flex-1 min-w-0">

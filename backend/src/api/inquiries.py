@@ -53,8 +53,8 @@ def submit_inquiry(
     # Honeypot: bot riempiono ogni campo, utenti veri lasciano questo vuoto.
     # Fingiamo successo per non rivelare il meccanismo.
     if data.website:
-        from datetime import datetime
-        now = datetime.utcnow().isoformat()
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         return InquiryResponse(
             id=0,
             article_id=data.article_id,

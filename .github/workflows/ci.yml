@@ -30,7 +30,7 @@ jobs:
           # (incluso playwright) ma senza i browser scaricati.
           pip install -r requirements-test.txt
 
-      - name: Run pytest
+      - name: Run pytest + coverage
         working-directory: backend
         env:
           JWT_SECRET_KEY: ci-test-secret
@@ -39,6 +39,14 @@ jobs:
           PYTHONPATH: src
         run: |
           python -m pytest tests/ -v --tb=short
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-backend
+          path: backend/coverage.xml
+          if-no-files-found: ignore
 
   frontend-tests:
     name: Frontend (Vitest)

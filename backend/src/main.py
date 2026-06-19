@@ -1,6 +1,8 @@
 """
 Main FastAPI application for NerdNostalgia backend.
 """
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -32,11 +34,20 @@ from utils.scheduler import start_scheduler, stop_scheduler
 from utils.session import get_db
 from utils.storage import UPLOADS_DIR, ensure_dirs
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Startup/shutdown via lifespan (sostituisce @app.on_event deprecated)."""
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+
 # Create FastAPI app
 app = FastAPI(
     title="NerdNostalgia API",
     version="1.0.0",
     description="API for NerdNostalgia - Manage and publish articles to e-commerce platforms",
+    lifespan=lifespan,
 )
 
 # Rate limiter
@@ -72,15 +83,6 @@ app.include_router(lots_router)
 app.include_router(dashboard_router)
 app.include_router(vinted_router)
 
-
-@app.on_event("startup")
-def _on_startup():
-    start_scheduler()
-
-
-@app.on_event("shutdown")
-def _on_shutdown():
-    stop_scheduler()
 
 # Static files (uploaded images)
 ensure_dirs()
