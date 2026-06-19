@@ -7,8 +7,20 @@ import type {
   WantedListResponse,
 } from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:7373";
-export const PUBLIC_API_BASE = API_BASE;
+// Due URL diversi:
+// - Lato browser: NEXT_PUBLIC_API_BASE_URL (es. http://localhost:7373 in dev,
+//   https://api.nerdnostalgia.it in prod). Baked nel bundle al build time.
+// - Lato server (SSR/RSC/route handlers): API_BASE_URL_INTERNAL, runtime env,
+//   tipicamente http://backend:7373 (service name Docker network) in dev.
+//   In prod (single host con Caddy esterno) puo' usare anche localhost dato che
+//   Caddy gira sull'host e i container espongono porte loopback.
+const API_BASE =
+  typeof window === "undefined"
+    ? (process.env.API_BASE_URL_INTERNAL ??
+       process.env.NEXT_PUBLIC_API_BASE_URL ??
+       "http://backend:7373")
+    : (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:7373");
+export const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:7373";
 
 export interface ListArticlesParams {
   status?: string;
