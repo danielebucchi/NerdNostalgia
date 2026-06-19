@@ -109,9 +109,20 @@ export function Footer() {
           </a>
         </div>
       </div>
-      <div className="text-center text-xs text-ink-soft pb-6 px-4">
-        © {new Date().getFullYear()} NerdNostalgia · made with{" "}
-        <span className="text-pink-deep">♥</span>
+      <div className="text-center text-xs text-ink-soft pb-6 px-4 space-y-2">
+        <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <Link href="/privacy" className="hover:text-lilac-deep hover:underline">
+            Privacy
+          </Link>
+          <span aria-hidden="true" className="opacity-40">·</span>
+          <Link href="/cookie-policy" className="hover:text-lilac-deep hover:underline">
+            Cookie Policy
+          </Link>
+        </nav>
+        <div>
+          © {new Date().getFullYear()} NerdNostalgia · made with{" "}
+          <span className="text-pink-deep">♥</span>
+        </div>
       </div>
     </footer>
   );
