@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Build artifacts
+tmp/
+*.log
+
+# IDE
+.idea/
+.vscode/
+
+# Frontend (vedi anche frontend/.gitignore)
+frontend/tsconfig.tsbuildinfo
