@@ -15,19 +15,16 @@ from utils.session import get_db
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def create_user(user_data: UserCreate, user_helper: UserHelper = Depends(get_user_helper)):
-    """
-    Crea un nuovo utente.
+def create_user(
+    user_data: UserCreate,
+    user_helper: UserHelper = Depends(get_user_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Crea un nuovo utente. ADMIN-ONLY.
 
-    Args:
-        user_data: Dati del nuovo utente
-        user_helper: Helper per l'utente
-
-    Returns:
-        UserResponse: Utente creato
-
-    Raises:
-        HTTPException: Se username o email gia' esistono
+    Per il primissimo bootstrap dell'admin usa la migrazione 0001_seed
+    (crea 'admin'/'changeme') oppure lo script `scripts/create_admin.py`
+    che gira direttamente dentro il container, senza passare per l'API.
     """
     # Check if username already exists
     existing_user = user_helper.get("username", user_data.username)
