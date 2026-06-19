@@ -116,14 +116,13 @@ export default async function ArticleDetailPage({ params }: PageProps) {
         ← Catalogo
       </Link>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* Gallery */}
-        <div>
-          <ArticleGallery images={article.images ?? []} title={article.title} />
-        </div>
-
-        {/* Info */}
-        <div>
+      {/* Layout responsive:
+          - Mobile (1col): titolo → immagine → descrizione → price → details → actions
+          - Desktop (2col): immagine a sinistra; a destra titolo/price/descrizione/details/actions
+          Implementato via grid + col-start/row-start espliciti, niente duplicazione DOM. */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10">
+        {/* Titolo + chips */}
+        <div className="md:col-start-2 md:row-start-1">
           <div className="flex flex-wrap gap-2 mb-4">
             <span className={`chip ${STATUS_CHIP[article.status] ?? "chip-mint"}`}>
               {STATUS_LABEL[article.status] ?? article.status}
@@ -143,18 +142,30 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           <h1 className="display text-3xl sm:text-4xl text-ink leading-tight">
             {article.title}
           </h1>
+        </div>
 
-          <div className="mt-6 display text-4xl text-pink-deep">
-            {formatPrice(article)}
-          </div>
+        {/* Gallery */}
+        <div className="md:col-start-1 md:row-start-1 md:row-span-4">
+          <ArticleGallery images={article.images ?? []} title={article.title} />
+        </div>
 
-          {article.description && (
-            <p className="mt-6 text-ink-soft text-lg whitespace-pre-line leading-relaxed">
+        {/* Prezzo: mobile sotto la descrizione, desktop sopra la descrizione */}
+        <div className="order-2 md:order-none md:col-start-2 md:row-start-2">
+          <div className="display text-4xl text-pink-deep">{formatPrice(article)}</div>
+        </div>
+
+        {/* Descrizione */}
+        {article.description && (
+          <div className="order-1 md:order-none md:col-start-2 md:row-start-3">
+            <p className="text-ink-soft text-lg whitespace-pre-line leading-relaxed">
               {article.description}
             </p>
-          )}
+          </div>
+        )}
 
-          <dl className="mt-8 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+        {/* Details + marketplaces + actions */}
+        <div className="order-3 md:order-none md:col-start-2 md:row-start-4">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
             {article.brand && <Row label="Marca" value={article.brand} />}
             {article.model && <Row label="Modello" value={article.model} />}
             {article.sku && <Row label="SKU" value={article.sku} />}
@@ -166,9 +177,7 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           {(article.vinted_status === "LISTED" && article.vinted_url) ||
           (article.ebay_status === "LISTED" && article.ebay_url) ? (
             <div className="mt-6 flex items-center gap-3">
-              <span className="text-xs uppercase tracking-wider text-ink-soft">
-                Anche su
-              </span>
+              <span className="text-xs uppercase tracking-wider text-ink-soft">Anche su</span>
               {article.vinted_status === "LISTED" && article.vinted_url && (
                 <a
                   href={article.vinted_url}
