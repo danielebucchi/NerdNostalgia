@@ -42,12 +42,28 @@ La migrazione `0001_seed_initial.sql` crea l'admin di default:
 - **username**: `admin`
 - **password**: `changeme` — **cambiala subito** in produzione
 
-Per cambiare la password:
+### Creare/aggiornare admin in produzione
+
+POST `/api/users/` è **admin-only**: il primissimo admin viene dalla seed migration
+(username `admin`, password `changeme`). Per gli altri usa lo script CLI:
+
 ```bash
-docker exec -it nerdnostalgia-backend python -c "
-from utils.security import hash_password
-print(hash_password('la-tua-password'))"
-# poi UPDATE users SET hashed_password='<output>' WHERE username='admin';
+# Crea nuovo admin
+docker exec -it nerdnostalgia-backend python /app/scripts/create_admin.py \
+  --username daniele --email daniele@example.com
+# Prompt password interattivo (oppure --password "...")
+
+# Aggiorna password di un admin esistente
+docker exec -it nerdnostalgia-backend python /app/scripts/create_admin.py \
+  --username admin --email admin@example.com --update
+```
+
+Per il quick-and-dirty senza script:
+```bash
+docker exec -it nerdnostalgia-backend python -c \
+  "from utils.security import hash_password; print(hash_password('la-tua-password'))"
+docker exec -it nerdnostalgia-backend sqlite3 /app/data/nerdnostalgia.db \
+  "UPDATE users SET hashed_password='<paste-hash>' WHERE username='admin'"
 ```
 
 ## Test
