@@ -509,6 +509,7 @@ export interface InquiryCreate {
   phone?: string;
   subject?: string;
   message: string;
+  website?: string; // honeypot — sempre vuoto per utenti reali
 }
 
 export type WantedStatus = "ACTIVE" | "FULFILLED" | "CLOSED";

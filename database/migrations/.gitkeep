@@ -1,0 +1,11 @@
+# Cartella migrazioni incrementali.
+# Ogni file deve essere named NNNN_descrizione.sql (NNNN = 4 cifre).
+# Esempio: 0001_add_articles_tags.sql
+#
+# Sono applicati in ordine alfanumerico dall'entrypoint.
+# La tabella schema_migrations tiene traccia di quelle gia' applicate
+# (per version = nome file senza .sql).
+#
+# Per modifiche schema future, AGGIUNGI un nuovo file qui — non modificare schema.sql.
+# Quando viene popolato un nuovo DB SQLite, schema.sql + tutte le migrazioni
+# vengono applicate insieme.

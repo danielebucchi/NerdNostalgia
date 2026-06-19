@@ -21,6 +21,9 @@ class InquiryCreate(BaseModel):
     phone: Optional[str] = Field(None, max_length=50)
     subject: Optional[str] = Field(None, max_length=255)
     message: str = Field(..., min_length=5, max_length=4000)
+    # Honeypot: hidden field. Utenti veri lo lasciano vuoto, i bot tendono
+    # a riempire ogni input → se valorizzato scartiamo silenziosamente.
+    website: Optional[str] = Field(None, max_length=255)
 
 
 class InquiryUpdate(BaseModel):

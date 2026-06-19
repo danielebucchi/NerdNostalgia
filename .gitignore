@@ -21,3 +21,8 @@ data/
 
 # Frontend (vedi anche frontend/.gitignore)
 frontend/tsconfig.tsbuildinfo
+
+# Secrets
+.env
+.env.local
+.env.production
