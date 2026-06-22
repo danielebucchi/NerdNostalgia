@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: false },
 };
 
-const LAST_UPDATE = "19 giugno 2026";
+const LAST_UPDATE = "22 giugno 2026";
 
 export default function PrivacyPage() {
   return (
@@ -30,10 +30,10 @@ export default function PrivacyPage() {
           Il titolare del trattamento è il gestore di <strong>{SITE_NAME}</strong>,
           contattabile all&apos;indirizzo{" "}
           <a
-            href="mailto:info@nerdnostalgia.it"
+            href="mailto:nerdnostalgiaita@gmail.com"
             className="text-lilac-deep font-semibold hover:underline"
           >
-            info@nerdnostalgia.it
+            nerdnostalgiaita@gmail.com
           </a>
           .
         </p>
@@ -161,10 +161,10 @@ export default function PrivacyPage() {
         <p>
           Per esercitarli scrivi a{" "}
           <a
-            href="mailto:info@nerdnostalgia.it"
+            href="mailto:nerdnostalgiaita@gmail.com"
             className="text-lilac-deep font-semibold hover:underline"
           >
-            info@nerdnostalgia.it
+            nerdnostalgiaita@gmail.com
           </a>
           . Hai inoltre diritto a presentare reclamo al{" "}
           <a

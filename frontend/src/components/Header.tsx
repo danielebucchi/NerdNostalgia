@@ -102,10 +102,10 @@ export function Footer() {
             Scrivimi per qualsiasi richiesta o per propormi un acquisto.
           </p>
           <a
-            href="mailto:info@nerdnostalgia.it"
+            href="mailto:nerdnostalgiaita@gmail.com"
             className="text-sm text-lilac-deep font-semibold mt-2 inline-block hover:underline"
           >
-            info@nerdnostalgia.it
+            nerdnostalgiaita@gmail.com
           </a>
         </div>
       </div>

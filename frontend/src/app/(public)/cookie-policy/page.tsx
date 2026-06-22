@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: false },
 };
 
-const LAST_UPDATE = "19 giugno 2026";
+const LAST_UPDATE = "22 giugno 2026";
 
 export default function CookiePolicyPage() {
   return (
@@ -159,10 +159,10 @@ export default function CookiePolicyPage() {
           <li>
             Contatti per richieste:{" "}
             <a
-              href="mailto:info@nerdnostalgia.it"
+              href="mailto:nerdnostalgiaita@gmail.com"
               className="text-lilac-deep font-semibold hover:underline"
             >
-              info@nerdnostalgia.it
+              nerdnostalgiaita@gmail.com
             </a>
           </li>
         </ul>
