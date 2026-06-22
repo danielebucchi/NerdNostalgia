@@ -73,6 +73,9 @@ class Article(BaseModel):
 
     # Pricing
     price = Column(Numeric(10, 2), nullable=False)
+    # Costo spedizione mostrato/richiesto al cliente. Diverso da
+    # shipping_cost piu' sotto (che e' la spesa sostenuta, lato inventario).
+    shipping_price = Column(Numeric(10, 2))
     currency = Column(String(3), default="EUR")
 
     # Inventory tracking (clone foglio "Flipping Inventario" / "Carte Pokemon Inventario")
@@ -168,6 +171,7 @@ class Article(BaseModel):
             "title": self.title,
             "description": self.description,
             "price": float(self.price) if self.price else None,
+            "shipping_price": float(self.shipping_price) if self.shipping_price is not None else None,
             "currency": self.currency,
             "category_id": self.category_id,
             "condition": self.condition.value if self.condition else None,

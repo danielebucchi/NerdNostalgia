@@ -67,6 +67,7 @@ interface FormState {
   title: string;
   description: string;
   price: string;
+  shipping_price: string;
   currency: string;
   category_id: number | null;
   condition: ArticleCondition;
@@ -96,6 +97,7 @@ const empty: FormState = {
   title: "",
   description: "",
   price: "",
+  shipping_price: "",
   currency: "EUR",
   category_id: null,
   condition: "USED",
@@ -125,6 +127,7 @@ function toForm(article: Article): FormState {
     title: article.title,
     description: article.description ?? "",
     price: String(article.price ?? ""),
+    shipping_price: article.shipping_price ?? "",
     currency: article.currency ?? "EUR",
     category_id: article.category_id ?? null,
     condition: article.condition,
@@ -217,6 +220,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
         title: state.title.trim(),
         description: state.description.trim() || null,
         price: Number(state.price),
+        shipping_price: state.shipping_price.trim() ? Number(state.shipping_price) : null,
         currency: state.currency.trim().toUpperCase(),
         category_id: state.category_id,
         condition: state.condition,
@@ -355,6 +359,24 @@ export function ArticleForm({ initial, onSaved }: Props) {
             min="0"
             value={state.quantity}
             onChange={(e) => set("quantity", e.target.value)}
+            className="input"
+          />
+        </Field>
+      </Row>
+
+      <Row>
+        <Field
+          label="Spedizione richiesta al cliente"
+          full
+          hint="Sommata al prezzo nel link PayPal. Lascia vuoto per 'da concordare'."
+        >
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="es. 5.00"
+            value={state.shipping_price}
+            onChange={(e) => set("shipping_price", e.target.value)}
             className="input"
           />
         </Field>
@@ -801,16 +823,21 @@ function Row({ cols = 1, children }: { cols?: number; children: React.ReactNode 
 function Field({
   label,
   full,
+  hint,
   children,
 }: {
   label: string;
   full?: boolean;
+  hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <label className={`block ${full ? "col-span-full" : ""}`}>
       <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">{label}</span>
       <div className="mt-1">{children}</div>
+      {hint && (
+        <span className="text-[11px] text-ink-soft mt-1 block leading-snug">{hint}</span>
+      )}
     </label>
   );
 }

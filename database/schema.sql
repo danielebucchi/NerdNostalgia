@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS articles (
     title VARCHAR(255) NOT NULL,
     description TEXT,
     price NUMERIC(10,2) NOT NULL,
+    -- Costo spedizione mostrato al cliente (somma a price nel link PayPal).
+    -- Diverso da shipping_cost piu' sotto, che e' la spesa sostenuta per
+    -- tracking interno profit/loss (es. potrebbe essere applicato ricarico).
+    shipping_price NUMERIC(10,2),
     currency VARCHAR(3) DEFAULT 'EUR',
     condition VARCHAR(20) NOT NULL DEFAULT 'USED'
         CHECK (condition IN ('NEW','USED','REFURBISHED','FOR_PARTS')),
