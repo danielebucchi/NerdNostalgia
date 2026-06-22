@@ -296,7 +296,15 @@ export function PurchaseDialog({
             <p className="text-pink-deep text-sm">⚠ {error}</p>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          {/* Istruzione F&F visibile prima del submit */}
+          <div className="rounded-xl bg-[#ffc439]/15 border border-[#ffc439]/40 p-3 text-sm leading-snug">
+            <strong className="text-[#003087]">Su PayPal seleziona &quot;A un amico o familiare&quot;</strong>{" "}
+            <span className="text-ink-soft">
+              per evitare le commissioni. Trovi l&apos;opzione subito dopo aver inserito l&apos;importo.
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}

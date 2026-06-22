@@ -193,6 +193,13 @@ export default function CartPage() {
                 Conferma indirizzo + dati, ti scrivo per finalizzare la
                 spedizione. Pagamento via PayPal.
               </p>
+              {paypalEnabled() && articles.length > 0 && (
+                <p className="text-[11px] text-[#003087] bg-[#ffc439]/20 rounded-lg px-3 py-2 mt-3 leading-snug">
+                  💡 Su PayPal seleziona{" "}
+                  <strong>&quot;A un amico o familiare&quot;</strong> per evitare le
+                  commissioni.
+                </p>
+              )}
             </div>
           </aside>
         </div>
