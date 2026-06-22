@@ -105,24 +105,39 @@ export default function AdminImportVintedPage() {
 
   return (
     <AdminShell>
-      <div className="flex items-end justify-between mb-6 gap-3 flex-wrap">
-        <div>
-          <h1 className="display text-3xl text-ink">🛍 Sync Vinted</h1>
-          <p className="text-ink-soft mt-1 text-sm">
-            Importa automaticamente gli annunci del tuo profilo Vinted come
-            articoli pubblicati. Le categorie vengono assegnate dal titolo
-            via keyword detection. Articoli scomparsi da Vinted vengono cancellati.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleTriggerSync}
-          disabled={busy}
-          className="btn btn-primary"
-        >
-          {busy ? "Sync in corso…" : "↻ Sync ora"}
-        </button>
+      <div className="mb-6">
+        <h1 className="display text-3xl text-ink">🛍 Sync Vinted</h1>
+        <p className="text-ink-soft mt-1 text-sm">
+          Importa automaticamente gli annunci del tuo profilo Vinted come
+          articoli pubblicati. Le categorie vengono assegnate dal titolo
+          via keyword detection. Articoli scomparsi da Vinted vengono cancellati.
+        </p>
       </div>
+
+      <button
+        type="button"
+        onClick={handleTriggerSync}
+        disabled={busy}
+        className={`btn btn-primary w-full mb-6 text-lg sm:text-xl font-bold px-8 py-5 shadow-hover ring-2 ring-pink-deep/20 hover:ring-pink-deep/40 transition-all ${
+          busy ? "opacity-70 cursor-wait" : "hover:scale-[1.01] active:scale-[0.99]"
+        }`}
+        aria-label="Avvia sincronizzazione Vinted"
+      >
+        {busy ? (
+          <span className="inline-flex items-center gap-3">
+            <span
+              className="inline-block h-5 w-5 rounded-full border-2 border-white/40 border-t-white animate-spin"
+              aria-hidden="true"
+            />
+            Sync in corso…
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-2">
+            <span className="text-2xl" aria-hidden="true">↻</span>
+            Sync ora da Vinted
+          </span>
+        )}
+      </button>
 
       {error && (
         <div className="card p-4 mb-4 text-pink-deep font-semibold">⚠ {error}</div>
