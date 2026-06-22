@@ -106,6 +106,133 @@ def _parse_item(item: dict) -> VintedItem:
     )
 
 
+def _fetch_description_for_item(page, item_id: int, stats: dict) -> Optional[str]:
+    """Recupera la description di un singolo item dalla pagina/API Vinted.
+
+    Tenta in ordine:
+      1) /api/v2/items/{id} via fetch lato browser (cookie/session ereditati).
+         Ritorna il body completo del seller: la sorgente piu' attendibile.
+      2) <meta property="og:description"> della pagina pubblica /items/{id}.
+         Spesso e' un template marketing ("Compra ... su Vinted, risparmia"),
+         ma in mancanza d'altro e' meglio di niente.
+
+    Aggiorna stats con quale sorgente ha funzionato (utile in log).
+    Ritorna la descrizione strippata o None se entrambe falliscono.
+    """
+    api_url = f"{BASE_HOST}/api/v2/items/{item_id}"
+    try:
+        descr = page.evaluate(
+            """async (url) => {
+                try {
+                    const r = await fetch(url, {
+                        headers: { 'Accept': 'application/json' },
+                        credentials: 'include',
+                    });
+                    if (!r.ok) return null;
+                    const j = await r.json();
+                    return j?.item?.description ?? null;
+                } catch (e) { return null; }
+            }""",
+            api_url,
+        )
+        if descr and isinstance(descr, str) and len(descr.strip()) > 5:
+            stats["api"] = stats.get("api", 0) + 1
+            return descr.strip()
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.debug("Item %s API fetch failed: %s", item_id, exc)
+
+    # Fallback: navigazione DOM + og:description
+    item_url = f"{BASE_HOST}/items/{item_id}"
+    try:
+        page.goto(item_url, wait_until="domcontentloaded", timeout=15_000)
+        descr = page.evaluate(
+            """() => {
+                const meta = document.querySelector('meta[property="og:description"]');
+                return meta ? meta.content : null;
+            }"""
+        )
+        if descr and len(descr.strip()) > 5:
+            stats["og"] = stats.get("og", 0) + 1
+            return descr.strip()
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("Item %s page fetch failed: %s", item_id, exc)
+
+    stats["fail"] = stats.get("fail", 0) + 1
+    return None
+
+
+def fetch_item_descriptions(item_ids: List[int], *, headless: bool = True) -> dict[int, str]:
+    """Backfill standalone delle descrizioni: data una lista di vinted_item_id,
+    apre Chromium, eredita i cookie visitando l'homepage e per ognuno prova
+    prima l'API e poi og:description. Ritorna {item_id: description}.
+
+    Pensato per essere chiamato da script CLI quando un sync passato non ha
+    popolato alcune descrizioni (rate-limit episodico, og:description vuoto, ecc).
+    """
+    if not item_ids:
+        return {}
+
+    out: dict[int, str] = {}
+    stats = {"api": 0, "og": 0, "fail": 0}
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=headless,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ],
+        )
+
+        def _new_page():
+            ctx = browser.new_context(
+                user_agent=USER_AGENT,
+                locale="it-IT",
+                viewport={"width": 1366, "height": 900},
+            )
+            pg = ctx.new_page()
+            try:
+                pg.goto(BASE_HOST + "/", wait_until="domcontentloaded", timeout=20_000)
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(1.0)
+            return pg
+
+        page = _new_page()
+        try:
+            for idx, item_id in enumerate(item_ids):
+                if idx > 0 and idx % 8 == 0:
+                    # Restart browser per evitare rate-limit cumulativo
+                    browser.close()
+                    time.sleep(2.0)
+                    browser = p.chromium.launch(
+                        headless=headless,
+                        args=[
+                            "--no-sandbox",
+                            "--disable-dev-shm-usage",
+                            "--disable-blink-features=AutomationControlled",
+                        ],
+                    )
+                    page = _new_page()
+
+                descr = _fetch_description_for_item(page, int(item_id), stats)
+                if descr:
+                    out[int(item_id)] = descr
+                time.sleep(1.2 + random.uniform(0, 0.7))
+        finally:
+            try:
+                browser.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+    LOGGER.info(
+        "Backfill descrizioni: %d/%d (api=%d og=%d fail=%d)",
+        len(out), len(item_ids), stats["api"], stats["og"], stats["fail"],
+    )
+    return out
+
+
 def fetch_user_items(
     vinted_user_id: int,
     *,
@@ -203,12 +330,16 @@ def fetch_user_items(
                     stagnant_rounds = 0
                     last_count = len(collected_raw)
 
-            # Arricchimento: per ogni item navigamo alla sua pagina pubblica
-            # e leggiamo og:description. Restart del browser ogni 8 items per
-            # evitare il rate-limit cumulativo di Vinted (testato empiricamente).
+            # Arricchimento descrizioni. Sorgenti in ordine di affidabilita':
+            #  1) Vinted API /api/v2/items/{id} (richiesta lato browser, eredita
+            #     cookies/session: piu' robusta, ritorna la VERA description del
+            #     seller — non il template marketing di og:description).
+            #  2) Tag <meta property="og:description"> della pagina pubblica
+            #     (fallback se l'API risponde 403/429/captcha).
+            # Restart browser ogni 8 items per stare sotto rate-limit cumulativo.
             if enrich_with_details:
                 ids = [raw["id"] for raw in collected_raw[:max_items] if raw.get("id")]
-                LOGGER.info("Fetch detail per %d items via item pages", len(ids))
+                LOGGER.info("Fetch detail per %d items", len(ids))
 
                 details_map: dict = {}
 
@@ -240,26 +371,17 @@ def fetch_user_items(
                 browser.close()
                 browser, page = _fresh_browser()
 
+                stats = {"api": 0, "og": 0, "fail": 0}
+
                 for idx, item_id in enumerate(ids[:200]):
                     if idx > 0 and idx % 8 == 0:
                         browser.close()
                         time.sleep(2.0)
                         browser, page = _fresh_browser()
 
-                    item_url = f"{BASE_HOST}/items/{item_id}"
-                    try:
-                        page.goto(item_url, wait_until="domcontentloaded", timeout=15_000)
-                        descr = page.evaluate(
-                            """() => {
-                                const meta = document.querySelector('meta[property="og:description"]');
-                                return meta ? meta.content : null;
-                            }"""
-                        )
-                        if descr and len(descr.strip()) > 5:
-                            details_map[item_id] = {"description": descr.strip()}
-                    except Exception as exc:  # noqa: BLE001
-                        LOGGER.warning("Item %s fail: %s", item_id, exc)
-                        continue
+                    descr = _fetch_description_for_item(page, int(item_id), stats)
+                    if descr:
+                        details_map[item_id] = {"description": descr}
                     time.sleep(1.2 + random.uniform(0, 0.7))
 
                 # Applica i details
@@ -269,7 +391,11 @@ def fetch_user_items(
                     if detail and detail.get("description"):
                         raw["description"] = detail["description"]
                         non_null_descr += 1
-                LOGGER.info("Descrizioni popolate: %d/%d", non_null_descr, len(ids))
+                LOGGER.info(
+                    "Descrizioni popolate: %d/%d (api=%d og=%d fail=%d)",
+                    non_null_descr, len(ids),
+                    stats["api"], stats["og"], stats["fail"],
+                )
 
             browser.close()
     except VintedClientError:
