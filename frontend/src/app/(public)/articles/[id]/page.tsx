@@ -149,9 +149,41 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           <ArticleGallery images={article.images ?? []} title={article.title} />
         </div>
 
-        {/* Prezzo: mobile sotto la descrizione, desktop sopra la descrizione */}
+        {/* Prezzo + CTA marketplace: mobile sotto la descrizione, desktop sopra */}
         <div className="order-2 md:order-none md:col-start-2 md:row-start-2">
-          <div className="display text-4xl text-pink-deep">{formatPrice(article)}</div>
+          <div className="flex flex-col gap-4">
+            <div className="display text-4xl text-pink-deep leading-none">
+              {formatPrice(article)}
+            </div>
+
+            {article.vinted_status === "LISTED" && article.vinted_url && (
+              <a
+                href={article.vinted_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Acquista questo articolo su Vinted"
+                className="btn btn-vinted text-base font-bold px-6 py-4 w-full sm:w-auto sm:self-start inline-flex items-center justify-center gap-3"
+              >
+                <MarketplaceLogo marketplace="vinted" height={22} />
+                <span>Acquista su Vinted</span>
+                <span aria-hidden="true" className="text-lg">→</span>
+              </a>
+            )}
+
+            {article.ebay_status === "LISTED" && article.ebay_url && (
+              <a
+                href={article.ebay_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Acquista questo articolo su eBay"
+                className="btn btn-ebay text-base font-bold px-6 py-4 w-full sm:w-auto sm:self-start inline-flex items-center justify-center gap-3"
+              >
+                <MarketplaceLogo marketplace="ebay" height={22} />
+                <span>Acquista su eBay</span>
+                <span aria-hidden="true" className="text-lg">→</span>
+              </a>
+            )}
+          </div>
         </div>
 
         {/* Descrizione */}
@@ -174,36 +206,7 @@ export default async function ArticleDetailPage({ params }: PageProps) {
             {article.dimensions_cm && <Row label="Dimensioni" value={article.dimensions_cm} />}
           </dl>
 
-          {(article.vinted_status === "LISTED" && article.vinted_url) ||
-          (article.ebay_status === "LISTED" && article.ebay_url) ? (
-            <div className="mt-6 flex items-center gap-3">
-              <span className="text-xs uppercase tracking-wider text-ink-soft">Anche su</span>
-              {article.vinted_status === "LISTED" && article.vinted_url && (
-                <a
-                  href={article.vinted_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Apri il listing su Vinted"
-                  className="inline-flex items-center bg-white/85 backdrop-blur rounded-full h-10 px-4 ring-1 ring-ink/10 shadow-soft hover:shadow-hover transition-shadow"
-                >
-                  <MarketplaceLogo marketplace="vinted" height={20} />
-                </a>
-              )}
-              {article.ebay_status === "LISTED" && article.ebay_url && (
-                <a
-                  href={article.ebay_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Apri il listing su eBay"
-                  className="inline-flex items-center bg-white/85 backdrop-blur rounded-full h-10 px-4 ring-1 ring-ink/10 shadow-soft hover:shadow-hover transition-shadow"
-                >
-                  <MarketplaceLogo marketplace="ebay" height={20} />
-                </a>
-              )}
-            </div>
-          ) : null}
-
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <WishlistButton articleId={article.id} variant="full" />
             <ShareButtons
               url={absUrl(`/articles/${article.id}`)}

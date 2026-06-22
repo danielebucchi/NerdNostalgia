@@ -150,6 +150,34 @@ h2.display {
   cursor: not-allowed;
 }
 
+/* Marketplace CTA — colori brand per riconoscibilita' immediata */
+.btn-vinted {
+  background: #09b1ba;
+  color: white;
+  box-shadow: 0 14px 30px -10px rgba(9, 177, 186, 0.55);
+}
+.btn-vinted:hover {
+  background: #07939a;
+  transform: translateY(-1px);
+  box-shadow: 0 22px 44px -14px rgba(9, 177, 186, 0.65);
+}
+.btn-vinted:active {
+  transform: translateY(1px);
+}
+.btn-ebay {
+  background: #0064d2;
+  color: white;
+  box-shadow: 0 14px 30px -10px rgba(0, 100, 210, 0.5);
+}
+.btn-ebay:hover {
+  background: #0050a8;
+  transform: translateY(-1px);
+  box-shadow: 0 22px 44px -14px rgba(0, 100, 210, 0.6);
+}
+.btn-ebay:active {
+  transform: translateY(1px);
+}
+
 /* ──────────── CARDS ──────────── */
 
 .card {
