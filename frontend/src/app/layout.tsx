@@ -76,7 +76,7 @@ const organizationJsonLd = {
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "customer service",
-    email: "info@nerdnostalgia.it",
+    email: "nerdnostalgiaita@gmail.com",
     availableLanguage: ["Italian"],
   },
 };
