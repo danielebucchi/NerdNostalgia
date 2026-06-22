@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/admin/lotti", label: "Lotti (interno)", icon: "📦" },
   { href: "/admin/vendite", label: "Vendite", icon: "💰" },
   { href: "/admin/spese", label: "Spese", icon: "💰" },
+  { href: "/admin/ordini", label: "Ordini", icon: "📥" },
   { href: "/admin/inquiries", label: "Richieste", icon: "✉" },
   { href: "/admin/wanted", label: "Cerco/Compro", icon: "🔍" },
   { href: "/admin/tassonomia", label: "Tassonomia", icon: "🏷" },

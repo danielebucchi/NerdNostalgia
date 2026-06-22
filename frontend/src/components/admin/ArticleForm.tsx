@@ -97,7 +97,7 @@ const empty: FormState = {
   title: "",
   description: "",
   price: "",
-  shipping_price: "",
+  shipping_price: "5.00",
   currency: "EUR",
   category_id: null,
   condition: "USED",

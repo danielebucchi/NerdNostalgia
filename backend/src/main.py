@@ -26,6 +26,7 @@ from api.lots import router as lots_router
 from api.marketplace_fees import router as marketplace_fees_router
 from api.platforms import router as platforms_router
 from api.misc_sales import router as misc_sales_router
+from api.orders import router as orders_router
 from api.personal_cards import router as personal_cards_router
 from api.users import router as users_router
 from api.vinted import router as vinted_router
@@ -77,6 +78,7 @@ app.include_router(card_purchases_router)
 app.include_router(consignment_sales_router)
 app.include_router(expenses_router)
 app.include_router(misc_sales_router)
+app.include_router(orders_router)
 app.include_router(personal_cards_router)
 app.include_router(inventory_router)
 app.include_router(lots_router)
