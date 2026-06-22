@@ -238,7 +238,7 @@ def fetch_user_items(
     *,
     max_items: int = 200,
     headless: bool = True,
-    scroll_attempts: int = 6,
+    scroll_attempts: int = 20,
     enrich_with_details: bool = True,
 ) -> Iterator[VintedItem]:
     """Itera tutti gli annunci di un profilo Vinted usando Chromium headless.
@@ -310,25 +310,67 @@ def fetch_user_items(
             except PlaywrightTimeoutError:
                 pass
 
-            # Scroll progressivo per caricare piu items (infinite scroll)
+            # Scroll progressivo per caricare piu items (infinite scroll).
+            # Strategia: scroll-to-bottom in JS (piu' affidabile di mouse.wheel,
+            # che con virtualizzazione DOM puo' non triggerare i loader), poi
+            # un'attesa generosa per dare tempo a Vinted di rispondere. Dopo 4
+            # round senza nuovi items si esce. Log per round per diagnosi.
             last_count = len(collected_raw)
             stagnant_rounds = 0
             for i in range(scroll_attempts):
                 if len(collected_raw) >= max_items:
                     break
-                page.mouse.wheel(0, 4000)
+                try:
+                    page.evaluate(
+                        "window.scrollTo(0, document.body.scrollHeight)"
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+                # mouse.wheel come refresh extra: alcuni listener Vinted lo
+                # ascoltano e non scattano solo con scrollTo programmatico
+                try:
+                    page.mouse.wheel(0, 2000)
+                except Exception:  # noqa: BLE001
+                    pass
                 try:
                     page.wait_for_load_state("networkidle", timeout=LOAD_MORE_WAIT_MS)
                 except PlaywrightTimeoutError:
                     pass
-                time.sleep(1.2)
-                if len(collected_raw) == last_count:
+                # Sleep generoso: meglio aspettare 2s in piu' che mollare il
+                # batch successivo che sta arrivando
+                time.sleep(2.5 + random.uniform(0, 0.8))
+
+                current = len(collected_raw)
+                gained = current - last_count
+                LOGGER.info(
+                    "Scroll round %d/%d: collected=%d (+%d)",
+                    i + 1, scroll_attempts, current, gained,
+                )
+                if gained == 0:
                     stagnant_rounds += 1
-                    if stagnant_rounds >= 2:
+                    if stagnant_rounds >= 4:
+                        LOGGER.info(
+                            "Stop scrolling: 4 round consecutivi senza nuovi items"
+                        )
                         break
                 else:
                     stagnant_rounds = 0
-                    last_count = len(collected_raw)
+                    last_count = current
+
+            # Final pass: aspetta ancora un secondo e ri-scrolla, perche' a
+            # volte l'ultimo batch arriva dopo che il loop principale e' uscito
+            try:
+                page.evaluate(
+                    "window.scrollTo(0, document.body.scrollHeight)"
+                )
+                page.wait_for_load_state("networkidle", timeout=LOAD_MORE_WAIT_MS)
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(2.0)
+            LOGGER.info(
+                "Profilo %d: %d items intercettati totali",
+                vinted_user_id, len(collected_raw),
+            )
 
             # Arricchimento descrizioni. Sorgenti in ordine di affidabilita':
             #  1) Vinted API /api/v2/items/{id} (richiesta lato browser, eredita
