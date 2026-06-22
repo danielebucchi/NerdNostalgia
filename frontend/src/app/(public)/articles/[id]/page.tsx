@@ -9,9 +9,34 @@ import { PaypalButton } from "@/components/PaypalButton";
 import { ShareButtons } from "@/components/ShareButtons";
 import { WishlistButton } from "@/components/WishlistButton";
 import { absUrl, clip, SITE_NAME } from "@/lib/seo";
+import type { Article } from "@/lib/types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+/**
+ * Totale da prefillare sul link PayPal: prezzo + spedizione (se settata).
+ * Se shipping_price e' null/0 → torna solo il prezzo articolo.
+ */
+function paypalTotal(article: Article): number {
+  const price = Number(article.price || 0);
+  const ship = article.shipping_price ? Number(article.shipping_price) : 0;
+  const total = price + (Number.isFinite(ship) ? ship : 0);
+  return Number.isFinite(total) ? total : price;
+}
+
+/**
+ * Label del bottone PayPal: importo totale se conosciamo la spedizione,
+ * "Paga + spedizione" se la spedizione e' da concordare (cosi' il
+ * compratore sa che il link prefilla solo il prezzo articolo).
+ */
+function paypalLabel(article: Article): string {
+  const ship = article.shipping_price ? Number(article.shipping_price) : 0;
+  if (ship > 0) {
+    return `Paga € ${paypalTotal(article).toFixed(2)} su PayPal`;
+  }
+  return "Paga su PayPal (+ spedizione)";
 }
 
 const CONDITION_SCHEMA: Record<string, string> = {
@@ -185,8 +210,31 @@ export default async function ArticleDetailPage({ params }: PageProps) {
               </a>
             )}
 
-            <PaypalButton amount={article.price} currency={article.currency || "EUR"} />
+            <PaypalButton
+              amount={paypalTotal(article)}
+              currency={article.currency || "EUR"}
+              label={paypalLabel(article)}
+            />
           </div>
+
+          {/* Nota spedizione: mostra dettaglio totale o avviso "da concordare" */}
+          {(() => {
+            const ship = article.shipping_price ? Number(article.shipping_price) : null;
+            if (ship && ship > 0) {
+              return (
+                <p className="text-xs text-ink-soft mt-2">
+                  Include € {Number(article.price).toFixed(2)} articolo +{" "}
+                  <strong className="text-ink">€ {ship.toFixed(2)}</strong> spedizione
+                </p>
+              );
+            }
+            return (
+              <p className="text-xs text-ink-soft mt-2">
+                Prezzo articolo. <strong className="text-ink">Spedizione da concordare</strong>{" "}
+                — scrivimi per il totale.
+              </p>
+            );
+          })()}
         </div>
 
         {/* Descrizione */}
