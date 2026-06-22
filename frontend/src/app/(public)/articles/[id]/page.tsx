@@ -149,9 +149,9 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           <ArticleGallery images={article.images ?? []} title={article.title} />
         </div>
 
-        {/* Prezzo + CTA marketplace: mobile sotto la descrizione, desktop sopra */}
+        {/* Prezzo + CTA marketplace inline: mobile wrap se non ci stanno */}
         <div className="order-2 md:order-none md:col-start-2 md:row-start-2">
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
             <div className="display text-4xl text-pink-deep leading-none">
               {formatPrice(article)}
             </div>
@@ -162,11 +162,11 @@ export default async function ArticleDetailPage({ params }: PageProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Acquista questo articolo su Vinted"
-                className="btn btn-vinted text-base font-bold px-6 py-4 w-full sm:w-auto sm:self-start inline-flex items-center justify-center gap-3"
+                className="btn btn-vinted text-sm font-bold px-4 py-2.5 inline-flex items-center gap-2"
               >
-                <MarketplaceLogo marketplace="vinted" height={22} />
+                <MarketplaceLogo marketplace="vinted" height={16} />
                 <span>Acquista su Vinted</span>
-                <span aria-hidden="true" className="text-lg">→</span>
+                <span aria-hidden="true">→</span>
               </a>
             )}
 
@@ -176,11 +176,11 @@ export default async function ArticleDetailPage({ params }: PageProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Acquista questo articolo su eBay"
-                className="btn btn-ebay text-base font-bold px-6 py-4 w-full sm:w-auto sm:self-start inline-flex items-center justify-center gap-3"
+                className="btn btn-ebay text-sm font-bold px-4 py-2.5 inline-flex items-center gap-2"
               >
-                <MarketplaceLogo marketplace="ebay" height={22} />
+                <MarketplaceLogo marketplace="ebay" height={16} />
                 <span>Acquista su eBay</span>
-                <span aria-hidden="true" className="text-lg">→</span>
+                <span aria-hidden="true">→</span>
               </a>
             )}
           </div>
