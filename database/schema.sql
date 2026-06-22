@@ -186,7 +186,9 @@ CREATE TABLE IF NOT EXISTS order_items (
     -- Snapshot del titolo + prezzo al momento dell'ordine (immutabile).
     title_snapshot VARCHAR(255) NOT NULL,
     price_snapshot NUMERIC(10,2) NOT NULL,
-    quantity INTEGER NOT NULL DEFAULT 1
+    quantity INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_article ON order_items(article_id);

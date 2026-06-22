@@ -14,9 +14,13 @@ Il pagamento PayPal e' out-of-band: l'admin conferma manualmente quando
 riceve il bonifico (PATCH status=PAID).
 
 Rate-limit: 3/min, 20/h per IP. Honeypot anti-bot via campo 'website'.
-"""
-from __future__ import annotations
 
+NB: NIENTE `from __future__ import annotations` qui — FastAPI usa
+inspect.signature per capire quali parametri sono body / query / path,
+e con annotation stringificate (PEP 563) trasforma erroneamente
+`payload: OrderCreate` in un query parameter ForwardRef, mandando in
+errore 422 ogni POST.
+"""
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
