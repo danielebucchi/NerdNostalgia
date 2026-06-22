@@ -16,6 +16,7 @@ from __future__ import annotations
 import datetime as _dt
 import io
 import logging
+import re
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -81,10 +82,60 @@ NN_KEYWORDS = (
 )
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Exclusion list: se una di queste parole compare nel TITOLO l'articolo
+# viene rifiutato senza nemmeno guardare le keyword positive.
+# Pensata per cose chiaramente non-nerd che potrebbero passare il filtro
+# generico per via di parole comuni nella description (es. "gift card"
+# che fa matchare "card", o "vintage" usato come buzzword).
+# ─────────────────────────────────────────────────────────────────────────
+NN_EXCLUDE_KEYWORDS = (
+    # Moda / abbigliamento
+    "borsa", "borse", "borsetta", "zaino non", "pochette", "clutch",
+    "vestito", "vestiti", "gonna", "pantalone", "pantaloni",
+    "camicia", "camicetta", "blazer", "giacca", "cappotto", "cardigan",
+    "tuta", "leggings", "calza", "calze", "intimo", "boxer", "mutand",
+    "costume da bagno", "bikini",
+    # Calzature
+    "scarpa", "scarpe", "sneakers", "stivale", "stivali", "stivaletto",
+    "sandalo", "sandali", "ciabatte", "infradito", "decollete",
+    # Beauty / cura
+    "profumo", "profumi", "trucco", "make up", "makeup", "rossetto",
+    "mascara", "fondotinta", "ombretto", "smalto", "shampoo",
+    # Gioielli moda (non collezionismo nerd)
+    "anello", "anelli", "bracciale", "braccialetto", "collana",
+    # Bambini / puericultura (a meno che non sia gioco)
+    "passeggino", "seggiolino auto", "lettino", "fasciatoio",
+    # Casa / arredo
+    "cuscino", "tovaglia", "lenzuola", "asciugamano",
+)
+
+
+def _word_match(pattern: str, text: str) -> bool:
+    """Match con word-boundary: il pattern e' una parola/locuzione,
+    cerchiamo che compaia delimitata da non-parola (\\b).
+    Es: 'card' matcha 'card' o 'gift card' ma non 'cardine'.
+    Multi-word ('mario kart') funziona perche' lo spazio e' un confine.
+    """
+    return re.search(rf"\b{re.escape(pattern)}\b", text) is not None
+
+
 def _matches_nn_keywords(*texts: Optional[str]) -> bool:
-    """True se uno dei testi contiene una keyword NerdNostalgia."""
+    """True se uno dei testi contiene una keyword NerdNostalgia in modo
+    word-boundary safe (no substring match)."""
     combined = " ".join(t.lower() for t in texts if t)
-    return any(kw in combined for kw in NN_KEYWORDS)
+    return any(_word_match(kw, combined) for kw in NN_KEYWORDS)
+
+
+def _has_exclude_keyword(title: Optional[str]) -> bool:
+    """True se il titolo contiene una keyword di esclusione (moda, beauty,
+    casa, ecc). Controlla SOLO il titolo perche' la description tende ad
+    aggiungere troppi falsi positivi (es. 'borsa di plastica per spedizione').
+    """
+    if not title:
+        return False
+    t = title.lower()
+    return any(_word_match(kw, t) for kw in NN_EXCLUDE_KEYWORDS)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -175,13 +226,17 @@ CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
 
 def _detect_category_slug(*texts: Optional[str]) -> Optional[str]:
     """Ritorna lo slug della categoria piu' specifica che matcha. None se
-    nessuna regola matcha."""
+    nessuna regola matcha.
+
+    Usa word-boundary matching cosi' 'card' non matcha 'cardine' e
+    'pes ' non sbatte su 'pesante'. Le regole con trailing space dei vecchi
+    pattern (es. 'pes ', 'tcg ') vengono normalizzate.
+    """
     combined = " ".join(t.lower() for t in texts if t)
-    # Aggiungi padding per match di parole intere "ps2 " → " ps2 "
-    haystack = " " + combined + " "
     for slug, keywords in CATEGORY_RULES:
-        if any(kw in haystack for kw in keywords):
-            return slug
+        for kw in keywords:
+            if _word_match(kw.strip(), combined):
+                return slug
     return None
 
 
@@ -237,8 +292,16 @@ def _save_photo(photo_bytes: bytes, article_id: int) -> Optional[str]:
 
 
 def _item_passes_filter(item: VintedItem) -> bool:
-    """Decide se l'item e' pertinente a NerdNostalgia in base alle keyword
-    nel titolo/descrizione/branch_title."""
+    """Decide se l'item e' pertinente a NerdNostalgia.
+
+    Due gate:
+      1) Exclusion list sul titolo: se contiene parole chiaramente non-nerd
+         (borsa, scarpe, profumo, ...) → reject. Cattura falsi positivi
+         come 'Borsa Valentino' la cui description ha 'card' o 'vintage'.
+      2) NN_KEYWORDS in word-boundary su titolo/descrizione/branch.
+    """
+    if _has_exclude_keyword(item.title):
+        return False
     return _matches_nn_keywords(
         item.title, item.description, item.catalog_branch_title,
     )
