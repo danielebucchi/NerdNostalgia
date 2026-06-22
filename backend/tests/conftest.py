@@ -73,12 +73,15 @@ def engine():
     def _fk_pragma(dbapi_conn, _):
         dbapi_conn.execute("PRAGMA foreign_keys=ON")
 
-    # Applica schema (idempotente con IF NOT EXISTS)
+    # Applica schema (idempotente con IF NOT EXISTS).
+    # executescript() del cursor sqlite3 gestisce nativamente i multi-statement
+    # e ignora i ';' dentro commenti — il naive split(';') si rompeva
+    # in mezzo a commenti che contenevano un ';'.
     with eng.connect() as conn:
         with open(SCHEMA_PATH) as f:
             sql = f.read()
-        for stmt in [s.strip() for s in sql.split(";") if s.strip()]:
-            conn.exec_driver_sql(stmt)
+        raw_conn = conn.connection.driver_connection  # sqlite3.Connection
+        raw_conn.executescript(sql)
         conn.commit()
 
     yield eng
