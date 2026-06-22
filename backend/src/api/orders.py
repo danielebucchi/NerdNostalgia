@@ -123,8 +123,8 @@ def _calc_shipping(articles: list[Article]) -> Decimal:
 )
 @limiter.limit("3/minute;20/hour")
 def create_order(
-    request: Request,
     payload: OrderCreate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Crea un ordine PENDING e manda email all'admin.
