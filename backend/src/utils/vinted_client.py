@@ -106,25 +106,30 @@ def _parse_item(item: dict) -> VintedItem:
     )
 
 
-# Match di un hashtag tipico Vinted: # seguito da lettere/numeri/underscore.
-# Servono per la SEO interna di Vinted, sul nostro sito sono solo rumore.
-_HASHTAG_RE = re.compile(r"#[\w]+", re.UNICODE)
+# Match di un hashtag tipico Vinted: opzionale whitespace prima + # + parola.
+# Includendo lo whitespace prima evitiamo di lasciare doppi spazi residui
+# quando l'hashtag e' in mezzo al testo ("ciao #pokemon mondo" → "ciao mondo").
+# Cosi' NON tocchiamo spazi nativi del testo originale.
+_HASHTAG_RE = re.compile(r"\s*#\w+", re.UNICODE)
 
 
 def strip_hashtags(text: Optional[str]) -> Optional[str]:
-    """Rimuove gli hashtag (#parola) dal testo e normalizza gli spazi.
+    """Rimuove gli hashtag (#parola) dal testo, INSIEME al whitespace che
+    li precede, in modo da non lasciare doppi spazi spuri.
+
+    Conserva intatti gli spazi/newline del testo originale che non sono
+    adiacenti a hashtag.
 
     Esempio:
-      "Bellissimo gioco!\\n\\n#pokemon #gamecube #vintage" → "Bellissimo gioco!"
+      "Bellissimo gioco!\\n\\n#pokemon #gamecube" → "Bellissimo gioco!"
+      "ciao #pokemon mondo"                       → "ciao mondo"
+      "testo senza hashtag con  doppio spazio"    → invariato
     """
     if not text:
         return text
     cleaned = _HASHTAG_RE.sub("", text)
-    # Collassa run di spazi interni a uno solo (ma preserva i newline)
-    cleaned = re.sub(r"[ \t]+", " ", cleaned)
-    # Collassa blank lines > 2 in due newline
-    cleaned = re.sub(r"\n\s*\n\s*\n+", "\n\n", cleaned)
-    # Trim per ogni riga + trim totale
+    # Solo trim per riga (per togliere trailing space lasciato da hashtag a
+    # fine riga) + trim totale. Nessun collasso di spazi interni.
     cleaned = "\n".join(line.rstrip() for line in cleaned.splitlines())
     return cleaned.strip()
 
