@@ -94,7 +94,7 @@ def _parse_item(item: dict) -> VintedItem:
     return VintedItem(
         item_id=int(item["id"]),
         title=item.get("title", ""),
-        description=item.get("description"),
+        description=strip_hashtags(item.get("description")),
         price=price_amount,
         currency=currency,
         url=item.get("url") or f"{BASE_HOST}/items/{item['id']}",
@@ -104,6 +104,29 @@ def _parse_item(item: dict) -> VintedItem:
         status=item.get("status"),
         raw=item,
     )
+
+
+# Match di un hashtag tipico Vinted: # seguito da lettere/numeri/underscore.
+# Servono per la SEO interna di Vinted, sul nostro sito sono solo rumore.
+_HASHTAG_RE = re.compile(r"#[\w]+", re.UNICODE)
+
+
+def strip_hashtags(text: Optional[str]) -> Optional[str]:
+    """Rimuove gli hashtag (#parola) dal testo e normalizza gli spazi.
+
+    Esempio:
+      "Bellissimo gioco!\\n\\n#pokemon #gamecube #vintage" → "Bellissimo gioco!"
+    """
+    if not text:
+        return text
+    cleaned = _HASHTAG_RE.sub("", text)
+    # Collassa run di spazi interni a uno solo (ma preserva i newline)
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    # Collassa blank lines > 2 in due newline
+    cleaned = re.sub(r"\n\s*\n\s*\n+", "\n\n", cleaned)
+    # Trim per ogni riga + trim totale
+    cleaned = "\n".join(line.rstrip() for line in cleaned.splitlines())
+    return cleaned.strip()
 
 
 def _fetch_description_for_item(page, item_id: int, stats: dict) -> Optional[str]:
@@ -136,8 +159,10 @@ def _fetch_description_for_item(page, item_id: int, stats: dict) -> Optional[str
             api_url,
         )
         if descr and isinstance(descr, str) and len(descr.strip()) > 5:
-            stats["api"] = stats.get("api", 0) + 1
-            return descr.strip()
+            cleaned = strip_hashtags(descr)
+            if cleaned and len(cleaned) > 5:
+                stats["api"] = stats.get("api", 0) + 1
+                return cleaned
     except Exception as exc:  # noqa: BLE001
         LOGGER.debug("Item %s API fetch failed: %s", item_id, exc)
 
@@ -152,8 +177,10 @@ def _fetch_description_for_item(page, item_id: int, stats: dict) -> Optional[str
             }"""
         )
         if descr and len(descr.strip()) > 5:
-            stats["og"] = stats.get("og", 0) + 1
-            return descr.strip()
+            cleaned = strip_hashtags(descr)
+            if cleaned and len(cleaned) > 5:
+                stats["og"] = stats.get("og", 0) + 1
+                return cleaned
     except Exception as exc:  # noqa: BLE001
         LOGGER.warning("Item %s page fetch failed: %s", item_id, exc)
 
