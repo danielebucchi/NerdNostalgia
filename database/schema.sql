@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS articles (
     -- Costo spedizione mostrato al cliente (somma a price nel link PayPal).
     -- Diverso da shipping_cost piu' sotto, che e' la spesa sostenuta per
     -- tracking interno profit/loss (es. potrebbe essere applicato ricarico).
-    -- Default 5€: copre piego di libri raccomandato per la maggior parte
-    -- degli articoli; per cose voluminose va aumentato manualmente.
+    -- Default 5 EUR: copre piego di libri raccomandato per la maggior
+    -- parte degli articoli, override manuale per cose voluminose.
     shipping_price NUMERIC(10,2) DEFAULT 5.00,
     currency VARCHAR(3) DEFAULT 'EUR',
     condition VARCHAR(20) NOT NULL DEFAULT 'USED'
