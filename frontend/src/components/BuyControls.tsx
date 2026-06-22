@@ -88,6 +88,13 @@ export function BuyControls({ article }: Props) {
         <strong className="text-ink">Spedizione: € {ship.toFixed(2)}</strong>{" "}
         · totale € {grandTotal.toFixed(2)}
       </p>
+      {paypalEnabled() && article.status === "PUBLISHED" && (
+        <p className="text-[11px] text-ink-soft mt-1 leading-snug">
+          💡 Su PayPal scegli{" "}
+          <strong className="text-[#003087]">&quot;Amico o familiare&quot;</strong> per
+          evitare le commissioni.
+        </p>
+      )}
 
       <PurchaseDialog
         open={dialogOpen}

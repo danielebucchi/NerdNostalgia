@@ -203,6 +203,9 @@ TOTALE:     € {float(order.grand_total):.2f} {order.currency}
 {f"Note: {order.notes}" if order.notes else ""}
 
 Pagamento PayPal: {paypal_url or "vedi paypal.me/DanieleBucchi"}
+(Il compratore e' stato istruito di scegliere "A un amico o familiare"
+su PayPal per evitare le commissioni — controlla che lo abbia fatto
+prima di marcare l'ordine come PAID.)
 
 Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
 """
@@ -245,6 +248,12 @@ Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
     <a href="{paypal_url}" style="display:inline-block; background:#ffc439; color:#003087; padding:10px 18px; border-radius:999px; text-decoration:none; font-weight:bold;">
       Apri il link PayPal del compratore
     </a>
+  </p>
+  <p style="font-size:0.85em; background:#ffc439/20; border-left:3px solid #ffc439; padding:8px 12px; color:#3d2a5c;">
+    💡 Il compratore è stato istruito di scegliere
+    <strong>&quot;A un amico o familiare&quot;</strong> su PayPal per evitare le
+    commissioni. Verifica che il pagamento ricevuto sia di questo tipo prima
+    di marcare l&apos;ordine come PAID.
   </p>
   <p style="font-size: 0.85em; color: #888;">
     Stato: <strong>PENDING</strong> — conferma il pagamento ricevuto da
