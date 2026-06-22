@@ -75,7 +75,9 @@ class Article(BaseModel):
     price = Column(Numeric(10, 2), nullable=False)
     # Costo spedizione mostrato/richiesto al cliente. Diverso da
     # shipping_cost piu' sotto (che e' la spesa sostenuta, lato inventario).
-    shipping_price = Column(Numeric(10, 2))
+    # Default 5€ (piego di libri raccomandato), override manuale per articoli
+    # voluminosi o piu' fragili.
+    shipping_price = Column(Numeric(10, 2), default=5)
     currency = Column(String(3), default="EUR")
 
     # Inventory tracking (clone foglio "Flipping Inventario" / "Carte Pokemon Inventario")

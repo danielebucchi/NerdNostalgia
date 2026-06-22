@@ -59,8 +59,8 @@ class ArticleCreate(ArticleInventoryFields):
     description: Optional[str] = None
     price: Decimal = Field(..., ge=0, max_digits=10, decimal_places=2)
     shipping_price: Optional[Decimal] = Field(
-        None, ge=0, max_digits=10, decimal_places=2,
-        description="Costo spedizione richiesto al cliente (somma a price nel link PayPal)",
+        Decimal("5.00"), ge=0, max_digits=10, decimal_places=2,
+        description="Costo spedizione richiesto al cliente. Default 5€.",
     )
     currency: str = Field("EUR", min_length=3, max_length=3)
     category_id: Optional[int] = Field(None, description="FK categoria/sottocategoria")

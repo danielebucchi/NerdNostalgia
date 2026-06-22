@@ -53,7 +53,9 @@ CREATE TABLE IF NOT EXISTS articles (
     -- Costo spedizione mostrato al cliente (somma a price nel link PayPal).
     -- Diverso da shipping_cost piu' sotto, che e' la spesa sostenuta per
     -- tracking interno profit/loss (es. potrebbe essere applicato ricarico).
-    shipping_price NUMERIC(10,2),
+    -- Default 5€: copre piego di libri raccomandato per la maggior parte
+    -- degli articoli; per cose voluminose va aumentato manualmente.
+    shipping_price NUMERIC(10,2) DEFAULT 5.00,
     currency VARCHAR(3) DEFAULT 'EUR',
     condition VARCHAR(20) NOT NULL DEFAULT 'USED'
         CHECK (condition IN ('NEW','USED','REFURBISHED','FOR_PARTS')),
@@ -135,6 +137,59 @@ CREATE INDEX IF NOT EXISTS idx_inquiries_article_id ON inquiries(article_id);
 CREATE INDEX IF NOT EXISTS idx_inquiries_email ON inquiries(email);
 CREATE INDEX IF NOT EXISTS idx_inquiries_status ON inquiries(status);
 CREATE INDEX IF NOT EXISTS idx_inquiries_created_at ON inquiries(created_at DESC);
+
+-- ============================================================
+-- orders + order_items: ordini di acquisto dal sito.
+-- Il pagamento e' fuori sistema (paypal.me), quindi un Order parte come
+-- PENDING quando il compratore submit-ta il form e diventa PAID solo
+-- quando l'admin lo conferma manualmente da /admin/ordini.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- Dati compratore
+    buyer_name VARCHAR(255) NOT NULL,
+    buyer_email VARCHAR(255) NOT NULL,
+    buyer_phone VARCHAR(50),
+    -- Indirizzo spedizione (campi separati per filtrare / esportare)
+    ship_street VARCHAR(255) NOT NULL,
+    ship_city VARCHAR(120) NOT NULL,
+    ship_postal_code VARCHAR(20) NOT NULL,
+    ship_province VARCHAR(120),
+    ship_country VARCHAR(80) NOT NULL DEFAULT 'Italia',
+    -- Importi (snapshot al momento del checkout, indipendenti da future
+    -- modifiche dei prezzi articolo)
+    subtotal NUMERIC(10,2) NOT NULL,
+    shipping_total NUMERIC(10,2) NOT NULL,
+    grand_total NUMERIC(10,2) NOT NULL,
+    currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+    notes TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+        CHECK (status IN ('PENDING','PAID','SHIPPED','CANCELLED')),
+    paid_at TIMESTAMP,
+    shipped_at TIMESTAMP,
+    cancelled_at TIMESTAMP,
+    admin_notes TEXT,
+    -- Tracking IP per rate-limit / antifrode
+    ip_address VARCHAR(45),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(buyer_email);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    -- SET NULL: se l'articolo viene cancellato non perdiamo lo storico ordine.
+    article_id INTEGER REFERENCES articles(id) ON DELETE SET NULL,
+    -- Snapshot del titolo + prezzo al momento dell'ordine (immutabile).
+    title_snapshot VARCHAR(255) NOT NULL,
+    price_snapshot NUMERIC(10,2) NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_article ON order_items(article_id);
 
 -- ============================================================
 -- wanted_items

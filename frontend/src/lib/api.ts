@@ -129,6 +129,64 @@ export function formatMaxPrice(item: Pick<WantedItem, "max_price" | "currency">)
   }).format(value);
 }
 
+export interface OrderItemInput {
+  article_id: number;
+  quantity: number;
+}
+
+export interface OrderCreateInput {
+  buyer_name: string;
+  buyer_email: string;
+  buyer_phone?: string;
+  ship_street: string;
+  ship_city: string;
+  ship_postal_code: string;
+  ship_province?: string;
+  ship_country?: string;
+  items: OrderItemInput[];
+  notes?: string;
+  website?: string; // honeypot
+}
+
+export interface OrderConfirmation {
+  id: number;
+  buyer_name: string;
+  buyer_email: string;
+  subtotal: string;
+  shipping_total: string;
+  grand_total: string;
+  currency: string;
+  status: string;
+  items: Array<{
+    id: number;
+    article_id: number | null;
+    title_snapshot: string;
+    price_snapshot: string;
+    quantity: number;
+  }>;
+}
+
+export async function createOrder(payload: OrderCreateInput): Promise<OrderConfirmation> {
+  const res = await fetch(`${API_BASE}/api/orders/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let detail = `${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.detail) {
+        detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 export function formatPrice(article: Pick<Article, "price" | "currency">): string {
   const value = Number(article.price);
   if (Number.isNaN(value)) return article.price;

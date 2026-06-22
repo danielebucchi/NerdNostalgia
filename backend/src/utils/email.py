@@ -152,3 +152,110 @@ Apri nell'admin: /admin/inquiries/{inquiry.id}
         html_body=html_body,
         reply_to=inquiry.email,
     )
+
+
+def send_order_notification(order, paypal_url: Optional[str] = None) -> bool:
+    """Notifica all'admin di un nuovo ordine con dati compratore + articoli.
+
+    L'email arriva nel momento in cui il compratore submit-ta il form,
+    NON quando il pagamento PayPal e' confermato (paypal.me non ha
+    webhook). Sara' l'admin a confermare il pagato da /admin/ordini.
+    """
+    cfg = _config()
+    to_admin = cfg["to_admin"]
+
+    items_lines: list[str] = []
+    items_html: list[str] = []
+    for it in order.items:
+        line = f"  - {it.title_snapshot} × {it.quantity} → € {float(it.price_snapshot):.2f}"
+        items_lines.append(line)
+        items_html.append(
+            f"<li><strong>{it.title_snapshot}</strong> × {it.quantity}"
+            f" <span style='color:#888'>(art. #{it.article_id})</span>"
+            f" → € {float(it.price_snapshot):.2f}</li>"
+        )
+
+    text_body = f"""Nuovo ordine #{order.id} su NerdNostalgia
+==========================================
+
+Compratore
+----------
+{order.buyer_name}
+Email: {order.buyer_email}
+{f"Tel:   {order.buyer_phone}" if order.buyer_phone else ""}
+
+Spedizione
+----------
+{order.ship_street}
+{order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}
+{order.ship_country}
+
+Articoli
+--------
+{chr(10).join(items_lines)}
+
+Totali
+------
+Subtotale:  € {float(order.subtotal):.2f}
+Spedizione: € {float(order.shipping_total):.2f}
+TOTALE:     € {float(order.grand_total):.2f} {order.currency}
+
+{f"Note: {order.notes}" if order.notes else ""}
+
+Pagamento PayPal: {paypal_url or "vedi paypal.me/DanieleBucchi"}
+
+Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
+"""
+
+    html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto;">
+  <h2 style="color: #e879a8;">🛒 Nuovo ordine #{order.id}</h2>
+
+  <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">Compratore</h3>
+  <p>
+    <strong>{order.buyer_name}</strong><br>
+    Email: <a href="mailto:{order.buyer_email}">{order.buyer_email}</a><br>
+    {f"Tel: <a href='tel:{order.buyer_phone}'>{order.buyer_phone}</a><br>" if order.buyer_phone else ""}
+  </p>
+
+  <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">Spedizione</h3>
+  <address style="background:#fbf7f4; padding:10px 14px; border-radius:8px; font-style:normal;">
+    {order.ship_street}<br>
+    {order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}<br>
+    {order.ship_country}
+  </address>
+
+  <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">Articoli</h3>
+  <ul>
+    {''.join(items_html)}
+  </ul>
+
+  <table style="margin-top:12px;">
+    <tr><td>Subtotale</td><td style="text-align:right; padding-left:24px;">€ {float(order.subtotal):.2f}</td></tr>
+    <tr><td>Spedizione</td><td style="text-align:right; padding-left:24px;">€ {float(order.shipping_total):.2f}</td></tr>
+    <tr style="font-weight:bold; font-size:1.1em; color:#e879a8;">
+      <td>TOTALE</td>
+      <td style="text-align:right; padding-left:24px;">€ {float(order.grand_total):.2f} {order.currency}</td>
+    </tr>
+  </table>
+
+  {f'<h3 style="color:#3d2a5c;">Note compratore</h3><pre style="white-space:pre-wrap; background:#fbf7f4; padding:12px; border-radius:8px;">{order.notes}</pre>' if order.notes else ""}
+
+  <hr>
+  <p>
+    <a href="{paypal_url}" style="display:inline-block; background:#ffc439; color:#003087; padding:10px 18px; border-radius:999px; text-decoration:none; font-weight:bold;">
+      Apri il link PayPal del compratore
+    </a>
+  </p>
+  <p style="font-size: 0.85em; color: #888;">
+    Stato: <strong>PENDING</strong> — conferma il pagamento ricevuto da
+    <code>/admin/ordini/{order.id}</code>
+  </p>
+</body></html>"""
+
+    return send_email(
+        to=to_admin,
+        subject=f"[NerdNostalgia] Nuovo ordine #{order.id} — € {float(order.grand_total):.2f}",
+        text_body=text_body,
+        html_body=html_body,
+        reply_to=order.buyer_email,
+    )

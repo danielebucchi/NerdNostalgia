@@ -4,39 +4,13 @@ import { notFound } from "next/navigation";
 import { formatPrice, getArticle } from "@/lib/api";
 import { ArticleActions } from "@/components/ArticleActions";
 import { ArticleGallery } from "@/components/ArticleGallery";
-import { MarketplaceLogo } from "@/components/MarketplaceLogo";
-import { PaypalButton } from "@/components/PaypalButton";
+import { BuyControls } from "@/components/BuyControls";
 import { ShareButtons } from "@/components/ShareButtons";
 import { WishlistButton } from "@/components/WishlistButton";
 import { absUrl, clip, SITE_NAME } from "@/lib/seo";
-import type { Article } from "@/lib/types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-/**
- * Totale da prefillare sul link PayPal: prezzo + spedizione (se settata).
- * Se shipping_price e' null/0 → torna solo il prezzo articolo.
- */
-function paypalTotal(article: Article): number {
-  const price = Number(article.price || 0);
-  const ship = article.shipping_price ? Number(article.shipping_price) : 0;
-  const total = price + (Number.isFinite(ship) ? ship : 0);
-  return Number.isFinite(total) ? total : price;
-}
-
-/**
- * Label del bottone PayPal: importo totale se conosciamo la spedizione,
- * "Paga + spedizione" se la spedizione e' da concordare (cosi' il
- * compratore sa che il link prefilla solo il prezzo articolo).
- */
-function paypalLabel(article: Article): string {
-  const ship = article.shipping_price ? Number(article.shipping_price) : 0;
-  if (ship > 0) {
-    return `Paga € ${paypalTotal(article).toFixed(2)} su PayPal`;
-  }
-  return "Paga su PayPal (+ spedizione)";
 }
 
 const CONDITION_SCHEMA: Record<string, string> = {
@@ -175,66 +149,12 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           <ArticleGallery images={article.images ?? []} title={article.title} />
         </div>
 
-        {/* Prezzo + CTA marketplace inline: mobile wrap se non ci stanno */}
+        {/* Prezzo + bottoni di acquisto + dialog PayPal */}
         <div className="order-2 md:order-none md:col-start-2 md:row-start-2">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <div className="display text-4xl text-pink-deep leading-none">
-              {formatPrice(article)}
-            </div>
-
-            {article.vinted_status === "LISTED" && article.vinted_url && (
-              <a
-                href={article.vinted_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Acquista questo articolo su Vinted"
-                className="btn btn-vinted text-sm font-bold px-4 py-2.5 inline-flex items-center gap-2"
-              >
-                <MarketplaceLogo marketplace="vinted" height={16} />
-                <span>Acquista su Vinted</span>
-                <span aria-hidden="true">→</span>
-              </a>
-            )}
-
-            {article.ebay_status === "LISTED" && article.ebay_url && (
-              <a
-                href={article.ebay_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Acquista questo articolo su eBay"
-                className="btn btn-ebay text-sm font-bold px-4 py-2.5 inline-flex items-center gap-2"
-              >
-                <MarketplaceLogo marketplace="ebay" height={16} />
-                <span>Acquista su eBay</span>
-                <span aria-hidden="true">→</span>
-              </a>
-            )}
-
-            <PaypalButton
-              amount={paypalTotal(article)}
-              currency={article.currency || "EUR"}
-              label={paypalLabel(article)}
-            />
+          <div className="display text-4xl text-pink-deep leading-none mb-4">
+            {formatPrice(article)}
           </div>
-
-          {/* Nota spedizione: mostra dettaglio totale o avviso "da concordare" */}
-          {(() => {
-            const ship = article.shipping_price ? Number(article.shipping_price) : null;
-            if (ship && ship > 0) {
-              return (
-                <p className="text-xs text-ink-soft mt-2">
-                  Include € {Number(article.price).toFixed(2)} articolo +{" "}
-                  <strong className="text-ink">€ {ship.toFixed(2)}</strong> spedizione
-                </p>
-              );
-            }
-            return (
-              <p className="text-xs text-ink-soft mt-2">
-                Prezzo articolo. <strong className="text-ink">Spedizione da concordare</strong>{" "}
-                — scrivimi per il totale.
-              </p>
-            );
-          })()}
+          <BuyControls article={article} />
         </div>
 
         {/* Descrizione */}
