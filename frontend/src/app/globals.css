@@ -177,6 +177,19 @@ h2.display {
 .btn-ebay:active {
   transform: translateY(1px);
 }
+.btn-paypal {
+  background: #ffc439;
+  color: #003087;
+  box-shadow: 0 14px 30px -10px rgba(255, 196, 57, 0.6);
+}
+.btn-paypal:hover {
+  background: #f2b22d;
+  transform: translateY(-1px);
+  box-shadow: 0 22px 44px -14px rgba(255, 196, 57, 0.75);
+}
+.btn-paypal:active {
+  transform: translateY(1px);
+}
 
 /* ──────────── CARDS ──────────── */
 

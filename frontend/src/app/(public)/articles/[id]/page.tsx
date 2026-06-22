@@ -5,6 +5,7 @@ import { formatPrice, getArticle } from "@/lib/api";
 import { ArticleActions } from "@/components/ArticleActions";
 import { ArticleGallery } from "@/components/ArticleGallery";
 import { MarketplaceLogo } from "@/components/MarketplaceLogo";
+import { PaypalButton } from "@/components/PaypalButton";
 import { ShareButtons } from "@/components/ShareButtons";
 import { WishlistButton } from "@/components/WishlistButton";
 import { absUrl, clip, SITE_NAME } from "@/lib/seo";
@@ -183,6 +184,8 @@ export default async function ArticleDetailPage({ params }: PageProps) {
                 <span aria-hidden="true">→</span>
               </a>
             )}
+
+            <PaypalButton amount={article.price} currency={article.currency || "EUR"} />
           </div>
         </div>
 
