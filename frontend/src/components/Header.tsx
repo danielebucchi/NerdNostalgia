@@ -44,7 +44,9 @@ export function Header() {
             alt="NerdNostalgia"
             className="w-10 h-10 sm:w-12 sm:h-12 rounded-full ring-1 ring-ink/10 object-cover bg-white shadow-soft flex-shrink-0"
           />
-          <span className="display text-lg sm:text-2xl md:text-3xl text-ink leading-none truncate">
+          {/* Wordmark nascosto su mobile: il logo + aria-label del Link
+              bastano per identita' / a11y, e lasciamo aria al nav buttons. */}
+          <span className="display hidden sm:inline text-2xl md:text-3xl text-ink leading-none truncate">
             Nerd<span className="text-lilac-deep">.</span>Nostalgia
           </span>
         </Link>
