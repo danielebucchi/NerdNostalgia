@@ -152,7 +152,7 @@ export interface OrderCreateInput {
 /**
  * Helper condiviso fra dialog e badge UI: il CAP rientra nelle province
  * di Livorno (57xxx) o Pisa (56xxx) — zone in cui il venditore propone
- * lo scambio a mano. DEVE restare allineato a backend
+ * la consegna a mano. DEVE restare allineato a backend
  * `_is_hand_exchange_eligible` in api/orders.py.
  */
 export function isHandExchangeEligible(postalCode: string): boolean {

@@ -28,6 +28,37 @@ LOGGER = logging.getLogger("email")
 DEFAULT_ADMIN_EMAIL = "nerdnostalgiaita@gmail.com"
 
 
+def _whatsapp_url(phone: Optional[str], default_text: str = "") -> Optional[str]:
+    """Converte un numero di telefono in URL wa.me.
+
+    Regole conservative: normalizza solo se il numero sembra italiano
+    (10 cifre che cominciano con 3 = cellulare; o 12 cifre che cominciano
+    con 39). Per altri formati restituisce None così l'email mostra solo
+    il classico tel: link senza promettere WhatsApp che potrebbe non
+    esistere.
+    """
+    if not phone:
+        return None
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if not digits:
+        return None
+    # 00 prefix → toglilo
+    if digits.startswith("00"):
+        digits = digits[2:]
+    # Cellulare italiano "333 1234567" → prefix 39
+    if len(digits) == 10 and digits.startswith("3"):
+        digits = "39" + digits
+    # 12 cifre con prefix 39 → ok
+    if len(digits) == 12 and digits.startswith("39"):
+        url = f"https://wa.me/{digits}"
+        if default_text:
+            from urllib.parse import quote
+            url += f"?text={quote(default_text)}"
+        return url
+    # Numero non riconosciuto come italiano: prudente, no WA
+    return None
+
+
 def _config() -> dict:
     return {
         "host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
@@ -175,6 +206,11 @@ def send_order_notification(order, paypal_url: Optional[str] = None) -> bool:
             f" → € {float(it.price_snapshot):.2f}</li>"
         )
 
+    wa_url = _whatsapp_url(
+        order.buyer_phone,
+        default_text=f"Ciao {order.buyer_name.split()[0] if order.buyer_name else ''}, "
+        f"ti scrivo da NerdNostalgia per il tuo ordine #{order.id}.",
+    )
     text_body = f"""Nuovo ordine #{order.id} su NerdNostalgia
 ==========================================
 
@@ -183,6 +219,7 @@ Compratore
 {order.buyer_name}
 Email: {order.buyer_email}
 {f"Tel:   {order.buyer_phone}" if order.buyer_phone else ""}
+{f"WhatsApp: {wa_url}" if wa_url else ""}
 
 Spedizione
 ----------
@@ -197,7 +234,7 @@ Articoli
 Totali
 ------
 Subtotale:  € {float(order.subtotal):.2f}
-Spedizione: € {float(order.shipping_total):.2f}{" (SCAMBIO A MANO)" if order.hand_exchange else ""}
+Spedizione: € {float(order.shipping_total):.2f}{" (CONSEGNA A MANO)" if order.hand_exchange else ""}
 TOTALE:     € {float(order.grand_total):.2f} {order.currency}
 
 {f"Note: {order.notes}" if order.notes else ""}
@@ -219,6 +256,21 @@ Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
     Email: <a href="mailto:{order.buyer_email}">{order.buyer_email}</a><br>
     {f"Tel: <a href='tel:{order.buyer_phone}'>{order.buyer_phone}</a><br>" if order.buyer_phone else ""}
   </p>
+  <!-- Bottoni contatto rapido: tap-to-mail / tap-to-call / WhatsApp -->
+  <div style="margin: 10px 0 16px;">
+    <a href="mailto:{order.buyer_email}?subject=Ordine%20%23{order.id}%20NerdNostalgia"
+       style="display:inline-block; background:#a890d8; color:white; padding:8px 14px; border-radius:999px; text-decoration:none; font-weight:bold; font-size:0.85em; margin-right:6px; margin-bottom:6px;">
+      ✉ Email
+    </a>
+    {f'''<a href="tel:{order.buyer_phone}"
+       style="display:inline-block; background:#7dd3c0; color:white; padding:8px 14px; border-radius:999px; text-decoration:none; font-weight:bold; font-size:0.85em; margin-right:6px; margin-bottom:6px;">
+      📞 Chiama
+    </a>''' if order.buyer_phone else ''}
+    {f'''<a href="{wa_url}" target="_blank"
+       style="display:inline-block; background:#25D366; color:white; padding:8px 14px; border-radius:999px; text-decoration:none; font-weight:bold; font-size:0.85em; margin-right:6px; margin-bottom:6px;">
+      💬 WhatsApp
+    </a>''' if wa_url else ''}
+  </div>
 
   <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">Spedizione</h3>
   <address style="background:#fbf7f4; padding:10px 14px; border-radius:8px; font-style:normal;">
@@ -235,7 +287,7 @@ Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
   <table style="margin-top:12px;">
     <tr><td>Subtotale</td><td style="text-align:right; padding-left:24px;">€ {float(order.subtotal):.2f}</td></tr>
     <tr>
-      <td>Spedizione{' <strong style="color:#7a4ca8;">(scambio a mano)</strong>' if order.hand_exchange else ''}</td>
+      <td>Spedizione{' <strong style="color:#7a4ca8;">(consegna a mano)</strong>' if order.hand_exchange else ''}</td>
       <td style="text-align:right; padding-left:24px;">€ {float(order.shipping_total):.2f}</td>
     </tr>
     <tr style="font-weight:bold; font-size:1.1em; color:#e879a8;">
@@ -243,7 +295,7 @@ Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
       <td style="text-align:right; padding-left:24px;">€ {float(order.grand_total):.2f} {order.currency}</td>
     </tr>
   </table>
-  {f'<p style="background:#a890d8/20; border-left:3px solid #a890d8; padding:8px 12px; margin-top:10px;">🤝 <strong>Scambio a mano</strong> richiesto dal compratore (zona Livorno/Pisa). Niente spedizione.</p>' if order.hand_exchange else ''}
+  {f'<p style="background:#a890d8/20; border-left:3px solid #a890d8; padding:8px 12px; margin-top:10px;">🤝 <strong>Consegna a mano</strong> richiesta dal compratore (zona Livorno/Pisa). Niente spedizione, mettiti d&apos;accordo via email/WhatsApp.</p>' if order.hand_exchange else ''}
 
   {f'<h3 style="color:#3d2a5c;">Note compratore</h3><pre style="white-space:pre-wrap; background:#fbf7f4; padding:12px; border-radius:8px;">{order.notes}</pre>' if order.notes else ""}
 
