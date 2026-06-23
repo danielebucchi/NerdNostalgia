@@ -368,11 +368,10 @@ function Filters({
 
   return (
     <div className="mb-6 sm:mb-8">
-      {/* Mobile: search da sola, poi riga bottoni full-width
-          Desktop: search + bottoni in linea */}
-      <div className="mb-3 flex flex-col sm:flex-row gap-2">
-        {/* Search: full-width su mobile, flex-1 da sm+ */}
-        <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
+      {/* Riga compatta: search prende tutto, bottone filtri solo icona
+          su mobile, label completa da sm+ */}
+      <div className="mb-3 flex items-stretch gap-2">
+        <div className="relative flex-1 min-w-0">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft text-lg pointer-events-none">
             🔎
           </span>
@@ -380,51 +379,65 @@ function Filters({
             type="search"
             value={filters.search}
             onChange={(e) => onUpdate("search", e.target.value)}
-            placeholder="Cerca per titolo, marca, console…"
+            placeholder="Cerca…"
             className="filter-input pl-10 w-full"
           />
         </div>
 
-        {/* Bottoni: full-width split su mobile, inline su desktop */}
-        <div className="flex gap-2 w-full sm:w-auto">
+        <button
+          type="button"
+          onClick={onTogglePanel}
+          aria-expanded={panelVisible}
+          aria-controls="catalog-filters-panel"
+          aria-label={panelVisible ? "Nascondi filtri" : "Mostra filtri"}
+          className={
+            "btn text-sm flex-shrink-0 inline-flex items-center justify-center gap-1.5 relative " +
+            // Mobile: quadrato compatto; sm+: padding standard + label
+            "w-11 px-0 sm:w-auto sm:px-4 " +
+            (panelVisible || activeFilterCount > 0 ? "btn-primary" : "btn-ghost")
+          }
+        >
+          {/* Su mobile il glifo cambia in base allo stato (+/−) */}
+          <span aria-hidden="true" className="sm:hidden text-lg leading-none font-bold">
+            {panelVisible ? "−" : "+"}
+          </span>
+          <span aria-hidden="true" className="hidden sm:inline">⚙</span>
+          <span className="hidden sm:inline">
+            {panelVisible ? "Nascondi filtri" : "Mostra filtri"}
+          </span>
+          {activeFilterCount > 0 && (
+            <span
+              className={
+                "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white/30 text-[10px] font-bold tabular-nums " +
+                // Su mobile il badge sta in alto a destra del quadrato; su sm+ inline
+                "absolute -top-1 -right-1 sm:static sm:bg-white/30"
+              }
+            >
+              {activeFilterCount}
+            </span>
+          )}
+          <span
+            aria-hidden="true"
+            className={`hidden sm:inline transition-transform duration-200 ${
+              panelVisible ? "rotate-180" : "rotate-0"
+            }`}
+          >
+            ▾
+          </span>
+        </button>
+
+        {hasAnyFilter && (
           <button
             type="button"
-            onClick={onTogglePanel}
-            aria-expanded={panelVisible}
-            aria-controls="catalog-filters-panel"
-            className={
-              "btn text-sm flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 " +
-              (panelVisible || activeFilterCount > 0 ? "btn-primary" : "btn-ghost")
-            }
+            onClick={onReset}
+            className="btn btn-ghost text-sm whitespace-nowrap flex-shrink-0 w-11 px-0 sm:w-auto sm:px-4"
+            aria-label="Azzera filtri"
+            title="Azzera filtri"
           >
-            <span aria-hidden="true">⚙</span>
-            <span>{panelVisible ? "Nascondi filtri" : "Mostra filtri"}</span>
-            {activeFilterCount > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-white/30 text-[11px] font-bold tabular-nums">
-                {activeFilterCount}
-              </span>
-            )}
-            <span
-              aria-hidden="true"
-              className={`transition-transform duration-200 ${
-                panelVisible ? "rotate-180" : "rotate-0"
-              }`}
-            >
-              ▾
-            </span>
+            <span className="sm:hidden text-lg leading-none">✕</span>
+            <span className="hidden sm:inline">✕ Azzera</span>
           </button>
-          {hasAnyFilter && (
-            <button
-              type="button"
-              onClick={onReset}
-              className="btn btn-ghost text-sm whitespace-nowrap flex-shrink-0"
-              aria-label="Azzera filtri"
-            >
-              <span className="sm:hidden">✕</span>
-              <span className="hidden sm:inline">✕ Azzera</span>
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Pannello filtri: collassabile sempre, persistito in localStorage */}
