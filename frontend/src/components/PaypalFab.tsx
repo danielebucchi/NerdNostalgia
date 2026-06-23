@@ -20,13 +20,12 @@ export function PaypalFab() {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Paga con PayPal — seleziona Amico/Familiare per evitare commissioni"
-      title="Su PayPal scegli 'A un amico o familiare' per evitare le commissioni"
+      aria-label="Donazione tramite PayPal"
+      title="Donazione tramite PayPal (scegli 'A un amico o familiare' per evitare commissioni)"
       className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 btn btn-paypal shadow-hover px-5 py-3.5 text-sm font-bold inline-flex items-center gap-2 hover:scale-105 active:scale-100 transition-transform"
     >
-      <span aria-hidden="true" className="text-lg">💳</span>
-      <span className="hidden sm:inline">PayPal · Amico/Familiare</span>
-      <span className="sm:hidden">PayPal</span>
+      <span aria-hidden="true" className="text-lg">❤</span>
+      <span>Donazione</span>
     </a>
   );
 }
