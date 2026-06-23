@@ -195,7 +195,7 @@ export default function CartPage() {
               </p>
               {articles.length > 0 && (
                 <div className="text-[11px] rounded-lg bg-mint-deep/12 text-mint-deep px-3 py-2 mt-3 leading-snug ring-1 ring-mint-deep/30">
-                  🤝 <strong>Scambio a mano gratuito</strong> a Livorno/Pisa
+                  🤝 <strong>Consegna a mano gratuita</strong> a Livorno/Pisa
                   (CAP 56xxx / 57xxx). Scegli l&apos;opzione al checkout per
                   azzerare la spedizione.
                 </div>

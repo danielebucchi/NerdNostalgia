@@ -104,7 +104,7 @@ export function PurchaseDialog({
     // Validazione client: hand_exchange richiede CAP LI/PI
     if (state.hand_exchange && !capEligible) {
       setError(
-        "Lo scambio a mano è disponibile solo per CAP di Pisa (56xxx) o " +
+        "La consegna a mano è disponibile solo per CAP di Pisa (56xxx) o " +
         "Livorno (57xxx). Cambia indirizzo o disattiva l'opzione.",
       );
       return;
@@ -343,7 +343,7 @@ export function PurchaseDialog({
               />
               <span className="flex-1">
                 <span className="block text-sm font-bold text-ink">
-                  🤝 Scambio a mano — niente spese di spedizione
+                  🤝 Consegna a mano — niente spese di spedizione
                 </span>
                 <span className="block text-xs text-ink-soft mt-1 leading-snug">
                   {capEligible

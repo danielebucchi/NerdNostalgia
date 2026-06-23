@@ -52,6 +52,19 @@ const STATUS_LABEL: Record<Order["status"], string> = {
   CANCELLED: "Annullato",
 };
 
+/** Costruisce un URL wa.me per un numero italiano (best-effort).
+ *  Tornare null se il formato non sembra italiano, così non promettiamo
+ *  WhatsApp dove magari non esiste. */
+function whatsappUrl(phone: string | null, text?: string): string | null {
+  if (!phone) return null;
+  let digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.length === 10 && digits.startsWith("3")) digits = "39" + digits;
+  if (digits.length !== 12 || !digits.startsWith("39")) return null;
+  const base = `https://wa.me/${digits}`;
+  return text ? `${base}?text=${encodeURIComponent(text)}` : base;
+}
+
 function fmtDateTime(s: string): string {
   try {
     return new Date(s).toLocaleString("it-IT", {
@@ -167,7 +180,7 @@ export default function AdminOrdersPage() {
                       </span>
                       {o.hand_exchange && (
                         <span className="chip chip-lilac text-[11px]">
-                          🤝 Scambio a mano
+                          🤝 Consegna a mano
                         </span>
                       )}
                       <span className="text-ink-soft text-xs">
@@ -179,6 +192,45 @@ export default function AdminOrdersPage() {
                       {o.buyer_email}
                       {o.buyer_phone && ` · ${o.buyer_phone}`}
                     </p>
+                    {/* Bottoni contatto rapido */}
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      <a
+                        href={`mailto:${o.buyer_email}?subject=${encodeURIComponent(
+                          `Ordine #${o.id} NerdNostalgia`,
+                        )}`}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full bg-lilac-deep/15 text-lilac-deep px-2.5 py-1 hover:bg-lilac-deep hover:text-white transition-colors"
+                        aria-label="Invia email al compratore"
+                      >
+                        ✉ Email
+                      </a>
+                      {o.buyer_phone && (
+                        <a
+                          href={`tel:${o.buyer_phone}`}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full bg-mint-deep/15 text-mint-deep px-2.5 py-1 hover:bg-mint-deep hover:text-white transition-colors"
+                          aria-label="Chiama il compratore"
+                        >
+                          📞 Chiama
+                        </a>
+                      )}
+                      {(() => {
+                        const wa = whatsappUrl(
+                          o.buyer_phone,
+                          `Ciao ${o.buyer_name.split(" ")[0]}, ti scrivo da NerdNostalgia per il tuo ordine #${o.id}.`,
+                        );
+                        if (!wa) return null;
+                        return (
+                          <a
+                            href={wa}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full bg-[#25D366]/15 text-[#128c4f] px-2.5 py-1 hover:bg-[#25D366] hover:text-white transition-colors"
+                            aria-label="Scrivi su WhatsApp"
+                          >
+                            💬 WhatsApp
+                          </a>
+                        );
+                      })()}
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="display text-2xl text-pink-deep">
@@ -241,7 +293,7 @@ export default function AdminOrdersPage() {
                             Spedizione
                             {o.hand_exchange && (
                               <span className="ml-1 text-[10px] text-lilac-deep">
-                                (scambio a mano)
+                                (consegna a mano)
                               </span>
                             )}
                           </dt>
