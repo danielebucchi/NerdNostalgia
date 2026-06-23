@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCart } from "@/lib/cart";
+import { paymentsEnabled } from "@/lib/features";
 
 interface Props {
   variant?: "desktop" | "mobile";
@@ -9,6 +10,7 @@ interface Props {
 
 export function CartNavLink({ variant = "desktop" }: Props) {
   const { count, hydrated } = useCart();
+  if (!paymentsEnabled()) return null;
   const showBadge = hydrated && count > 0;
   const label = `Carrello${showBadge ? ` (${count})` : ""}`;
 

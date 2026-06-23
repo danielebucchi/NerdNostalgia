@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MarketplaceLogo } from "@/components/MarketplaceLogo";
 import { PurchaseDialog } from "@/components/PurchaseDialog";
+import { paymentsEnabled } from "@/lib/features";
 import { paypalEnabled } from "@/lib/paypal";
 import { useCart } from "@/lib/cart";
 import type { Article } from "@/lib/types";
@@ -56,7 +57,7 @@ export function BuyControls({ article }: Props) {
           </a>
         )}
 
-        {paypalEnabled() && article.status === "PUBLISHED" && (
+        {paymentsEnabled() && paypalEnabled() && article.status === "PUBLISHED" && (
           <button
             type="button"
             onClick={() => setDialogOpen(true)}
@@ -68,7 +69,7 @@ export function BuyControls({ article }: Props) {
           </button>
         )}
 
-        {article.status === "PUBLISHED" && (
+        {paymentsEnabled() && article.status === "PUBLISHED" && (
           <button
             type="button"
             onClick={() => toggle(article.id)}
@@ -84,11 +85,16 @@ export function BuyControls({ article }: Props) {
       </div>
 
       <p className="text-xs text-ink-soft mt-2">
-        Prezzo: € {Number(article.price).toFixed(2)} ·{" "}
-        <strong className="text-ink">Spedizione: € {ship.toFixed(2)}</strong>{" "}
-        · totale € {grandTotal.toFixed(2)}
+        Prezzo: € {Number(article.price).toFixed(2)}
+        {paymentsEnabled() && (
+          <>
+            {" "}·{" "}
+            <strong className="text-ink">Spedizione: € {ship.toFixed(2)}</strong>{" "}
+            · totale € {grandTotal.toFixed(2)}
+          </>
+        )}
       </p>
-      {paypalEnabled() && article.status === "PUBLISHED" && (
+      {paymentsEnabled() && paypalEnabled() && article.status === "PUBLISHED" && (
         <>
           <div className="mt-3 inline-flex items-center gap-2 text-xs rounded-full bg-white text-ink px-3 py-1.5 font-semibold ring-2 ring-mint-deep shadow-soft">
             <span aria-hidden="true" className="text-base">🤝</span>
@@ -110,12 +116,14 @@ export function BuyControls({ article }: Props) {
         </>
       )}
 
-      <PurchaseDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        articles={[article]}
-        shippingTotal={ship}
-      />
+      {paymentsEnabled() && (
+        <PurchaseDialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          articles={[article]}
+          shippingTotal={ship}
+        />
+      )}
     </>
   );
 }

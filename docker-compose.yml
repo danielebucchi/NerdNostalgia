@@ -64,6 +64,7 @@ services:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:7373}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3737}
         NEXT_PUBLIC_PAYPAL_ME: ${NEXT_PUBLIC_PAYPAL_ME:-}
+        NEXT_PUBLIC_PAYMENTS_ENABLED: ${NEXT_PUBLIC_PAYMENTS_ENABLED:-false}
     container_name: nerdnostalgia-frontend
     restart: unless-stopped
     depends_on:
@@ -77,6 +78,7 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:7373}
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3737}
       - NEXT_PUBLIC_PAYPAL_ME=${NEXT_PUBLIC_PAYPAL_ME:-}
+      - NEXT_PUBLIC_PAYMENTS_ENABLED=${NEXT_PUBLIC_PAYMENTS_ENABLED:-false}
       # Server-side: il frontend container raggiunge backend via service name
       # (dentro la docker network "nerdnostalgia_default"), non via localhost.
       - API_BASE_URL_INTERNAL=${API_BASE_URL_INTERNAL:-http://backend:7373}

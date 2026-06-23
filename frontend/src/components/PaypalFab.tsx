@@ -3,13 +3,15 @@
 import { paypalUrl } from "@/lib/paypal";
 
 /**
- * Bottone PayPal floating fisso in basso a destra.
- * Importo libero (l'utente lo inserisce su paypal.me).
+ * Bottone "Donazione" floating fisso in basso a destra.
  *
- * z-index 40: sopra contenuto/header (z<40), sotto il CookieBanner (z-50)
- * cosi' non si sovrappone all'avviso cookie al primo accesso.
+ * NB: NON e' gated dal feature flag PAYMENTS_ENABLED — anche quando
+ * il flusso d'acquisto e' disabilitato (carrello+PayPal-checkout off),
+ * la donazione resta sempre disponibile come canale di supporto.
  *
- * Hidden se NEXT_PUBLIC_PAYPAL_ME non e' configurato.
+ * Hidden solo se NEXT_PUBLIC_PAYPAL_ME non e' configurato.
+ *
+ * z-index 40: sopra contenuto/header (z<40), sotto il CookieBanner (z-50).
  */
 export function PaypalFab() {
   const url = paypalUrl();
