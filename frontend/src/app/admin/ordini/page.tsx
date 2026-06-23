@@ -28,6 +28,7 @@ interface Order {
   grand_total: string;
   currency: string;
   notes: string | null;
+  hand_exchange?: boolean;
   status: "PENDING" | "PAID" | "SHIPPED" | "CANCELLED";
   paid_at: string | null;
   shipped_at: string | null;
@@ -164,6 +165,11 @@ export default function AdminOrdersPage() {
                       <span className={`chip ${STATUS_CHIP[o.status]} text-[11px]`}>
                         {STATUS_LABEL[o.status]}
                       </span>
+                      {o.hand_exchange && (
+                        <span className="chip chip-lilac text-[11px]">
+                          🤝 Scambio a mano
+                        </span>
+                      )}
                       <span className="text-ink-soft text-xs">
                         #{o.id} · {fmtDateTime(o.created_at)}
                       </span>
@@ -231,7 +237,14 @@ export default function AdminOrdersPage() {
                           <dd>€ {Number(o.subtotal).toFixed(2)}</dd>
                         </div>
                         <div className="flex justify-between">
-                          <dt className="text-ink-soft">Spedizione</dt>
+                          <dt className="text-ink-soft">
+                            Spedizione
+                            {o.hand_exchange && (
+                              <span className="ml-1 text-[10px] text-lilac-deep">
+                                (scambio a mano)
+                              </span>
+                            )}
+                          </dt>
                           <dd>€ {Number(o.shipping_total).toFixed(2)}</dd>
                         </div>
                         <div className="flex justify-between font-bold text-pink-deep pt-1 border-t border-ink/10">

@@ -145,7 +145,21 @@ export interface OrderCreateInput {
   ship_country?: string;
   items: OrderItemInput[];
   notes?: string;
+  hand_exchange?: boolean;
   website?: string; // honeypot
+}
+
+/**
+ * Helper condiviso fra dialog e badge UI: il CAP rientra nelle province
+ * di Livorno (57xxx) o Pisa (56xxx) — zone in cui il venditore propone
+ * lo scambio a mano. DEVE restare allineato a backend
+ * `_is_hand_exchange_eligible` in api/orders.py.
+ */
+export function isHandExchangeEligible(postalCode: string): boolean {
+  const digits = postalCode.replace(/\D/g, "").slice(0, 5);
+  if (digits.length < 2) return false;
+  const prefix = digits.slice(0, 2);
+  return prefix === "56" || prefix === "57";
 }
 
 export interface OrderConfirmation {

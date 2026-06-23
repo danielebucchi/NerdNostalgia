@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createOrder } from "@/lib/api";
+import { createOrder, isHandExchangeEligible } from "@/lib/api";
 import { paypalUrl } from "@/lib/paypal";
 import type { Article } from "@/lib/types";
 
@@ -26,6 +26,7 @@ interface FormState {
   ship_province: string;
   ship_country: string;
   notes: string;
+  hand_exchange: boolean;
   website: string; // honeypot
 }
 
@@ -39,6 +40,7 @@ const empty: FormState = {
   ship_province: "",
   ship_country: "Italia",
   notes: "",
+  hand_exchange: false,
   website: "",
 };
 
@@ -58,7 +60,9 @@ export function PurchaseDialog({
     (acc, a) => acc + Number(a.price || 0),
     0,
   );
-  const grandTotal = subtotal + shippingTotal;
+  const capEligible = isHandExchangeEligible(state.ship_postal_code);
+  const effectiveShipping = state.hand_exchange ? 0 : shippingTotal;
+  const grandTotal = subtotal + effectiveShipping;
   const currency = articles[0]?.currency || "EUR";
 
   // Reset alla chiusura
@@ -82,11 +86,29 @@ export function PurchaseDialog({
   if (!open) return null;
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
-    setState((s) => ({ ...s, [k]: v }));
+    setState((s) => {
+      const next = { ...s, [k]: v };
+      // Se il CAP cambia e non e' piu' eligible per scambio a mano,
+      // disattivo l'opzione automaticamente per evitare submit invalido
+      if (k === "ship_postal_code" && next.hand_exchange) {
+        if (!isHandExchangeEligible(String(v))) {
+          next.hand_exchange = false;
+        }
+      }
+      return next;
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Validazione client: hand_exchange richiede CAP LI/PI
+    if (state.hand_exchange && !capEligible) {
+      setError(
+        "Lo scambio a mano è disponibile solo per CAP di Pisa (56xxx) o " +
+        "Livorno (57xxx). Cambia indirizzo o disattiva l'opzione.",
+      );
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -100,6 +122,7 @@ export function PurchaseDialog({
         ship_province: state.ship_province.trim() || undefined,
         ship_country: state.ship_country.trim() || "Italia",
         notes: state.notes.trim() || undefined,
+        hand_exchange: state.hand_exchange,
         website: state.website,
         items: articles.map((a) => ({ article_id: a.id, quantity: 1 })),
       });
@@ -172,8 +195,26 @@ export function PurchaseDialog({
               <span className="tabular-nums">€ {subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-ink-soft">Spedizione</span>
-              <span className="tabular-nums">€ {shippingTotal.toFixed(2)}</span>
+              <span className="text-ink-soft">
+                Spedizione
+                {state.hand_exchange && (
+                  <span className="ml-1 chip chip-lilac text-[10px] py-0.5">
+                    🤝 a mano
+                  </span>
+                )}
+              </span>
+              <span className="tabular-nums">
+                {state.hand_exchange ? (
+                  <>
+                    <span className="line-through text-ink-soft mr-1">
+                      € {shippingTotal.toFixed(2)}
+                    </span>
+                    <strong className="text-mint-deep">€ 0,00</strong>
+                  </>
+                ) : (
+                  `€ ${shippingTotal.toFixed(2)}`
+                )}
+              </span>
             </div>
             <div className="flex justify-between font-bold text-base text-pink-deep pt-1 border-t border-ink/10">
               <span>Totale</span>
@@ -281,6 +322,37 @@ export function PurchaseDialog({
               className="input"
             />
           </Field>
+
+          {/* Scambio a mano: visibile sempre, abilitato solo se CAP LI/PI */}
+          <div
+            className={`rounded-xl border-2 p-3 transition-colors ${
+              state.hand_exchange
+                ? "border-lilac-deep bg-lilac-deep/8"
+                : capEligible
+                  ? "border-mint-deep/40 bg-mint-deep/5"
+                  : "border-ink/10 bg-ink/3"
+            }`}
+          >
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={state.hand_exchange}
+                disabled={!capEligible}
+                onChange={(e) => set("hand_exchange", e.target.checked)}
+                className="mt-0.5 w-5 h-5 flex-shrink-0 accent-lilac-deep cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              <span className="flex-1">
+                <span className="block text-sm font-bold text-ink">
+                  🤝 Scambio a mano — niente spese di spedizione
+                </span>
+                <span className="block text-xs text-ink-soft mt-1 leading-snug">
+                  {capEligible
+                    ? `CAP ${state.ship_postal_code} compatibile (Pisa/Livorno). Concorderemo via email luogo e orario per l'incontro.`
+                    : "Disponibile solo se l'indirizzo è in provincia di Pisa (56xxx) o Livorno (57xxx)."}
+                </span>
+              </span>
+            </label>
+          </div>
 
           <Field label="Note (opzionale)">
             <textarea

@@ -197,7 +197,7 @@ Articoli
 Totali
 ------
 Subtotale:  € {float(order.subtotal):.2f}
-Spedizione: € {float(order.shipping_total):.2f}
+Spedizione: € {float(order.shipping_total):.2f}{" (SCAMBIO A MANO)" if order.hand_exchange else ""}
 TOTALE:     € {float(order.grand_total):.2f} {order.currency}
 
 {f"Note: {order.notes}" if order.notes else ""}
@@ -234,12 +234,16 @@ Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
 
   <table style="margin-top:12px;">
     <tr><td>Subtotale</td><td style="text-align:right; padding-left:24px;">€ {float(order.subtotal):.2f}</td></tr>
-    <tr><td>Spedizione</td><td style="text-align:right; padding-left:24px;">€ {float(order.shipping_total):.2f}</td></tr>
+    <tr>
+      <td>Spedizione{' <strong style="color:#7a4ca8;">(scambio a mano)</strong>' if order.hand_exchange else ''}</td>
+      <td style="text-align:right; padding-left:24px;">€ {float(order.shipping_total):.2f}</td>
+    </tr>
     <tr style="font-weight:bold; font-size:1.1em; color:#e879a8;">
       <td>TOTALE</td>
       <td style="text-align:right; padding-left:24px;">€ {float(order.grand_total):.2f} {order.currency}</td>
     </tr>
   </table>
+  {f'<p style="background:#a890d8/20; border-left:3px solid #a890d8; padding:8px 12px; margin-top:10px;">🤝 <strong>Scambio a mano</strong> richiesto dal compratore (zona Livorno/Pisa). Niente spedizione.</p>' if order.hand_exchange else ''}
 
   {f'<h3 style="color:#3d2a5c;">Note compratore</h3><pre style="white-space:pre-wrap; background:#fbf7f4; padding:12px; border-radius:8px;">{order.notes}</pre>' if order.notes else ""}
 

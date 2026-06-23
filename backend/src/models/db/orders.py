@@ -7,6 +7,7 @@ il compratore compila il form e diventa PAID solo via conferma admin.
 import enum
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -50,6 +51,8 @@ class Order(BaseModel):
     currency = Column(String(3), nullable=False, default="EUR")
 
     notes = Column(Text)
+    # Scambio a mano (LI/PI): se True, shipping_total e' 0.
+    hand_exchange = Column(Boolean, nullable=False, default=False)
     status = Column(
         PgEnum(OrderStatus, name="order_status", create_type=False),
         nullable=False,
