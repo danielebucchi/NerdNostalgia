@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArticleCard } from "@/components/ArticleCard";
 import type { Article, ArticleCondition } from "@/lib/types";
+
+// Persistenza preferenza aperto/chiuso del pannello filtri.
+// Default su primo accesso: aperto (utente nuovo vede subito le opzioni).
+const PANEL_STORAGE_KEY = "nn:catalog-filters-open:v1";
 
 /** Slug top-level di un articolo (sé stesso se categoria top, altrimenti il parent). */
 function topSlugOf(article: Article): string | null {
@@ -55,7 +59,34 @@ interface Props {
 
 export function CatalogSection({ initialArticles }: Props) {
   const [filters, setFilters] = useState<FilterState>(EMPTY);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  // Pannello filtri: aperto di default, preferenza persistita in localStorage.
+  // Vale per tutti i breakpoint (mobile + desktop): l'utente comanda.
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PANEL_STORAGE_KEY);
+      if (saved !== null) {
+        setPanelOpen(saved === "1");
+      }
+    } catch {
+      // ignore: storage non disponibile (private mode)
+    }
+    setHydrated(true);
+  }, []);
+
+  function togglePanel() {
+    setPanelOpen((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem(PANEL_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
 
   /** Match completo, eventualmente escludendo una dimensione (per i counter). */
   function matches(article: Article, exclude: Dim | null = null): boolean {
@@ -156,6 +187,16 @@ export function CatalogSection({ initialArticles }: Props) {
     filters.minPrice !== "" ||
     filters.maxPrice !== "";
 
+  // Conta dei filtri attivi (per badge sul bottone, escluso 'search'
+  // che ha il suo input visibile separatamente).
+  const activeFilterCount =
+    (filters.category !== null ? 1 : 0) +
+    (filters.subcategory !== null ? 1 : 0) +
+    (filters.condition !== null ? 1 : 0) +
+    (filters.brand !== null ? 1 : 0) +
+    (filters.minPrice !== "" ? 1 : 0) +
+    (filters.maxPrice !== "" ? 1 : 0);
+
   function update<K extends keyof FilterState>(key: K, value: FilterState[K]) {
     setFilters((f) => {
       // Cambiare categoria top-level resetta la sottocategoria
@@ -236,10 +277,12 @@ export function CatalogSection({ initialArticles }: Props) {
         priceMin={facets.priceMin}
         priceMax={facets.priceMax}
         hasAnyFilter={hasAnyFilter}
+        activeFilterCount={activeFilterCount}
         onUpdate={update}
         onReset={reset}
-        mobileOpen={mobileOpen}
-        onToggleMobile={() => setMobileOpen((v) => !v)}
+        panelOpen={panelOpen}
+        hydrated={hydrated}
+        onTogglePanel={togglePanel}
         resultsCount={filtered.length}
       />
 
@@ -285,10 +328,12 @@ interface FiltersProps {
   priceMin: number;
   priceMax: number;
   hasAnyFilter: boolean;
+  activeFilterCount: number;
   onUpdate: <K extends keyof FilterState>(key: K, value: FilterState[K]) => void;
   onReset: () => void;
-  mobileOpen: boolean;
-  onToggleMobile: () => void;
+  panelOpen: boolean;
+  hydrated: boolean;
+  onTogglePanel: () => void;
   resultsCount: number;
 }
 
@@ -309,17 +354,23 @@ function Filters({
   priceMin,
   priceMax,
   hasAnyFilter,
+  activeFilterCount,
   onUpdate,
   onReset,
-  mobileOpen,
-  onToggleMobile,
+  panelOpen,
+  hydrated,
+  onTogglePanel,
   resultsCount,
 }: FiltersProps) {
+  // Prima dell'hydration, il pannello va renderizzato per evitare flash;
+  // useremo la sua preferenza salvata appena disponibile.
+  const panelVisible = hydrated ? panelOpen : true;
+
   return (
     <div className="mb-6 sm:mb-8">
-      {/* Riga sempre visibile: search + bottone filtri mobile */}
-      <div className="flex gap-2 mb-3">
-        <div className="relative flex-1">
+      {/* Riga sempre visibile: search + bottone toggle filtri (mobile + desktop) */}
+      <div className="flex gap-2 mb-3 flex-wrap sm:flex-nowrap">
+        <div className="relative flex-1 min-w-[200px]">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft text-lg pointer-events-none">
             🔎
           </span>
@@ -333,30 +384,46 @@ function Filters({
         </div>
         <button
           type="button"
-          onClick={onToggleMobile}
-          className="btn btn-ghost text-sm sm:hidden whitespace-nowrap"
-          aria-expanded={mobileOpen}
+          onClick={onTogglePanel}
+          aria-expanded={panelVisible}
+          aria-controls="catalog-filters-panel"
+          className={
+            "btn text-sm whitespace-nowrap inline-flex items-center gap-2 " +
+            (panelVisible || activeFilterCount > 0 ? "btn-primary" : "btn-ghost")
+          }
         >
-          ⚙ Filtri
-          {hasAnyFilter && (
-            <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-pink-deep text-white text-[10px] font-bold">
-              !
+          <span aria-hidden="true">⚙</span>
+          <span>{panelVisible ? "Nascondi filtri" : "Mostra filtri"}</span>
+          {activeFilterCount > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-white/30 text-[11px] font-bold tabular-nums">
+              {activeFilterCount}
             </span>
           )}
+          <span
+            aria-hidden="true"
+            className={`transition-transform duration-200 ${
+              panelVisible ? "rotate-180" : "rotate-0"
+            }`}
+          >
+            ▾
+          </span>
         </button>
         {hasAnyFilter && (
           <button
             type="button"
             onClick={onReset}
-            className="btn btn-ghost text-sm hidden sm:inline-flex whitespace-nowrap"
+            className="btn btn-ghost text-sm whitespace-nowrap"
           >
             ✕ Azzera
           </button>
         )}
       </div>
 
-      {/* Pannello filtri: sempre visibile da sm+, collassabile su mobile */}
-      <div className={`${mobileOpen ? "block" : "hidden"} sm:block`}>
+      {/* Pannello filtri: collassabile sempre, persistito in localStorage */}
+      <div
+        id="catalog-filters-panel"
+        className={panelVisible ? "block" : "hidden"}
+      >
         <div className="card p-4 sm:p-5 space-y-4">
           {/* Categoria */}
           {Object.keys(catCounts).length > 0 && (
@@ -484,21 +551,19 @@ function Filters({
             </FilterRow>
           )}
 
-          {/* Riassunto risultati + reset mobile */}
+          {/* Riassunto risultati */}
           <div className="flex items-center justify-between pt-3 border-t border-ink/8">
             <span className="text-xs text-ink-soft">
               <strong className="text-ink">{resultsCount}</strong>{" "}
               risultat{resultsCount === 1 ? "o" : "i"}
+              {activeFilterCount > 0 && (
+                <span className="ml-2">
+                  · {activeFilterCount}{" "}
+                  filtr{activeFilterCount === 1 ? "o" : "i"} attiv
+                  {activeFilterCount === 1 ? "o" : "i"}
+                </span>
+              )}
             </span>
-            {hasAnyFilter && (
-              <button
-                type="button"
-                onClick={onReset}
-                className="btn btn-ghost text-xs sm:hidden"
-              >
-                ✕ Azzera
-              </button>
-            )}
           </div>
         </div>
       </div>
