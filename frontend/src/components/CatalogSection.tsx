@@ -408,9 +408,9 @@ function Filters({
           {activeFilterCount > 0 && (
             <span
               className={
-                "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white/30 text-[10px] font-bold tabular-nums " +
+                "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white text-ink text-[10px] font-bold tabular-nums ring-1 ring-ink/15 shadow-soft " +
                 // Su mobile il badge sta in alto a destra del quadrato; su sm+ inline
-                "absolute -top-1 -right-1 sm:static sm:bg-white/30"
+                "absolute -top-1 -right-1 sm:static sm:shadow-none"
               }
             >
               {activeFilterCount}
