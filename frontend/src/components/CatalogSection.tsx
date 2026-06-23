@@ -394,7 +394,10 @@ function Filters({
             "btn text-sm flex-shrink-0 inline-flex items-center justify-center gap-1.5 relative " +
             // Mobile: quadrato compatto; sm+: padding standard + label
             "w-11 px-0 sm:w-auto sm:px-4 " +
-            (panelVisible || activeFilterCount > 0 ? "btn-primary" : "btn-ghost")
+            // Logica colore invertita: chiuso = primary (invita ad aprire),
+            // aperto = ghost (azione neutra). Il badge col numero indica
+            // gia' se ci sono filtri attivi, niente bisogno di tinta extra.
+            (panelVisible ? "btn-ghost" : "btn-primary")
           }
         >
           {/* Su mobile il glifo cambia in base allo stato (+/−) */}
