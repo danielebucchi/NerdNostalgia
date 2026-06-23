@@ -90,10 +90,11 @@ export function BuyControls({ article }: Props) {
       </p>
       {paypalEnabled() && article.status === "PUBLISHED" && (
         <>
-          <div className="mt-3 inline-flex items-center gap-2 text-xs rounded-full bg-mint-deep/12 text-mint-deep px-3 py-1.5 font-semibold ring-1 ring-mint-deep/30">
-            <span aria-hidden="true">🤝</span>
+          <div className="mt-3 inline-flex items-center gap-2 text-xs rounded-full bg-white text-ink px-3 py-1.5 font-semibold ring-2 ring-mint-deep shadow-soft">
+            <span aria-hidden="true" className="text-base">🤝</span>
             <span>
-              Scambio a mano <strong>gratuito</strong> a Livorno/Pisa
+              Scambio a mano <strong className="text-mint-deep">gratuito</strong>{" "}
+              a Livorno/Pisa
               <span className="font-normal text-ink-soft ml-1">
                 (no spedizione)
               </span>
