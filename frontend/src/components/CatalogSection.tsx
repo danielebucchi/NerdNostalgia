@@ -368,9 +368,11 @@ function Filters({
 
   return (
     <div className="mb-6 sm:mb-8">
-      {/* Riga sempre visibile: search + bottone toggle filtri (mobile + desktop) */}
-      <div className="flex gap-2 mb-3 flex-wrap sm:flex-nowrap">
-        <div className="relative flex-1 min-w-[200px]">
+      {/* Mobile: search da sola, poi riga bottoni full-width
+          Desktop: search + bottoni in linea */}
+      <div className="mb-3 flex flex-col sm:flex-row gap-2">
+        {/* Search: full-width su mobile, flex-1 da sm+ */}
+        <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft text-lg pointer-events-none">
             🔎
           </span>
@@ -382,41 +384,47 @@ function Filters({
             className="filter-input pl-10 w-full"
           />
         </div>
-        <button
-          type="button"
-          onClick={onTogglePanel}
-          aria-expanded={panelVisible}
-          aria-controls="catalog-filters-panel"
-          className={
-            "btn text-sm whitespace-nowrap inline-flex items-center gap-2 " +
-            (panelVisible || activeFilterCount > 0 ? "btn-primary" : "btn-ghost")
-          }
-        >
-          <span aria-hidden="true">⚙</span>
-          <span>{panelVisible ? "Nascondi filtri" : "Mostra filtri"}</span>
-          {activeFilterCount > 0 && (
-            <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-white/30 text-[11px] font-bold tabular-nums">
-              {activeFilterCount}
-            </span>
-          )}
-          <span
-            aria-hidden="true"
-            className={`transition-transform duration-200 ${
-              panelVisible ? "rotate-180" : "rotate-0"
-            }`}
-          >
-            ▾
-          </span>
-        </button>
-        {hasAnyFilter && (
+
+        {/* Bottoni: full-width split su mobile, inline su desktop */}
+        <div className="flex gap-2 w-full sm:w-auto">
           <button
             type="button"
-            onClick={onReset}
-            className="btn btn-ghost text-sm whitespace-nowrap"
+            onClick={onTogglePanel}
+            aria-expanded={panelVisible}
+            aria-controls="catalog-filters-panel"
+            className={
+              "btn text-sm flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 " +
+              (panelVisible || activeFilterCount > 0 ? "btn-primary" : "btn-ghost")
+            }
           >
-            ✕ Azzera
+            <span aria-hidden="true">⚙</span>
+            <span>{panelVisible ? "Nascondi filtri" : "Mostra filtri"}</span>
+            {activeFilterCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-white/30 text-[11px] font-bold tabular-nums">
+                {activeFilterCount}
+              </span>
+            )}
+            <span
+              aria-hidden="true"
+              className={`transition-transform duration-200 ${
+                panelVisible ? "rotate-180" : "rotate-0"
+              }`}
+            >
+              ▾
+            </span>
           </button>
-        )}
+          {hasAnyFilter && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="btn btn-ghost text-sm whitespace-nowrap flex-shrink-0"
+              aria-label="Azzera filtri"
+            >
+              <span className="sm:hidden">✕</span>
+              <span className="hidden sm:inline">✕ Azzera</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Pannello filtri: collassabile sempre, persistito in localStorage */}
