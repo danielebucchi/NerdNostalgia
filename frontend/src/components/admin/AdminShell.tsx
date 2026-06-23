@@ -4,20 +4,25 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/admin/AuthProvider";
+import { paymentsEnabled } from "@/lib/features";
 
-const NAV_ITEMS = [
+const ALL_NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: "📊", exact: true },
   { href: "/admin/articles", label: "Articoli", icon: "🎮" },
   { href: "/admin/lotti", label: "Lotti (interno)", icon: "📦" },
   { href: "/admin/vendite", label: "Vendite", icon: "💰" },
   { href: "/admin/spese", label: "Spese", icon: "💰" },
-  { href: "/admin/ordini", label: "Ordini", icon: "📥" },
+  { href: "/admin/ordini", label: "Ordini", icon: "📥", requiresPayments: true },
   { href: "/admin/inquiries", label: "Richieste", icon: "✉" },
   { href: "/admin/wanted", label: "Cerco/Compro", icon: "🔍" },
   { href: "/admin/tassonomia", label: "Tassonomia", icon: "🏷" },
   { href: "/admin/import-vinted", label: "Sync Vinted", icon: "🛍" },
   { href: "/admin/markups", label: "Commissioni", icon: "💸" },
 ];
+
+const NAV_ITEMS = ALL_NAV_ITEMS.filter(
+  (item) => !item.requiresPayments || paymentsEnabled(),
+);
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();

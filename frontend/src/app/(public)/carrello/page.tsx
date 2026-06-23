@@ -5,10 +5,37 @@ import { useEffect, useState } from "react";
 import { PurchaseDialog } from "@/components/PurchaseDialog";
 import { formatPrice, getArticle } from "@/lib/api";
 import { aggregateShipping, cartSubtotal, useCart } from "@/lib/cart";
+import { paymentsEnabled } from "@/lib/features";
 import { paypalEnabled } from "@/lib/paypal";
 import type { Article } from "@/lib/types";
 
 export default function CartPage() {
+  // Feature flag: se i pagamenti sono off, /carrello mostra solo un avviso.
+  if (!paymentsEnabled()) {
+    return (
+      <article>
+        <Link href="/" className="btn btn-ghost text-sm mb-6">
+          ← Catalogo
+        </Link>
+        <div className="card p-8 text-center max-w-xl mx-auto">
+          <h1 className="display text-2xl text-ink mb-3">
+            🛒 Carrello non disponibile
+          </h1>
+          <p className="text-ink-soft mb-6">
+            Gli acquisti dal sito sono temporaneamente disabilitati. Per il
+            momento contattami direttamente per qualsiasi articolo.
+          </p>
+          <Link href="/contatti" className="btn btn-primary text-sm inline-flex">
+            Scrivimi
+          </Link>
+        </div>
+      </article>
+    );
+  }
+  return <CartContent />;
+}
+
+function CartContent() {
   const { items, remove, clear, hydrated } = useCart();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
