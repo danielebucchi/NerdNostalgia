@@ -89,11 +89,24 @@ export function BuyControls({ article }: Props) {
         · totale € {grandTotal.toFixed(2)}
       </p>
       {paypalEnabled() && article.status === "PUBLISHED" && (
-        <p className="text-[11px] text-ink-soft mt-1 leading-snug">
-          💡 Su PayPal scegli{" "}
-          <strong className="text-[#003087]">&quot;Amico o familiare&quot;</strong> per
-          evitare le commissioni.
-        </p>
+        <>
+          <div className="mt-3 inline-flex items-center gap-2 text-xs rounded-full bg-mint-deep/12 text-mint-deep px-3 py-1.5 font-semibold ring-1 ring-mint-deep/30">
+            <span aria-hidden="true">🤝</span>
+            <span>
+              Scambio a mano <strong>gratuito</strong> a Livorno/Pisa
+              <span className="font-normal text-ink-soft ml-1">
+                (no spedizione)
+              </span>
+            </span>
+          </div>
+          <p className="text-[11px] text-ink-soft mt-2 leading-snug">
+            💡 Su PayPal scegli{" "}
+            <strong className="text-[#003087]">
+              &quot;Amico o familiare&quot;
+            </strong>{" "}
+            per evitare le commissioni.
+          </p>
+        </>
       )}
 
       <PurchaseDialog

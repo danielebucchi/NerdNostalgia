@@ -61,6 +61,8 @@ class OrderCreate(BaseModel):
     # Carrello
     items: List[OrderItemIn] = Field(..., min_length=1, max_length=20)
     notes: Optional[str] = Field(None, max_length=2000)
+    # Scambio a mano (LI/PI): salta la spedizione
+    hand_exchange: bool = False
     # Honeypot anti-bot: deve restare vuoto
     website: Optional[str] = Field(None, max_length=200)
 
@@ -90,6 +92,7 @@ class OrderResponse(BaseModel):
     grand_total: Decimal
     currency: str
     notes: Optional[str]
+    hand_exchange: bool = False
     status: OrderStatus
     paid_at: Optional[datetime]
     shipped_at: Optional[datetime]
@@ -117,6 +120,22 @@ def _calc_shipping(articles: list[Article]) -> Decimal:
     nel pacco. Senza shipping_price → 5€ default."""
     ships = [a.shipping_price or DEFAULT_SHIPPING for a in articles]
     return max(ships) if ships else DEFAULT_SHIPPING
+
+
+# CAP italiani per scambio a mano:
+#   56xxx → provincia di Pisa
+#   57xxx → provincia di Livorno
+HAND_EXCHANGE_CAP_PREFIXES = ("56", "57")
+
+
+def _is_hand_exchange_eligible(postal_code: str) -> bool:
+    """True se il CAP rientra nelle province LI/PI dove il venditore
+    propone lo scambio a mano. Tolleriamo spazi e lettere extra,
+    teniamo le prime 2 cifre numeriche."""
+    digits = "".join(ch for ch in postal_code if ch.isdigit())[:5]
+    if len(digits) < 2:
+        return False
+    return digits[:2] in HAND_EXCHANGE_CAP_PREFIXES
 
 
 # ─────────────────── Public endpoint: crea ordine ───────────────────
@@ -178,7 +197,22 @@ def create_order(
             quantity=it.quantity,
         ))
 
-    shipping_total = _calc_shipping(articles)
+    # Spedizione: 0 se scambio a mano in LI/PI, altrimenti regola normale.
+    # Validazione: se hand_exchange ma il CAP non e' LI/PI, rifiuta perche'
+    # l'utente sta cercando di evitare le spese senza diritto.
+    hand_exchange = bool(payload.hand_exchange)
+    if hand_exchange:
+        if not _is_hand_exchange_eligible(payload.ship_postal_code):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Scambio a mano disponibile solo per CAP di Pisa (56xxx) "
+                    "o Livorno (57xxx). Togli la spunta o cambia indirizzo."
+                ),
+            )
+        shipping_total = Decimal("0")
+    else:
+        shipping_total = _calc_shipping(articles)
     grand_total = subtotal + shipping_total
 
     # IP per audit/rate-limit info
@@ -198,6 +232,7 @@ def create_order(
         grand_total=grand_total,
         currency="EUR",
         notes=(payload.notes or "").strip() or None,
+        hand_exchange=hand_exchange,
         status=OrderStatus.PENDING,
         ip_address=ip,
         items=items_to_insert,

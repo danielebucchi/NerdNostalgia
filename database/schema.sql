@@ -163,6 +163,9 @@ CREATE TABLE IF NOT EXISTS orders (
     grand_total NUMERIC(10,2) NOT NULL,
     currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
     notes TEXT,
+    -- Scambio a mano: compratore residente in LI/PI, niente spedizione.
+    -- Validato lato API che il CAP cominci con 56 (Pisa) o 57 (Livorno).
+    hand_exchange BOOLEAN NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
         CHECK (status IN ('PENDING','PAID','SHIPPED','CANCELLED')),
     paid_at TIMESTAMP,
