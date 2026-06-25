@@ -36,11 +36,29 @@ def applied_versions(conn: sqlite3.Connection) -> set[str]:
     return {row[0] for row in cur.fetchall()}
 
 
+# Errori SQLite che indicano "lo schema è già a posto": la migrazione è in
+# realtà un no-op (es. schema.sql contiene già la modifica). Li trattiamo
+# come applicate-con-successo per evitare crash loop su DB freschi creati
+# da uno schema.sql aggiornato.
+_IDEMPOTENT_ERRORS = (
+    "duplicate column",
+    "already exists",
+)
+
+
 def apply_migration(conn: sqlite3.Connection, path: Path) -> None:
     version = path.stem  # nome senza .sql
     sql = path.read_text()
     print(f"  → applico {version}", flush=True)
-    conn.executescript(sql)
+    try:
+        conn.executescript(sql)
+    except sqlite3.OperationalError as exc:
+        msg = str(exc).lower()
+        if any(token in msg for token in _IDEMPOTENT_ERRORS):
+            print(f"    ⚠  no-op: {exc} (segno come applicata)", flush=True)
+            conn.rollback()
+        else:
+            raise
     conn.execute("INSERT INTO schema_migrations(version) VALUES (?)", (version,))
     conn.commit()
 
