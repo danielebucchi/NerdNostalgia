@@ -101,14 +101,30 @@ def serialize_items(items) -> list[dict]:
     return out
 
 
-def push(api_url: str, token: str, items: list[dict], timeout: int = 120) -> dict:
-    LOGGER.info("Push di %d items a %s/api/vinted/import", len(items), api_url)
-    r = requests.post(
-        f"{api_url}/api/vinted/import",
-        json={"items": items, "triggered_by": "remote"},
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=timeout,
-    )
+def push(api_url: str, token: str, items: list[dict]) -> dict | None:
+    """Pusha gli items al server. Timeout volutamente alto: l'import lato
+    server scarica le foto da Vinted CDN per ogni item, e per 100+ items
+    può durare 10-20 minuti. Se il client va in timeout comunque, il
+    server è quasi sempre arrivato in fondo (la sync è idempotente: un
+    re-run skippa gli items già importati). Ritorna None su timeout.
+    """
+    LOGGER.info("Push di %d items a %s/api/vinted/import (timeout 30m)", len(items), api_url)
+    try:
+        # (connect, read) — read alto perché l'import è sincrono server-side
+        r = requests.post(
+            f"{api_url}/api/vinted/import",
+            json={"items": items, "triggered_by": "remote"},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=(30, 1800),
+        )
+    except requests.exceptions.ReadTimeout:
+        LOGGER.warning(
+            "Read timeout dal server (>30m). Il backend molto probabilmente "
+            "sta ancora processando o ha già finito. La sync è idempotente: "
+            "il prossimo run skippa gli items già importati."
+        )
+        return None
+
     if r.status_code >= 300:
         LOGGER.error("Import fallito: HTTP %s — %s", r.status_code, r.text[:300])
         sys.exit(3)
@@ -138,6 +154,11 @@ def main() -> int:
         return 0
 
     log = push(api_url, token, payload)
+    if log is None:
+        # Timeout: il server molto probabilmente ha finito comunque (vedi
+        # `GET /api/vinted/logs` per confermare). Exit 0 perché la sync
+        # è idempotente e il prossimo run riconcilia eventuali residui.
+        return 0
     LOGGER.info(
         "Server response: fetched=%s imported=%s updated=%s skipped=%s error=%s",
         log.get("items_fetched"),
