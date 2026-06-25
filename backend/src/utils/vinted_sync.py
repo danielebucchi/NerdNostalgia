@@ -21,7 +21,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 from PIL import Image, ImageOps
 from sqlalchemy.orm import Session
@@ -406,16 +406,22 @@ def _apply_item_to_article(
     return article, "created"
 
 
-def run_sync(db: Session, triggered_by: str = "cron") -> VintedSyncLog:
-    """Esegue la sync e ritorna il log scritto su DB.
+def persist_items(
+    db: Session,
+    items: "Iterable[VintedItem]",
+    triggered_by: str = "cron",
+    update_last_run: bool = True,
+) -> VintedSyncLog:
+    """Pipeline di sola persistenza: prende un iterable di VintedItem già
+    fetchati (da dove vuole il chiamante: server-side Playwright, client
+    remoto via POST /api/vinted/import, fixture di test, ecc.) e li
+    riversa nel DB applicando filtri, auto-detect categoria e upsert.
 
-    La sync fa SOLO insert/update. NON cancella articoli che spariscono
-    da Vinted (potrebbe esserci uno scroll parziale e cancelleremmo
-    erroneamente articoli ancora online). Per rimuovere un articolo
-    venduto, usa /admin/articles e cambia lo status a SOLD o eliminalo
-    manualmente.
+    Scrive un record in vinted_sync_logs e lo restituisce.
+
+    triggered_by: "cron" | "manual" | "remote" | qualsiasi tag custom.
+    update_last_run: se True aggiorna settings.last_run_at al termine.
     """
-    settings = db.query(VintedSettings).order_by(VintedSettings.id.asc()).first()
     log = VintedSyncLog(
         started_at=datetime.now(_dt.UTC),
         triggered_by=triggered_by,
@@ -424,28 +430,21 @@ def run_sync(db: Session, triggered_by: str = "cron") -> VintedSyncLog:
     db.commit()
     db.refresh(log)
 
-    if settings is None or not settings.enabled:
-        log.finished_at = datetime.now(_dt.UTC)
-        log.error_message = "Sync Vinted disabilitata o non configurata"
-        db.commit()
-        return log
-
-    user_id = _admin_user_id(db)
-
     fetched = 0
     imported = 0
     updated = 0
     skipped = 0
 
     try:
-        for item in fetch_user_items(settings.vinted_user_id):
+        owner_user_id = _admin_user_id(db)
+        for item in items:
             fetched += 1
             if not _item_passes_filter(item):
                 skipped += 1
                 continue
             try:
-                _, op = _apply_item_to_article(db, item, user_id)
-            except Exception as exc:  # noqa: BLE001
+                _, op = _apply_item_to_article(db, item, owner_user_id)
+            except Exception:  # noqa: BLE001
                 LOGGER.exception("Errore importando item %s", item.item_id)
                 skipped += 1
                 continue
@@ -456,14 +455,14 @@ def run_sync(db: Session, triggered_by: str = "cron") -> VintedSyncLog:
             else:
                 skipped += 1
 
-        settings.last_run_at = datetime.now(_dt.UTC)
-        db.commit()
-    except VintedClientError as exc:
-        log.error_message = f"Client Vinted: {exc}"
-        LOGGER.error("Vinted sync fallita: %s", exc)
+        if update_last_run:
+            settings = db.query(VintedSettings).order_by(VintedSettings.id.asc()).first()
+            if settings is not None:
+                settings.last_run_at = datetime.now(_dt.UTC)
+                db.commit()
     except Exception as exc:  # noqa: BLE001
         log.error_message = f"Errore inatteso: {exc}"
-        LOGGER.exception("Vinted sync inattesa")
+        LOGGER.exception("persist_items inattesa")
     finally:
         log.finished_at = datetime.now(_dt.UTC)
         log.items_fetched = fetched
@@ -474,3 +473,46 @@ def run_sync(db: Session, triggered_by: str = "cron") -> VintedSyncLog:
         db.refresh(log)
 
     return log
+
+
+def run_sync(db: Session, triggered_by: str = "cron") -> VintedSyncLog:
+    """Esegue la sync server-side (Playwright headless) e ritorna il log.
+
+    Wrapper: fa il fetch via vinted_client + delega la persistenza a
+    persist_items(). Se sei su un IP datacenter dove Cloudflare blocca
+    Playwright, vedi `scripts/sync_from_local.py` e l'endpoint
+    POST /api/vinted/import per la pipeline "fetch da Mac → push al server".
+
+    La sync fa SOLO insert/update. NON cancella articoli che spariscono
+    da Vinted (scroll parziale → cancellazioni accidentali). Per rimuovere
+    un articolo venduto: /admin/articles → status SOLD.
+    """
+    settings = db.query(VintedSettings).order_by(VintedSettings.id.asc()).first()
+    if settings is None or not settings.enabled:
+        log = VintedSyncLog(
+            started_at=datetime.now(_dt.UTC),
+            finished_at=datetime.now(_dt.UTC),
+            triggered_by=triggered_by,
+            error_message="Sync Vinted disabilitata o non configurata",
+        )
+        db.add(log)
+        db.commit()
+        db.refresh(log)
+        return log
+
+    try:
+        items_iter = list(fetch_user_items(settings.vinted_user_id))
+    except VintedClientError as exc:
+        log = VintedSyncLog(
+            started_at=datetime.now(_dt.UTC),
+            finished_at=datetime.now(_dt.UTC),
+            triggered_by=triggered_by,
+            error_message=f"Client Vinted: {exc}",
+        )
+        db.add(log)
+        db.commit()
+        db.refresh(log)
+        LOGGER.error("Vinted sync fallita: %s", exc)
+        return log
+
+    return persist_items(db, items_iter, triggered_by=triggered_by)

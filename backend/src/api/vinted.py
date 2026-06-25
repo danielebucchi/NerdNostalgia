@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 from helpers.auth import require_admin
 from models.db import User, VintedSettings, VintedSyncLog
 from utils.session import get_db
-from utils.vinted_sync import run_sync
+from utils.vinted_client import VintedItem
+from utils.vinted_sync import persist_items, run_sync
 
 router = APIRouter(prefix="/api/vinted", tags=["vinted"])
 
@@ -47,6 +48,26 @@ class VintedSyncLogResponse(BaseModel):
     items_updated: int
     items_skipped: int
     error_message: Optional[str]
+
+
+class VintedItemPayload(BaseModel):
+    """Singolo item nel body di POST /api/vinted/import. Specchio
+    minimale di utils.vinted_client.VintedItem (escluso `raw`)."""
+    item_id: int = Field(..., ge=1)
+    title: str
+    description: Optional[str] = None
+    price: Optional[float] = None
+    currency: str = "EUR"
+    url: str
+    photos: List[str] = Field(default_factory=list)
+    catalog_id: Optional[int] = None
+    catalog_branch_title: Optional[str] = None
+    status: Optional[str] = None
+
+
+class VintedImportRequest(BaseModel):
+    items: List[VintedItemPayload]
+    triggered_by: str = Field(default="remote", max_length=20)
 
 
 # ----------------------------- Settings -----------------------------
@@ -102,6 +123,49 @@ def trigger_sync(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    """Trigger sync manuale (sincrono — l'admin vede l'esito immediato)."""
+    """Trigger sync manuale (sincrono — l'admin vede l'esito immediato).
+
+    Esegue il fetch via Playwright sul server. Se il server è su un IP
+    datacenter dove Cloudflare blocca lo headless browser, vedi invece
+    `POST /api/vinted/import` + lo script `backend/scripts/sync_from_local.py`
+    che fa il fetch dal Mac (IP residenziale) e poi pusha qui.
+    """
     log = run_sync(db, triggered_by="manual")
+    return log
+
+
+@router.post("/import", response_model=VintedSyncLogResponse)
+def import_items(
+    payload: VintedImportRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Import di items già fetchati altrove (es. dal Mac dell'admin, IP
+    residenziale, dove Cloudflare non blocca Playwright).
+
+    Body atteso:
+        {
+          "items": [ {item_id, title, price, photos: [...], ...}, ... ],
+          "triggered_by": "remote"   # opzionale, tag per i logs
+        }
+
+    Le foto vengono scaricate dal CDN Vinted lato server (no CF su CDN).
+    """
+    items = [
+        VintedItem(
+            item_id=p.item_id,
+            title=p.title,
+            description=p.description,
+            price=p.price,
+            currency=p.currency,
+            url=p.url,
+            photos=p.photos,
+            catalog_id=p.catalog_id,
+            catalog_branch_title=p.catalog_branch_title,
+            status=p.status,
+            raw={},  # non trasportato dal client per ridurre payload
+        )
+        for p in payload.items
+    ]
+    log = persist_items(db, items, triggered_by=payload.triggered_by)
     return log
