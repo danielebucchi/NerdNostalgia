@@ -24,10 +24,10 @@ export function PaypalFab() {
       rel="noopener noreferrer"
       aria-label="Donazione tramite PayPal"
       title="Donazione tramite PayPal (scegli 'A un amico o familiare' per evitare commissioni)"
-      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 btn btn-paypal shadow-hover px-5 py-3.5 text-sm font-bold inline-flex items-center gap-2 hover:scale-105 active:scale-100 transition-transform"
+      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 btn btn-paypal shadow-hover text-sm font-bold inline-flex items-center justify-center hover:scale-105 active:scale-100 transition-transform w-12 h-12 p-0 sm:w-auto sm:h-auto sm:px-5 sm:py-3.5 sm:gap-2"
     >
-      <span aria-hidden="true" className="text-lg">❤</span>
-      <span>Donazione</span>
+      <span aria-hidden="true" className="inline-flex items-center justify-center w-5 h-5 text-xl leading-none">❤</span>
+      <span className="hidden sm:inline">Donazione</span>
     </a>
   );
 }
