@@ -145,7 +145,7 @@ export default function AdminDashboardPage() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
         <Stat label="Pubblicati" value={stats?.articlesPublished} href="/admin/articles?status=PUBLISHED" tone="mint" icon="🎮" />
         <Stat label="Bozze" value={stats?.articlesDraft} href="/admin/articles?status=DRAFT" tone="lilac" icon="📝" />
-        <Stat label="Richieste nuove" value={stats?.inquiriesNew} hint={stats ? `su ${stats.inquiriesTotal}` : ""} href="/admin/inquiries?status=NEW" tone="pink" icon="✉️" />
+        <Stat label="Richieste nuove" value={stats?.inquiriesNew} hint={stats ? `su ${stats.inquiriesTotal}` : ""} href="/admin/inquiries?status=NEW" tone="pink" icon="💬" />
         <Stat label="Wanted attivi" value={stats?.wantedActive} href="/admin/wanted" tone="sky" icon="🔍" />
       </div>
 
