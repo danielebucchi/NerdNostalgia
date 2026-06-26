@@ -13,7 +13,7 @@ const ALL_NAV_ITEMS = [
   { href: "/admin/vendite", label: "Vendite", icon: "💰" },
   { href: "/admin/spese", label: "Spese", icon: "💰" },
   { href: "/admin/ordini", label: "Ordini", icon: "📥", requiresPayments: true },
-  { href: "/admin/inquiries", label: "Richieste", icon: "✉" },
+  { href: "/admin/inquiries", label: "Richieste", icon: "✉️" },
   { href: "/admin/wanted", label: "Cerco/Compro", icon: "🔍" },
   { href: "/admin/tassonomia", label: "Tassonomia", icon: "🏷" },
   { href: "/admin/import-vinted", label: "Sync Vinted", icon: "🛍" },
