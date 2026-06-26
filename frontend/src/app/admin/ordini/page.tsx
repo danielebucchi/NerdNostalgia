@@ -201,7 +201,7 @@ export default function AdminOrdersPage() {
                         className="inline-flex items-center gap-1 text-[11px] font-semibold rounded-full bg-lilac-deep/15 text-lilac-deep px-2.5 py-1 hover:bg-lilac-deep hover:text-white transition-colors"
                         aria-label="Invia email al compratore"
                       >
-                        ✉ Email
+                        ✉️ Email
                       </a>
                       {o.buyer_phone && (
                         <a
