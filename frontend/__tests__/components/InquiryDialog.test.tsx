@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // Mock del modulo api: lo dichiariamo PRIMA di importare il componente
@@ -91,13 +91,15 @@ describe("InquiryDialog", () => {
 
   it("invia il valore del honeypot se compilato (bot)", async () => {
     const user = userEvent.setup();
-    render(<InquiryDialog open={true} onClose={() => {}} />);
+    const { container } = render(<InquiryDialog open={true} onClose={() => {}} />);
 
-    // Honeypot e' un input nascosto offscreen, raggiungibile via name e' meno facile,
-    // ma `getByLabelText` con testo del label invisibile funziona perche' RTL legge
-    // i label associati (anche se hidden via CSS).
-    const honeypot = screen.getByLabelText(/Sito web/i);
-    await user.type(honeypot, "https://spam.example");
+    // L'honeypot e' un input senza label (display:none, aria-hidden, name
+    // opaco) per non innescare password manager. Lo selezioniamo via name e
+    // usiamo fireEvent.change perche' userEvent.type rifiuta elementi non
+    // visibili.
+    const honeypot = container.querySelector<HTMLInputElement>('input[name="hp_f8a3"]');
+    expect(honeypot).not.toBeNull();
+    fireEvent.change(honeypot!, { target: { value: "https://spam.example" } });
 
     await user.type(screen.getByLabelText(/Nome/i), "Bot");
     await user.type(screen.getByLabelText(/^Email/i), "bot@b.it");
