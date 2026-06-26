@@ -18,11 +18,10 @@ export function WhatsappFab() {
       rel="noopener noreferrer"
       aria-label="Entra nel gruppo WhatsApp NerdNostalgia"
       title="Entra nel gruppo WhatsApp NerdNostalgia"
-      className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-40 btn btn-whatsapp shadow-hover text-sm font-bold inline-flex items-center justify-center hover:scale-105 active:scale-100 transition-transform w-12 h-12 p-0 sm:w-auto sm:h-auto sm:px-5 sm:py-3.5 sm:gap-2"
+      className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-40 btn btn-whatsapp shadow-hover inline-flex items-center justify-center hover:scale-105 active:scale-100 transition-transform w-12 h-12 p-0"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/whatsapp.png" alt="" className="w-5 h-5 object-contain" />
-      <span className="hidden sm:inline">Gruppo</span>
+      <img src="/whatsapp.png" alt="" className="w-8 h-8 object-contain" />
     </a>
   );
 }
