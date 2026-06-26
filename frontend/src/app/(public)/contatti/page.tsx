@@ -19,7 +19,7 @@ export default function ContattiPage() {
         </p>
         <div className="mt-6">
           <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
-            Apri il form 💬
+            Apri il form
           </button>
         </div>
       </div>
