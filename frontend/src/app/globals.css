@@ -190,6 +190,19 @@ h2.display {
 .btn-paypal:active {
   transform: translateY(1px);
 }
+.btn-whatsapp {
+  background: #25D366;
+  color: white;
+  box-shadow: 0 14px 30px -10px rgba(37, 211, 102, 0.55);
+}
+.btn-whatsapp:hover {
+  background: #1eb957;
+  transform: translateY(-1px);
+  box-shadow: 0 22px 44px -14px rgba(37, 211, 102, 0.7);
+}
+.btn-whatsapp:active {
+  transform: translateY(1px);
+}
 
 /* ──────────── CARDS ──────────── */
 
