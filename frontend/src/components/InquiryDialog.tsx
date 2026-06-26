@@ -128,22 +128,20 @@ export function InquiryDialog({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
-            {/* Honeypot: nascosto visivamente E ai tab. Solo i bot lo vedono. */}
-            <div
+            {/* Honeypot: nascosto a utenti, screen-reader e tab. Niente label
+                ("Sito web", "URL" etc. attiva i password manager). Niente name
+                semantico. display:none è più rispettato di off-screen dagli
+                autofill aggressivi (1Password, Bitwarden, Chrome). */}
+            <input
+              type="text"
+              name="hp_f8a3"
+              tabIndex={-1}
+              autoComplete="new-password"
               aria-hidden="true"
-              style={{ position: "absolute", left: "-10000px", top: "auto", width: 1, height: 1, overflow: "hidden" }}
-            >
-              <label>
-                Sito web (lascia vuoto)
-                <input
-                  type="text"
-                  tabIndex={-1}
-                  autoComplete="off"
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                />
-              </label>
-            </div>
+              style={{ display: "none" }}
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
 
             <Field label="Nome" required>
               <input
