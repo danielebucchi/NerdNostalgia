@@ -7,7 +7,7 @@ La gestione del Lot e dei suoi metadati comuni sta in api/lots.py.
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from helpers.auth import require_admin
@@ -24,6 +24,8 @@ from models.db import (
 )
 from models.entities.category import CategoryResponse
 from models.entities.inventory import (
+    InventoryImageAdd,
+    InventoryImageReorder,
     InventoryItemCreate,
     InventoryItemResponse,
     InventoryItemUpdate,
@@ -32,6 +34,11 @@ from models.entities.inventory import (
     StatusUpdateRequest,
 )
 from utils.session import get_db
+from utils.storage import (
+    UploadValidationError,
+    delete_file_for_url,
+    save_inventory_image,
+)
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
@@ -294,4 +301,102 @@ def unpublish_from_site(
         item.status = InventoryItemStatus.DRAFT
     db.commit()
     db.refresh(item)
+    return _to_response(item)
+
+
+# ---- Immagini ---------------------------------------------------------------
+# Le foto salvate su un inventory_item vengono copiate sull'Article al
+# publish_to_site (vedi sopra), quindi qui basta gestire upload/rimozione/
+# riordino. Il pattern e' allineato a quello di api/articles.py.
+
+MAX_INVENTORY_IMAGES = 12
+
+
+@router.post("/{item_id}/upload-image", response_model=InventoryItemResponse)
+def upload_inventory_image(
+    item_id: int,
+    file: UploadFile = File(...),
+    helper: InventoryHelper = Depends(get_inventory_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Carica un file immagine e lo appende all'array images dell'item.
+    Genera automaticamente webp large + thumb (vedi utils/storage)."""
+    item = helper.get(item_id)
+    if not item:
+        raise HTTPException(404, f"Lot item {item_id} non trovato")
+
+    if len(item.images or []) >= MAX_INVENTORY_IMAGES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Massimo {MAX_INVENTORY_IMAGES} immagini per articolo",
+        )
+
+    try:
+        url, _ = save_inventory_image(
+            item_id=item_id,
+            file_obj=file.file,
+            content_type=file.content_type or "",
+        )
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    helper.add_image(item, url)
+    return _to_response(item)
+
+
+@router.post("/{item_id}/images", response_model=InventoryItemResponse)
+def add_inventory_image(
+    item_id: int,
+    payload: InventoryImageAdd,
+    helper: InventoryHelper = Depends(get_inventory_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Aggiunge un URL immagine esterno (es. import da altra fonte)."""
+    item = helper.get(item_id)
+    if not item:
+        raise HTTPException(404, f"Lot item {item_id} non trovato")
+    helper.add_image(item, payload.url)
+    return _to_response(item)
+
+
+@router.delete("/{item_id}/images", response_model=InventoryItemResponse)
+def remove_inventory_image(
+    item_id: int,
+    url: str = Query(..., description="URL dell'immagine da rimuovere"),
+    helper: InventoryHelper = Depends(get_inventory_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Rimuove un'immagine. Se e' interna, cancella anche il file su disco.
+    Non tocca l'Article gia' pubblicato: quelle foto restano indipendenti
+    dopo il publish."""
+    item = helper.get(item_id)
+    if not item:
+        raise HTTPException(404, f"Lot item {item_id} non trovato")
+    helper.remove_image(item, url)
+    delete_file_for_url(url)
+    return _to_response(item)
+
+
+@router.put("/{item_id}/images", response_model=InventoryItemResponse)
+def reorder_inventory_images(
+    item_id: int,
+    payload: InventoryImageReorder,
+    helper: InventoryHelper = Depends(get_inventory_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Riordina le immagini. Accetta SOLO una permutazione della lista attuale
+    (no add/remove)."""
+    item = helper.get(item_id)
+    if not item:
+        raise HTTPException(404, f"Lot item {item_id} non trovato")
+    try:
+        helper.set_images(item, payload.images)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     return _to_response(item)

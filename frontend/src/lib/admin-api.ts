@@ -86,5 +86,6 @@ export const adminApi = {
   postLogin: <T>(path: string, data: Record<string, string>) =>
     request<T>("POST", path, { formUrlEncoded: data, auth: false }),
   patch: <T>(path: string, json: unknown) => request<T>("PATCH", path, { json }),
+  put: <T>(path: string, json: unknown) => request<T>("PUT", path, { json }),
   delete: <T>(path: string) => request<T>("DELETE", path),
 };
