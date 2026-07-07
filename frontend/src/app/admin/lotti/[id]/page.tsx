@@ -67,6 +67,7 @@ export default function AdminLotDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [photosOpen, setPhotosOpen] = useState<number | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -195,6 +196,24 @@ export default function AdminLotDetailPage() {
     }
   }
 
+  async function handleDuplicateLot() {
+    if (!lot) return;
+    const copyItems = items.length > 0
+      ? confirm(`Duplicare "${lot.title || lot.code}" copiando anche i ${items.length} item come template?\n\nOK = con item · Annulla = solo anagrafica`)
+      : false;
+    setBusy(true);
+    try {
+      const dup = await adminApi.post<Lot>(
+        `/api/lots/${lotId}/duplicate`,
+        { copy_items: copyItems, title_prefix: "Copia di " },
+      );
+      router.push(`/admin/lotti/${dup.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
   async function handleDeleteLot() {
     if (!lot) return;
     if (items.length > 0) {
@@ -247,15 +266,26 @@ export default function AdminLotDetailPage() {
           </div>
           <h1 className="display text-3xl text-ink">{lot.title || "(senza nome)"}</h1>
         </div>
-        <button
-          type="button"
-          onClick={handleDeleteLot}
-          disabled={busy || items.length > 0}
-          className="btn btn-ghost text-xs"
-          title={items.length > 0 ? "Lotto non vuoto" : "Elimina lotto"}
-        >
-          🗑 Elimina lotto
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleDuplicateLot}
+            disabled={busy}
+            className="btn btn-ghost text-xs"
+            title="Duplica anagrafica (± item) come template per un nuovo lotto"
+          >
+            📋 Duplica
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteLot}
+            disabled={busy || items.length > 0}
+            className="btn btn-ghost text-xs"
+            title={items.length > 0 ? "Lotto non vuoto" : "Elimina lotto"}
+          >
+            🗑 Elimina lotto
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -280,7 +310,17 @@ export default function AdminLotDetailPage() {
       <DistributeBox busy={busy} onDistribute={handleDistribute} suggested={lot.total_cost} />
 
       <form onSubmit={handleAddItem} className="card p-4 mb-4">
-        <h2 className="display text-base text-ink mb-3">+ Aggiungi item al lotto</h2>
+        <div className="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
+          <h2 className="display text-base text-ink">+ Aggiungi item al lotto</h2>
+          <button
+            type="button"
+            onClick={() => setBulkOpen(true)}
+            className="btn btn-ghost text-xs"
+            title="Incolla righe tab-separated per creare tanti item in un colpo"
+          >
+            📥 Importa da incolla
+          </button>
+        </div>
         <div className="grid sm:grid-cols-6 gap-2">
           <input name="title" placeholder="Oggetto *" required className="input col-span-2" />
           <select name="category_id" className="input col-span-2">
@@ -384,6 +424,18 @@ export default function AdminLotDetailPage() {
         <code>/admin/articles</code>.
       </p>
 
+      {bulkOpen && (
+        <BulkImportItemsDialog
+          lotId={lotId}
+          categories={categories}
+          onClose={() => setBulkOpen(false)}
+          onDone={() => {
+            setBulkOpen(false);
+            reload();
+          }}
+        />
+      )}
+
       {photosOpen !== null && (() => {
         const target = items.find((i) => i.id === photosOpen);
         if (!target) return null;
@@ -447,6 +499,286 @@ function PhotosDialog({
           images={item.images ?? []}
           onChange={onImagesChange}
         />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bulk import item da testo incollato
+//
+// Formato accettato: righe tab-separated (compatibile copia-incolla da
+// Excel/Sheets) o CSV con virgola/punto-e-virgola. Colonne (in ordine):
+//   titolo | categoria | costo | listino | qty | collezione | numero | note
+// Solo titolo e' obbligatorio. Header opzionale nella prima riga: se contiene
+// una parola tra "titolo/oggetto/nome" allora e' un header e viene saltato.
+// La categoria viene matchata per nome (case-insensitive) contro l'elenco
+// categorie del sistema; se non matcha viene lasciata a null.
+// ---------------------------------------------------------------------------
+
+interface ParsedRow {
+  title: string;
+  category_id: number | null;
+  category_hint: string | null;  // per feedback: nome grezzo se non ha matchato
+  cost: number | null;
+  list_price: number | null;
+  quantity: number;
+  card_collection: string | null;
+  card_number: string | null;
+  notes: string | null;
+}
+
+function parseBulkText(raw: string, categories: Category[]): ParsedRow[] {
+  const lines = raw
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  if (lines.length === 0) return [];
+
+  // Rileva delimitatore dominante nella prima riga: tab vince (copia-incolla
+  // da Excel), poi punto-e-virgola (locale IT), poi virgola.
+  const first = lines[0];
+  const delimiter = first.includes("\t")
+    ? "\t"
+    : first.includes(";")
+      ? ";"
+      : ",";
+
+  // Skip header se la prima riga contiene ovviamente label
+  const header = first.toLowerCase();
+  const headerWords = ["titolo", "oggetto", "nome", "title", "name"];
+  const startIndex = headerWords.some((w) => header.includes(w)) ? 1 : 0;
+
+  const byName = new Map<string, number>();
+  for (const c of categories) {
+    byName.set(c.name.trim().toLowerCase(), c.id);
+  }
+
+  const num = (s: string): number | null => {
+    const t = s.trim().replace(",", ".");
+    if (t === "") return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const out: ParsedRow[] = [];
+  for (let i = startIndex; i < lines.length; i++) {
+    const cells = lines[i].split(delimiter).map((c) => c.trim());
+    const title = cells[0] || "";
+    if (!title) continue;
+    const catName = cells[1] || "";
+    const matched = catName ? byName.get(catName.toLowerCase()) ?? null : null;
+    out.push({
+      title,
+      category_id: matched,
+      category_hint: catName && !matched ? catName : null,
+      cost: cells[2] ? num(cells[2]) : null,
+      list_price: cells[3] ? num(cells[3]) : null,
+      quantity: cells[4] ? Math.max(1, Math.floor(num(cells[4]) ?? 1)) : 1,
+      card_collection: cells[5] || null,
+      card_number: cells[6] || null,
+      notes: cells[7] || null,
+    });
+  }
+  return out;
+}
+
+function BulkImportItemsDialog({
+  lotId,
+  categories,
+  onClose,
+  onDone,
+}: {
+  lotId: number;
+  categories: Category[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [text, setText] = useState("");
+  const parsed = useMemo(() => parseBulkText(text, categories), [text, categories]);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const unmatchedCats = useMemo(
+    () => Array.from(new Set(parsed.map((r) => r.category_hint).filter(Boolean) as string[])),
+    [parsed],
+  );
+
+  async function handleImport() {
+    if (parsed.length === 0) return;
+    setBusy(true);
+    setError(null);
+    setProgress({ done: 0, total: parsed.length });
+    let done = 0;
+    try {
+      // Serializzato per prevedibilita' su errori e per non stressare
+      // il rate limiter. Con ~50 item = ~2s, accettabile.
+      for (const row of parsed) {
+        await adminApi.post("/api/inventory/", {
+          lot_id: lotId,
+          title: row.title,
+          category_id: row.category_id,
+          cost: row.cost,
+          list_price: row.list_price,
+          quantity: row.quantity,
+          card_collection: row.card_collection,
+          card_number: row.card_number,
+          notes: row.notes,
+        });
+        done += 1;
+        setProgress({ done, total: parsed.length });
+      }
+      onDone();
+    } catch (err) {
+      setError(
+        `${err instanceof Error ? err.message : String(err)}\n` +
+          `Creati ${done} di ${parsed.length} — i restanti non sono stati importati. ` +
+          `Ricontrolla il testo e ritenta con le sole righe mancanti.`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm"
+      onClick={busy ? undefined : onClose}
+    >
+      <div
+        className="card w-full max-w-4xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 className="display text-xl text-ink">📥 Importa item da testo</h2>
+            <p className="text-xs text-ink-soft mt-0.5">
+              Incolla righe tab-separated (o CSV). Solo il titolo è obbligatorio.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="w-8 h-8 rounded-full border-2 border-ink flex items-center justify-center text-ink hover:bg-pink shrink-0 disabled:opacity-40"
+            aria-label="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+
+        <details className="mb-3">
+          <summary className="text-xs font-bold text-ink-soft cursor-pointer hover:text-ink">
+            📖 Formato colonne (in ordine)
+          </summary>
+          <div className="mt-2 p-2 rounded bg-ink/5 text-xs text-ink-soft font-mono leading-relaxed">
+            titolo{"\t"}categoria{"\t"}costo{"\t"}listino{"\t"}qty{"\t"}collezione{"\t"}numero{"\t"}note
+          </div>
+          <p className="text-xs text-ink-soft mt-1.5 leading-relaxed">
+            <strong>Delimitatori</strong>: tab (default), oppure{" "}
+            <code>;</code> o <code>,</code>. <strong>Header</strong>: opzionale
+            (viene saltata se contiene parole tipo &quot;titolo&quot;).{" "}
+            <strong>Categoria</strong>: viene cercata per nome esatto (case-insensitive);
+            se non trova match resta vuota. <strong>Numeri</strong>: accettano{" "}
+            <code>,</code> o <code>.</code> come separatore decimale.
+          </p>
+        </details>
+
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          disabled={busy}
+          rows={10}
+          placeholder={`Es. (tab-separated):\nPokemon XD\tGiochi\t10\t45\t1\n\nOppure con header:\ntitolo\tcategoria\tcosto\tlistino\nCarta Charizard\tCarte\t5\t30`}
+          className="w-full p-3 rounded-lg border border-ink/15 bg-white/80 font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-pink-deep/40"
+        />
+
+        <div className="mt-3 flex items-baseline justify-between gap-3 flex-wrap">
+          <span className="text-sm font-semibold text-ink">
+            {parsed.length === 0
+              ? "Nessuna riga da importare"
+              : `Anteprima: ${parsed.length} item`}
+          </span>
+          {unmatchedCats.length > 0 && (
+            <span
+              className="text-[11px] text-pink-deep"
+              title="Le categorie non trovate vengono importate con categoria vuota"
+            >
+              ⚠ Categorie non trovate: {unmatchedCats.join(", ")}
+            </span>
+          )}
+        </div>
+
+        {parsed.length > 0 && (
+          <div className="mt-2 overflow-x-auto max-h-64 border border-ink/10 rounded-lg">
+            <table className="min-w-full text-xs">
+              <thead className="bg-white/70 border-b border-ink/10 text-ink-soft uppercase tracking-wider sticky top-0">
+                <tr>
+                  <th className="text-left py-1.5 px-2">#</th>
+                  <th className="text-left py-1.5 px-2">Titolo</th>
+                  <th className="text-left py-1.5 px-2">Cat.</th>
+                  <th className="text-right py-1.5 px-2">Costo</th>
+                  <th className="text-right py-1.5 px-2">Listino</th>
+                  <th className="text-right py-1.5 px-2">Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parsed.slice(0, 200).map((r, i) => (
+                  <tr key={i} className="border-b border-ink/5">
+                    <td className="py-1 px-2 text-ink-soft">{i + 1}</td>
+                    <td className="py-1 px-2">{r.title}</td>
+                    <td className="py-1 px-2">
+                      {r.category_id
+                        ? categories.find((c) => c.id === r.category_id)?.name ?? "—"
+                        : r.category_hint
+                          ? <span className="text-pink-deep">? {r.category_hint}</span>
+                          : "—"}
+                    </td>
+                    <td className="py-1 px-2 text-right tabular-nums">{r.cost ?? "—"}</td>
+                    <td className="py-1 px-2 text-right tabular-nums">{r.list_price ?? "—"}</td>
+                    <td className="py-1 px-2 text-right tabular-nums">{r.quantity}</td>
+                  </tr>
+                ))}
+                {parsed.length > 200 && (
+                  <tr>
+                    <td colSpan={6} className="py-2 px-2 text-center text-ink-soft italic">
+                      … e altre {parsed.length - 200} righe (verranno importate tutte)
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {error && (
+          <p className="mt-3 text-sm text-pink-deep font-semibold whitespace-pre-line">⚠ {error}</p>
+        )}
+        {progress && !error && (
+          <p className="mt-3 text-sm text-ink-soft">
+            Importazione: {progress.done} di {progress.total}…
+          </p>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="btn btn-ghost text-sm"
+          >
+            Annulla
+          </button>
+          <button
+            type="button"
+            onClick={handleImport}
+            disabled={busy || parsed.length === 0}
+            className="btn btn-primary text-sm"
+          >
+            {busy ? "Importazione…" : `Importa ${parsed.length} item`}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -28,6 +28,7 @@ from models.entities.lot import (
     BulkPublishResponse,
     DistributeLotCostRequest,
     DistributeLotCostResponse,
+    DuplicateLotRequest,
     LotCreate,
     LotListResponse,
     LotResponse,
@@ -276,3 +277,65 @@ def bulk_publish(
     return BulkPublishResponse(
         created=created, skipped=skipped, item_ids_created=created_ids
     )
+
+
+@router.post("/{lot_id}/duplicate", response_model=LotResponse, status_code=status.HTTP_201_CREATED)
+def duplicate_lot(
+    lot_id: int,
+    payload: DuplicateLotRequest,
+    db: Session = Depends(get_db),
+    helper: LotHelper = Depends(get_lot_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Clona un lotto come template. Il nuovo lotto parte OPEN con code nuovo.
+    Gli item copiati partono in DRAFT senza foto, senza vendite, con list_price
+    e cost invariati (utile per rifornimenti di stesso tipo prodotto)."""
+    src = helper.get(lot_id)
+    if not src:
+        raise HTTPException(404, f"Lot {lot_id} non trovato")
+
+    dup = Lot(
+        title=(payload.title_prefix + (src.title or src.code)) if payload.title_prefix else src.title,
+        purchase_date=src.purchase_date,
+        purchase_platform=src.purchase_platform,
+        bought_by=src.bought_by,
+        total_cost=src.total_cost,
+        notes=src.notes,
+        # status e code li setta helper.save()
+    )
+    helper.save(dup)
+
+    if payload.copy_items:
+        for it in src.items:
+            clone = InventoryItem(
+                lot_id=dup.id,
+                title=it.title,
+                description=it.description,
+                cost=it.cost,
+                list_price=it.list_price,
+                quantity=it.quantity,
+                # nulla di venduto sul clone:
+                quantity_sold=0,
+                sold_date=None,
+                sold_by=None,
+                sold_platform=None,
+                sale_price=None,
+                fee_amount=None,
+                shipping_cost=it.shipping_cost,
+                status=InventoryItemStatus.DRAFT,
+                category_id=it.category_id,
+                card_collection=it.card_collection,
+                card_number=it.card_number,
+                card_finish=it.card_finish,
+                notes=it.notes,
+                # foto e link article NON copiati: sono specifici del pezzo,
+                # non del "tipo" articolo che stiamo replicando.
+                images=[],
+                article_id=None,
+                vinted_item_id=None,
+            )
+            db.add(clone)
+        db.commit()
+        db.refresh(dup)
+
+    return _to_response(dup)
