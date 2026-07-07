@@ -452,6 +452,7 @@ export interface InventoryItem {
   title: string;
   description: string | null;
   cost: string | null;
+  list_price: string | null;
   sold_date: string | null;
   sold_by: string | null;
   sold_platform: string | null;

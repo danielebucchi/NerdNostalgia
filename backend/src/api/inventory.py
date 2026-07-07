@@ -92,6 +92,7 @@ def _to_response(item: InventoryItem) -> InventoryItemResponse:
         title=item.title,
         description=item.description,
         cost=item.cost,
+        list_price=item.list_price,
         sold_date=item.sold_date,
         sold_by=item.sold_by,
         sold_platform=item.sold_platform,
@@ -249,11 +250,15 @@ def publish_to_site(
             return _to_response(item)
         item.article_id = None
 
+    # list_price ha priorita' — e' il prezzo di listino esplicito. Il
+    # fallback su sale_price copre i vecchi item creati prima dell'aggiunta
+    # del campo (o casi in cui l'utente ha compilato solo il ricavo).
+    price = item.list_price or item.sale_price or Decimal("0")
     article = Article(
         user_id=admin.id,
         title=item.title,
         description=item.description,
-        price=item.sale_price or Decimal("0"),
+        price=price,
         currency="EUR",
         condition=ArticleCondition.USED,
         status=ArticleStatus.DRAFT,

@@ -50,6 +50,10 @@ class InventoryItem(BaseModel):
     description = Column(Text)
 
     cost = Column(Numeric(10, 2))
+    # Prezzo di listino a cui vogliamo esporre l'articolo sul catalogo
+    # pubblico. Al publish_to_site diventa Article.price (fallback su
+    # sale_price se list_price e' None — vedi api/inventory.py:publish).
+    list_price = Column(Numeric(10, 2))
 
     sold_date = Column(Date, index=True)
     sold_by = Column(String(20))
