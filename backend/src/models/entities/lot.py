@@ -84,3 +84,15 @@ class BulkPublishResponse(BaseModel):
     created: int
     skipped: int
     item_ids_created: List[int]
+
+
+class DuplicateLotRequest(BaseModel):
+    """Clona un lotto esistente. Il nuovo lotto parte in stato OPEN e riceve
+    un nuovo code sequenziale. Foto e status di vendita degli item NON vengono
+    copiati (il duplicato serve da template)."""
+    copy_items: bool = True
+    title_prefix: str = Field(
+        "Copia di ",
+        max_length=32,
+        description="Prefisso applicato al titolo del nuovo lotto",
+    )

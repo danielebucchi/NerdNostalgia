@@ -114,3 +114,75 @@ def test_distribute_cost_with_items(client, admin_headers, db_session, lot_paylo
     assert body["items_updated"] == 2
     assert body["total_pieces"] == 4
     assert body["unit_cost"] == "25.00"
+
+
+def test_duplicate_lot_clones_metadata_and_items(client, admin_headers, lot_payload):
+    src = client.post("/api/lots/", headers=admin_headers, json=lot_payload).json()
+    client.post(
+        "/api/inventory/",
+        headers=admin_headers,
+        json={"lot_id": src["id"], "title": "A", "cost": "10.00",
+              "list_price": "25.00", "quantity": 1},
+    )
+    client.post(
+        "/api/inventory/",
+        headers=admin_headers,
+        json={"lot_id": src["id"], "title": "B", "cost": "5.00", "quantity": 2},
+    )
+
+    r = client.post(
+        f"/api/lots/{src['id']}/duplicate",
+        headers=admin_headers,
+        json={"copy_items": True, "title_prefix": "Copia di "},
+    )
+    assert r.status_code == 201, r.text
+    dup = r.json()
+    assert dup["id"] != src["id"]
+    assert dup["code"] != src["code"]  # nuovo code sequenziale
+    assert dup["title"].startswith("Copia di ")
+    assert dup["purchase_platform"] == src["purchase_platform"]
+    assert dup["status"] == "OPEN"
+
+    items = client.get(
+        f"/api/inventory/?lot_id={dup['id']}", headers=admin_headers,
+    ).json()["items"]
+    assert len(items) == 2
+    titles = sorted(i["title"] for i in items)
+    assert titles == ["A", "B"]
+    # I clonati partono DRAFT senza vendite / foto / article link
+    for it in items:
+        assert it["status"] == "DRAFT"
+        assert it["sale_price"] is None
+        assert it["images"] == []
+        assert it["article_id"] is None
+    # ma list_price e cost sono conservati (template intatto)
+    item_a = next(i for i in items if i["title"] == "A")
+    assert float(item_a["list_price"]) == 25.00
+    assert float(item_a["cost"]) == 10.00
+
+
+def test_duplicate_lot_without_items(client, admin_headers, lot_payload):
+    src = client.post("/api/lots/", headers=admin_headers, json=lot_payload).json()
+    client.post(
+        "/api/inventory/",
+        headers=admin_headers,
+        json={"lot_id": src["id"], "title": "A", "quantity": 1},
+    )
+    r = client.post(
+        f"/api/lots/{src['id']}/duplicate",
+        headers=admin_headers,
+        json={"copy_items": False},
+    )
+    assert r.status_code == 201
+    dup = r.json()
+    items = client.get(
+        f"/api/inventory/?lot_id={dup['id']}", headers=admin_headers,
+    ).json()["items"]
+    assert items == []
+
+
+def test_duplicate_lot_not_found(client, admin_headers):
+    r = client.post(
+        "/api/lots/99999/duplicate", headers=admin_headers, json={},
+    )
+    assert r.status_code == 404
