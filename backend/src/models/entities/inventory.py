@@ -24,6 +24,7 @@ class InventoryItemBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
     description: Optional[str] = None
     cost: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
+    list_price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
 
     sold_date: Optional[date] = None
     sold_by: Optional[str] = Field(None, max_length=20)
@@ -58,6 +59,7 @@ class InventoryItemUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = None
     cost: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
+    list_price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
     sold_date: Optional[date] = None
     sold_by: Optional[str] = Field(None, max_length=20)
     sold_platform: Optional[str] = Field(None, max_length=50)
@@ -88,6 +90,7 @@ class InventoryItemResponse(BaseModel):
     title: str
     description: Optional[str]
     cost: Optional[Decimal]
+    list_price: Optional[Decimal] = None
 
     sold_date: Optional[date]
     sold_by: Optional[str]

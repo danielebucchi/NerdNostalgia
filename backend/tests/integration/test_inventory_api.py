@@ -211,6 +211,55 @@ def test_reorder_rejects_non_permutation(client, admin_headers, item_id):
     assert r.status_code == 400
 
 
+def test_publish_uses_list_price_when_set(client, admin_headers, lot_id):
+    """list_price ha priorita' su sale_price come Article.price."""
+    item = client.post(
+        "/api/inventory/",
+        headers=admin_headers,
+        json={
+            "lot_id": lot_id,
+            "title": "Con listino",
+            "quantity": 1,
+            "list_price": "25.00",
+            "sale_price": "40.00",
+        },
+    ).json()
+
+    r = client.post(
+        f"/api/inventory/{item['id']}/publish",
+        headers=admin_headers,
+        json={},
+    )
+    assert r.status_code == 200, r.text
+    article_id = r.json()["article_id"]
+    art = client.get(f"/api/articles/{article_id}", headers=admin_headers).json()
+    assert float(art["price"]) == 25.00
+
+
+def test_publish_falls_back_to_sale_price(client, admin_headers, lot_id):
+    """Se list_price e' None, la vecchia logica su sale_price resta valida."""
+    item = client.post(
+        "/api/inventory/",
+        headers=admin_headers,
+        json={
+            "lot_id": lot_id,
+            "title": "Solo ricavo",
+            "quantity": 1,
+            "sale_price": "18.50",
+        },
+    ).json()
+
+    r = client.post(
+        f"/api/inventory/{item['id']}/publish",
+        headers=admin_headers,
+        json={},
+    )
+    assert r.status_code == 200
+    article_id = r.json()["article_id"]
+    art = client.get(f"/api/articles/{article_id}", headers=admin_headers).json()
+    assert float(art["price"]) == 18.50
+
+
 def test_publish_to_site_copies_images_to_article(client, admin_headers, item_id):
     """Il publish deve copiare item.images → article.images. E' la ragione
     per cui carichiamo le foto sull'inventory item invece che sull'articolo."""

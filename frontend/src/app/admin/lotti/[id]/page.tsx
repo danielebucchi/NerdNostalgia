@@ -338,6 +338,7 @@ export default function AdminLotDetailPage() {
                 <Th>Oggetto</Th>
                 <Th>Cat.</Th>
                 <Th className="text-right">Costo</Th>
+                <Th className="text-right">Listino</Th>
                 <Th>Data vend.</Th>
                 <Th className="text-right">Ricavo</Th>
                 <Th className="text-right">Fee</Th>
@@ -605,6 +606,7 @@ function Row({
 }) {
   const [title, setTitle] = useState(item.title);
   const [cost, setCost] = useState(item.cost ?? "");
+  const [listPrice, setListPrice] = useState(item.list_price ?? "");
   const [soldDate, setSoldDate] = useState(item.sold_date ?? "");
   const [salePrice, setSalePrice] = useState(item.sale_price ?? "");
   const [fee, setFee] = useState(item.fee_amount ?? "");
@@ -680,6 +682,17 @@ function Row({
           onChange={(e) => setCost(e.target.value)}
           onBlur={() => maybeSave("cost", cost, item.cost)}
           className="cell-input text-right tabular-nums w-20"
+        />
+      </Td>
+      <Td className="text-right">
+        <input
+          type="number" step="0.01"
+          value={listPrice ?? ""}
+          onChange={(e) => setListPrice(e.target.value)}
+          onBlur={() => maybeSave("list_price", listPrice, item.list_price)}
+          className="cell-input text-right tabular-nums w-20"
+          placeholder="—"
+          title="Prezzo di listino usato al publish"
         />
       </Td>
       <Td>

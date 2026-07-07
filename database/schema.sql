@@ -329,6 +329,7 @@ CREATE TABLE IF NOT EXISTS inventory_items (
     title VARCHAR(500) NOT NULL,
     description TEXT,
     cost NUMERIC(10,2),
+    list_price NUMERIC(10,2),
     sold_date DATE,
     sold_by VARCHAR(20),
     sold_platform VARCHAR(50),
