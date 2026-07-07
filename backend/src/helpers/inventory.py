@@ -88,6 +88,33 @@ class InventoryHelper(BaseHelper):
         self.db.delete(item)
         self.db.commit()
 
+    def add_image(self, item: InventoryItem, url: str) -> None:
+        images = list(item.images or [])
+        if url not in images:
+            images.append(url)
+        item.images = images
+        item.updated_at = dt.now(datetime.UTC)
+        self.db.commit()
+        self.db.refresh(item)
+
+    def remove_image(self, item: InventoryItem, url: str) -> None:
+        images = [u for u in (item.images or []) if u != url]
+        item.images = images
+        item.updated_at = dt.now(datetime.UTC)
+        self.db.commit()
+        self.db.refresh(item)
+
+    def set_images(self, item: InventoryItem, urls: List[str]) -> None:
+        """Sostituisce l'intera lista (usato per reorder)."""
+        current = set(item.images or [])
+        # Consenti solo riordino: rifiuta URL non gia' presenti.
+        if set(urls) != current:
+            raise ValueError("set_images accetta solo permutazioni della lista corrente")
+        item.images = list(urls)
+        item.updated_at = dt.now(datetime.UTC)
+        self.db.commit()
+        self.db.refresh(item)
+
 
 def get_inventory_helper(db: Session = Depends(get_db)) -> InventoryHelper:
     return InventoryHelper(db=db)

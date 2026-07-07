@@ -139,3 +139,11 @@ class PublishToSiteRequest(BaseModel):
 class StatusUpdateRequest(BaseModel):
     """Cambio status manuale (es. mark RESERVED)."""
     status: InventoryItemStatusLiteral
+
+
+class InventoryImageAdd(BaseModel):
+    url: str = Field(..., min_length=1, max_length=2000)
+
+
+class InventoryImageReorder(BaseModel):
+    images: List[str] = Field(..., description="Nuovo ordine — deve essere una permutazione della lista corrente")

@@ -107,3 +107,128 @@ def test_delete_item(client, admin_headers, lot_id):
     ).json()
     r = client.delete(f"/api/inventory/{item['id']}", headers=admin_headers)
     assert r.status_code == 204
+
+
+# ---------------------------------------------------------------------------
+# Immagini: upload / delete / reorder / propagazione a publish_to_site
+# ---------------------------------------------------------------------------
+
+import io  # noqa: E402
+from PIL import Image  # noqa: E402
+
+
+def _tiny_png_bytes(color: tuple = (200, 100, 50)) -> bytes:
+    """Genera un PNG 4x4 unico per test. Il contenuto non conta, serve solo
+    che sia decodificabile da PIL nella pipeline di save_upload."""
+    img = Image.new("RGB", (4, 4), color=color)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@pytest.fixture()
+def item_id(client, admin_headers, lot_id):
+    r = client.post(
+        "/api/inventory/",
+        headers=admin_headers,
+        json={"lot_id": lot_id, "title": "Con foto", "quantity": 1},
+    )
+    return r.json()["id"]
+
+
+def test_upload_inventory_image_appends_url(client, admin_headers, item_id):
+    r = client.post(
+        f"/api/inventory/{item_id}/upload-image",
+        headers=admin_headers,
+        files={"file": ("a.png", _tiny_png_bytes(), "image/png")},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["images"]) == 1
+    assert body["images"][0].endswith(".webp")
+    assert f"/inventory/{item_id}/" in body["images"][0]
+
+
+def test_upload_inventory_image_rejects_non_image(client, admin_headers, item_id):
+    r = client.post(
+        f"/api/inventory/{item_id}/upload-image",
+        headers=admin_headers,
+        files={"file": ("bad.txt", b"not an image", "text/plain")},
+    )
+    assert r.status_code == 400
+
+
+def test_delete_inventory_image_removes_url(client, admin_headers, item_id):
+    up = client.post(
+        f"/api/inventory/{item_id}/upload-image",
+        headers=admin_headers,
+        files={"file": ("a.png", _tiny_png_bytes(), "image/png")},
+    ).json()
+    url = up["images"][0]
+    r = client.delete(
+        f"/api/inventory/{item_id}/images",
+        headers=admin_headers,
+        params={"url": url},
+    )
+    assert r.status_code == 200
+    assert r.json()["images"] == []
+
+
+def test_reorder_inventory_images(client, admin_headers, item_id):
+    a = client.post(
+        f"/api/inventory/{item_id}/upload-image",
+        headers=admin_headers,
+        files={"file": ("a.png", _tiny_png_bytes((10, 10, 10)), "image/png")},
+    ).json()["images"][0]
+    both = client.post(
+        f"/api/inventory/{item_id}/upload-image",
+        headers=admin_headers,
+        files={"file": ("b.png", _tiny_png_bytes((200, 200, 200)), "image/png")},
+    ).json()["images"]
+    assert both[0] == a and len(both) == 2
+    b = both[1]
+
+    r = client.put(
+        f"/api/inventory/{item_id}/images",
+        headers=admin_headers,
+        json={"images": [b, a]},
+    )
+    assert r.status_code == 200
+    assert r.json()["images"] == [b, a]
+
+
+def test_reorder_rejects_non_permutation(client, admin_headers, item_id):
+    up = client.post(
+        f"/api/inventory/{item_id}/upload-image",
+        headers=admin_headers,
+        files={"file": ("a.png", _tiny_png_bytes(), "image/png")},
+    ).json()
+    r = client.put(
+        f"/api/inventory/{item_id}/images",
+        headers=admin_headers,
+        json={"images": up["images"] + ["https://external.example/x.webp"]},
+    )
+    assert r.status_code == 400
+
+
+def test_publish_to_site_copies_images_to_article(client, admin_headers, item_id):
+    """Il publish deve copiare item.images → article.images. E' la ragione
+    per cui carichiamo le foto sull'inventory item invece che sull'articolo."""
+    client.post(
+        f"/api/inventory/{item_id}/upload-image",
+        headers=admin_headers,
+        files={"file": ("a.png", _tiny_png_bytes(), "image/png")},
+    )
+    r = client.post(
+        f"/api/inventory/{item_id}/publish",
+        headers=admin_headers,
+        json={},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    article_id = body["article_id"]
+    assert article_id
+
+    art = client.get(f"/api/articles/{article_id}", headers=admin_headers)
+    assert art.status_code == 200
+    assert len(art.json()["images"]) == 1

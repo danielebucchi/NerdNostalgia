@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { ImageGalleryEditor } from "@/components/admin/ImageGalleryEditor";
 import { adminApi } from "@/lib/admin-api";
 import { useCategories } from "@/lib/useCategories";
 import { usePlatforms } from "@/lib/usePlatforms";
@@ -65,6 +66,7 @@ export default function AdminLotDetailPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [photosOpen, setPhotosOpen] = useState<number | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -332,6 +334,7 @@ export default function AdminLotDetailPage() {
                   />
                 </Th>
                 <Th>Stato</Th>
+                <Th>Foto</Th>
                 <Th>Oggetto</Th>
                 <Th>Cat.</Th>
                 <Th className="text-right">Costo</Th>
@@ -364,6 +367,7 @@ export default function AdminLotDetailPage() {
                   }}
                   onSave={(patch) => handleSaveItem(it.id, patch)}
                   onDelete={() => handleDeleteItem(it.id)}
+                  onOpenPhotos={() => setPhotosOpen(it.id)}
                 />
               ))}
             </tbody>
@@ -377,8 +381,71 @@ export default function AdminLotDetailPage() {
         <code>/admin/articles</code>.
       </p>
 
+      {photosOpen !== null && (() => {
+        const target = items.find((i) => i.id === photosOpen);
+        if (!target) return null;
+        return (
+          <PhotosDialog
+            item={target}
+            onClose={() => setPhotosOpen(null)}
+            onImagesChange={(imgs) => {
+              // Aggiorna in-place la riga senza ricaricare l'intera tabella:
+              // reload() sarebbe uno spreco per una modifica cosi' localizzata.
+              setItems((curr) =>
+                curr.map((i) => (i.id === target.id ? { ...i, images: imgs } : i)),
+              );
+            }}
+          />
+        );
+      })()}
+
       <style>{styles}</style>
     </AdminShell>
+  );
+}
+
+function PhotosDialog({
+  item,
+  onClose,
+  onImagesChange,
+}: {
+  item: InventoryItem;
+  onClose: () => void;
+  onImagesChange: (images: string[]) => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="card w-full max-w-3xl p-5 sm:p-6 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <h2 className="display text-xl text-ink truncate">Foto — {item.title}</h2>
+            <p className="text-xs text-ink-soft mt-0.5">
+              Le foto vengono copiate sull&apos;articolo pubblico quando pubblichi il lotto.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full border-2 border-ink flex items-center justify-center text-ink hover:bg-pink shrink-0"
+            aria-label="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+        <ImageGalleryEditor
+          scope="inventory"
+          entityId={item.id}
+          images={item.images ?? []}
+          onChange={onImagesChange}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -524,7 +591,7 @@ function DistributeBox({
 }
 
 function Row({
-  item, categories, platformNames, busy, selected, onToggle, onSave, onDelete,
+  item, categories, platformNames, busy, selected, onToggle, onSave, onDelete, onOpenPhotos,
 }: {
   item: InventoryItem;
   categories: Category[];
@@ -534,6 +601,7 @@ function Row({
   onToggle: () => void;
   onSave: (patch: Partial<InventoryItem>) => void;
   onDelete: () => void;
+  onOpenPhotos: () => void;
 }) {
   const [title, setTitle] = useState(item.title);
   const [cost, setCost] = useState(item.cost ?? "");
@@ -575,6 +643,12 @@ function Row({
             <option key={s} value={s}>{STATUS_LABEL[s]}</option>
           ))}
         </select>
+      </Td>
+      <Td>
+        <PhotoCell
+          images={item.images ?? []}
+          onOpen={onOpenPhotos}
+        />
       </Td>
       <Td>
         <input
@@ -716,6 +790,35 @@ function Th({ children, className = "" }: { children?: React.ReactNode; classNam
 
 function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <td className={`py-1 px-1 align-middle ${className}`}>{children}</td>;
+}
+
+function PhotoCell({ images, onOpen }: { images: string[]; onOpen: () => void }) {
+  const cover = images[0];
+  const thumb = cover && cover.endsWith(".webp") && !cover.endsWith(".thumb.webp")
+    ? cover.slice(0, -".webp".length) + ".thumb.webp"
+    : cover;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={images.length > 0 ? `${images.length} foto — gestisci` : "Aggiungi foto"}
+      className="relative w-10 h-10 rounded-md overflow-hidden bg-ink/5 ring-1 ring-ink/10 hover:ring-pink-deep flex items-center justify-center"
+    >
+      {cover ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumb} alt="" loading="lazy" className="w-full h-full object-cover" />
+          {images.length > 1 && (
+            <span className="absolute bottom-0 right-0 bg-ink/80 text-cream text-[9px] font-bold px-1 rounded-tl">
+              {images.length}
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="text-lg text-ink-soft/50">＋</span>
+      )}
+    </button>
+  );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

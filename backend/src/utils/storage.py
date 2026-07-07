@@ -13,6 +13,15 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 APP_TMP_DIR = os.getenv("APP_TMP_DIR", "/tmp/nerdnostalgia")
 UPLOADS_DIR = Path(APP_TMP_DIR) / "uploads"
 ARTICLES_UPLOADS_DIR = UPLOADS_DIR / "articles"
+INVENTORY_UPLOADS_DIR = UPLOADS_DIR / "inventory"
+
+# Scope validi per il naming delle sottocartelle. Corrispondono anche al
+# segmento di URL /static/<scope>/<id>/<uuid>.webp. Aggiungere qui una voce
+# nuova basta a supportare un nuovo tipo di entita' con la stessa pipeline.
+_SCOPES = {
+    "articles": ARTICLES_UPLOADS_DIR,
+    "inventory": INVENTORY_UPLOADS_DIR,
+}
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:7373")
 STATIC_URL_PREFIX = "/static"
@@ -41,11 +50,18 @@ class UploadValidationError(Exception):
 
 
 def ensure_dirs() -> None:
-    ARTICLES_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    for base in _SCOPES.values():
+        base.mkdir(parents=True, exist_ok=True)
 
 
 def article_dir(article_id: int) -> Path:
     return ARTICLES_UPLOADS_DIR / str(article_id)
+
+
+def _scope_dir(scope: str, entity_id: int) -> Path:
+    if scope not in _SCOPES:
+        raise ValueError(f"scope invalido: {scope!r}")
+    return _SCOPES[scope] / str(entity_id)
 
 
 def public_url(relative_path: str) -> str:
@@ -99,8 +115,9 @@ def _resize_to_webp(image: Image.Image, max_width: int) -> bytes:
     return out.getvalue()
 
 
-def save_article_image(
-    article_id: int,
+def save_upload(
+    scope: str,
+    entity_id: int,
     file_obj,
     content_type: str,
 ) -> Tuple[str, Path]:
@@ -108,6 +125,8 @@ def save_article_image(
     Salva un file immagine su disco generando due varianti WebP:
       - {uuid}.webp        → versione grande (max 1600px)
       - {uuid}.thumb.webp  → versione card (max 600px)
+
+    `scope` identifica la sottocartella (articles, inventory, ...).
 
     Restituisce (public_url della versione grande, path_on_disk).
     Solleva UploadValidationError se content-type non ammesso o dimensione
@@ -136,7 +155,7 @@ def save_article_image(
         raise UploadValidationError("File non riconosciuto come immagine valida") from exc
 
     uid = uuid.uuid4().hex
-    dest_dir = article_dir(article_id)
+    dest_dir = _scope_dir(scope, entity_id)
     dest_dir.mkdir(parents=True, exist_ok=True)
     large_path = dest_dir / f"{uid}.webp"
     thumb_path = dest_dir / f"{uid}.thumb.webp"
@@ -144,8 +163,26 @@ def save_article_image(
     large_path.write_bytes(large_bytes)
     thumb_path.write_bytes(thumb_bytes)
 
-    relative = f"articles/{article_id}/{large_path.name}"
+    relative = f"{scope}/{entity_id}/{large_path.name}"
     return public_url(relative), large_path
+
+
+def save_article_image(
+    article_id: int,
+    file_obj,
+    content_type: str,
+) -> Tuple[str, Path]:
+    """Wrapper storico per backward-compat: delega a save_upload(articles)."""
+    return save_upload("articles", article_id, file_obj, content_type)
+
+
+def save_inventory_image(
+    item_id: int,
+    file_obj,
+    content_type: str,
+) -> Tuple[str, Path]:
+    """Salva un'immagine legata a un inventory_item del lotto."""
+    return save_upload("inventory", item_id, file_obj, content_type)
 
 
 def thumb_url_for(url: str) -> str:
@@ -184,8 +221,20 @@ def delete_file_for_url(url: str) -> bool:
     return removed
 
 
-def delete_article_dir(article_id: int) -> None:
-    """Cancella tutta la cartella uploads di un articolo (best effort)."""
-    target = article_dir(article_id)
+def delete_upload_dir(scope: str, entity_id: int) -> None:
+    """Cancella tutta la cartella uploads di un'entita' (best effort)."""
+    try:
+        target = _scope_dir(scope, entity_id)
+    except ValueError:
+        return
     if target.exists():
         shutil.rmtree(target, ignore_errors=True)
+
+
+def delete_article_dir(article_id: int) -> None:
+    """Wrapper storico per backward-compat."""
+    delete_upload_dir("articles", article_id)
+
+
+def delete_inventory_dir(item_id: int) -> None:
+    delete_upload_dir("inventory", item_id)
