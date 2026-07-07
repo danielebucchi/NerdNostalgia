@@ -377,8 +377,10 @@ export default function AdminLotDetailPage() {
       )}
 
       <p className="text-xs text-ink-soft mt-3">
-        Seleziona uno o più item e usa <strong>📝 Crea bozze Article</strong> per
-        pubblicarli sul sito in stato DRAFT. Poi completi foto e descrizione in{" "}
+        Compila <strong>Foto</strong> e <strong>Listino</strong> qui, poi seleziona
+        uno o più item e usa <strong>📝 Crea bozze Article</strong> per pubblicarli
+        sul sito. Le foto e il prezzo di listino vengono copiati sull&apos;articolo
+        pubblico. Descrizione e altri dettagli finali li ritocchi in{" "}
         <code>/admin/articles</code>.
       </p>
 
