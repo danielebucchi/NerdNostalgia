@@ -142,9 +142,17 @@ export default function AdminLottiListPage() {
             per vedere/modificare gli item.
           </p>
         </div>
-        <Link href="/admin/lotti/new" className="btn btn-primary text-sm">
-          + Nuovo lotto
-        </Link>
+        <div className="flex gap-2 flex-wrap">
+          <Link href="/admin/lotti/import" className="btn btn-ghost text-sm" title="Import CSV completo: lotti + item raggruppati">
+            📤 CSV
+          </Link>
+          <Link href="/admin/lotti/bulk" className="btn btn-ghost text-sm" title="Crea piu' lotti in un colpo (solo anagrafica)">
+            📥 Bulk
+          </Link>
+          <Link href="/admin/lotti/new" className="btn btn-primary text-sm">
+            + Nuovo lotto
+          </Link>
+        </div>
       </div>
 
       {error && (
