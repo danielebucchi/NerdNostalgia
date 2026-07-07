@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/admin-api";
-import { formatPrice } from "@/lib/api";
 import { getMarkupsFromFees, useMarketplaceFees } from "@/lib/useMarketplaceFees";
 import type { Article, MarketplaceStatus } from "@/lib/types";
 
@@ -72,14 +71,11 @@ function getMarketplaceData(article: Article, key: MarketplaceKey) {
   };
 }
 
-function buildDescription(
-  article: Article,
-  footer: string,
-  overridePrice: string | null,
-): string {
+// Costruisce SOLO la descrizione da incollare nel campo "Descrizione" del
+// marketplace. Titolo e prezzo si copiano separatamente perche' su mobile
+// vanno in campi form distinti (incollare tutto insieme era ingestibile).
+function buildDescription(article: Article, footer: string): string {
   const lines: string[] = [];
-  lines.push(article.title);
-  lines.push("");
   if (article.description) {
     lines.push(article.description);
     lines.push("");
@@ -94,13 +90,8 @@ function buildDescription(
     lines.push(...meta);
     lines.push("");
   }
-  const priceStr = overridePrice
-    ? formatPrice({ price: overridePrice, currency: article.currency })
-    : formatPrice(article);
-  lines.push(`Prezzo indicativo: ${priceStr}`);
-  lines.push("");
   lines.push(footer);
-  return lines.join("\n");
+  return lines.join("\n").trim();
 }
 
 interface Props {
@@ -125,7 +116,8 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
   const [price, setPrice] = useState<string>(current.price ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  // Feedback per copia: null = nessuna, altrimenti nome del campo appena copiato.
+  const [copiedField, setCopiedField] = useState<"title" | "description" | "price" | null>(null);
 
   useEffect(() => {
     setStatus(current.status);
@@ -170,13 +162,22 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
     await patch(buildPayload(next, url.trim() || null, price));
   }
 
-  async function copyDescription() {
-    const overridePrice = price.trim() || current.price;
-    const text = buildDescription(article, config.descriptionFooter, overridePrice);
+  async function copyField(field: "title" | "description" | "price") {
+    let text = "";
+    if (field === "title") {
+      text = article.title;
+    } else if (field === "description") {
+      text = buildDescription(article, config.descriptionFooter);
+    } else {
+      // Prezzo: number puro (senza simbolo/valuta) — Vinted/eBay hanno un
+      // input numerico che vuole solo cifre + punto/virgola decimale.
+      const raw = price.trim() || current.price || article.price;
+      text = String(raw ?? "");
+    }
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2200);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2200);
     } catch {
       setError("Impossibile copiare negli appunti (browser non lo supporta).");
     }
@@ -198,22 +199,49 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
         <code>SOLD</code> anche nel catalogo.
       </p>
 
-      <div className="grid sm:grid-cols-2 gap-3 mb-4">
-        <a
-          href={config.newListingUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-primary text-sm justify-center"
-        >
-          {config.emoji} Apri {config.label} · Nuovo annuncio ↗
-        </a>
-        <button
-          type="button"
-          onClick={copyDescription}
-          className="btn btn-ghost text-sm justify-center"
-        >
-          {copied ? "✓ Copiato!" : "📋 Copia descrizione formattata"}
-        </button>
+      <a
+        href={config.newListingUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="btn btn-primary text-sm justify-center w-full mb-3"
+      >
+        {config.emoji} Apri {config.label} · Nuovo annuncio ↗
+      </a>
+
+      <div className="mb-4">
+        <p className="text-[11px] uppercase tracking-wider text-ink-soft font-bold mb-1.5">
+          Copia nei campi di {config.label}
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => copyField("title")}
+            className="btn btn-ghost text-xs justify-center px-2"
+            title="Copia il titolo negli appunti"
+          >
+            {copiedField === "title" ? "✓ Titolo" : "📋 Titolo"}
+          </button>
+          <button
+            type="button"
+            onClick={() => copyField("description")}
+            className="btn btn-ghost text-xs justify-center px-2"
+            title="Copia solo la descrizione (meta + footer inclusi)"
+          >
+            {copiedField === "description" ? "✓ Descriz." : "📋 Descriz."}
+          </button>
+          <button
+            type="button"
+            onClick={() => copyField("price")}
+            className="btn btn-ghost text-xs justify-center px-2"
+            title={
+              price.trim()
+                ? `Copia ${price} (prezzo ${config.label})`
+                : `Copia ${article.price} (prezzo catalogo)`
+            }
+          >
+            {copiedField === "price" ? "✓ Prezzo" : "📋 Prezzo"}
+          </button>
+        </div>
       </div>
 
       <div className="mb-3">
