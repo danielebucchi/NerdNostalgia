@@ -1,4 +1,7 @@
-import { paypalUrl } from "@/lib/paypal";
+"use client";
+
+import { buildPaypalUrl } from "@/lib/paypal";
+import { useSettings } from "@/lib/settings-context";
 
 interface Props {
   /** Importo da prefillare nel link paypal.me. Lascia vuoto per importo libero. */
@@ -11,7 +14,7 @@ interface Props {
 
 /**
  * Bottone CTA inline che apre paypal.me con importo prefillato (se passato).
- * Se NEXT_PUBLIC_PAYPAL_ME non e' configurato, ritorna null (no render).
+ * Se paypal_me non e' configurato (settings/env), ritorna null (no render).
  */
 export function PaypalButton({
   amount,
@@ -19,7 +22,8 @@ export function PaypalButton({
   className = "",
   label = "Paga con PayPal",
 }: Props) {
-  const url = paypalUrl(amount, currency);
+  const { paypalMe } = useSettings();
+  const url = buildPaypalUrl(paypalMe, amount, currency);
   if (!url) return null;
 
   const ariaAmount = amount ? ` (${Number(amount).toFixed(2)} ${currency})` : "";

@@ -1,20 +1,23 @@
 "use client";
 
-import { paypalUrl } from "@/lib/paypal";
+import { buildPaypalUrl } from "@/lib/paypal";
+import { useSettings } from "@/lib/settings-context";
 
 /**
  * Bottone "Donazione" floating fisso in basso a destra.
  *
- * NB: NON e' gated dal feature flag PAYMENTS_ENABLED — anche quando
+ * NB: NON e' gated dal feature flag payments_enabled — anche quando
  * il flusso d'acquisto e' disabilitato (carrello+PayPal-checkout off),
  * la donazione resta sempre disponibile come canale di supporto.
  *
- * Hidden solo se NEXT_PUBLIC_PAYPAL_ME non e' configurato.
+ * Hidden solo se paypal_me non e' configurato (settings runtime, con
+ * fallback sulla env di build NEXT_PUBLIC_PAYPAL_ME).
  *
  * z-index 40: sopra contenuto/header (z<40), sotto il CookieBanner (z-50).
  */
 export function PaypalFab() {
-  const url = paypalUrl();
+  const { paypalMe } = useSettings();
+  const url = buildPaypalUrl(paypalMe);
   if (!url) return null;
 
   return (

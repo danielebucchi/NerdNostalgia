@@ -5,13 +5,13 @@ import { useEffect, useState } from "react";
 import { PurchaseDialog } from "@/components/PurchaseDialog";
 import { formatPrice, getArticle } from "@/lib/api";
 import { aggregateShipping, cartSubtotal, useCart } from "@/lib/cart";
-import { paymentsEnabled } from "@/lib/features";
-import { paypalEnabled } from "@/lib/paypal";
+import { useSettings } from "@/lib/settings-context";
 import type { Article } from "@/lib/types";
 
 export default function CartPage() {
+  const { paymentsEnabled } = useSettings();
   // Feature flag: se i pagamenti sono off, /carrello mostra solo un avviso.
-  if (!paymentsEnabled()) {
+  if (!paymentsEnabled) {
     return (
       <article>
         <Link href="/" className="btn btn-ghost text-sm mb-6">
@@ -37,6 +37,9 @@ export default function CartPage() {
 
 function CartContent() {
   const { items, remove, clear, hydrated } = useCart();
+  const { paypalMe, handExchangeCapPrefixes, handExchangeCities } = useSettings();
+  const paypalConfigured = paypalMe.length > 0;
+  const capZonesLabel = handExchangeCapPrefixes.map((p) => `${p}xxx`).join(" / ");
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -201,7 +204,7 @@ function CartContent() {
                 </div>
               </dl>
 
-              {paypalEnabled() ? (
+              {paypalConfigured ? (
                 <button
                   type="button"
                   onClick={() => setDialogOpen(true)}
@@ -222,12 +225,12 @@ function CartContent() {
               </p>
               {articles.length > 0 && (
                 <div className="text-[11px] rounded-lg bg-mint-deep/12 text-mint-deep px-3 py-2 mt-3 leading-snug ring-1 ring-mint-deep/30">
-                  🤝 <strong>Consegna a mano gratuita</strong> a Livorno/Pisa
-                  (CAP 56xxx / 57xxx). Scegli l&apos;opzione al checkout per
+                  🤝 <strong>Consegna a mano gratuita</strong> a {handExchangeCities}
+                  {" "}(CAP {capZonesLabel}). Scegli l&apos;opzione al checkout per
                   azzerare la spedizione.
                 </div>
               )}
-              {paypalEnabled() && articles.length > 0 && (
+              {paypalConfigured && articles.length > 0 && (
                 <p className="text-[11px] text-[#003087] bg-[#ffc439]/20 rounded-lg px-3 py-2 mt-2 leading-snug">
                   💡 Su PayPal seleziona{" "}
                   <strong>&quot;A un amico o familiare&quot;</strong> per evitare le

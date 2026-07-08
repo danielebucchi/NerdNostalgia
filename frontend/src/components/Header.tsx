@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CartNavLink } from "@/components/CartNavLink";
 import { LogoImage } from "@/components/LogoImage";
+import { SearchBox } from "@/components/SearchBox";
 import { WishlistNavLink } from "@/components/WishlistNavLink";
 
 const TOPBAR_MESSAGES = [
@@ -51,6 +52,9 @@ export function Header() {
           </span>
         </Link>
 
+        {/* Ricerca istantanea: inline su desktop, riga dedicata su mobile */}
+        <SearchBox className="hidden md:block flex-1 max-w-xs mx-2" />
+
         <nav className="hidden md:flex items-center gap-2 flex-shrink-0">
           <Link href="/" className="btn btn-ghost text-sm">Catalogo</Link>
           <Link href="/cerco-compro" className="btn btn-ghost text-sm">Cerco/Compro</Link>
@@ -76,6 +80,10 @@ export function Header() {
             Scrivi
           </Link>
         </nav>
+      </div>
+      {/* Mobile: barra ricerca full-width sotto la riga principale */}
+      <div className="md:hidden px-4 pb-3">
+        <SearchBox />
       </div>
     </header>
   );

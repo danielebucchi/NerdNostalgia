@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { MarketplaceLogo } from "@/components/MarketplaceLogo";
 import { PurchaseDialog } from "@/components/PurchaseDialog";
-import { paymentsEnabled } from "@/lib/features";
-import { paypalEnabled } from "@/lib/paypal";
 import { useCart } from "@/lib/cart";
+import { useSettings, whatsappUrl } from "@/lib/settings-context";
 import type { Article } from "@/lib/types";
 
 interface Props {
@@ -15,6 +14,7 @@ interface Props {
 /**
  * Controlli di acquisto inline accanto al prezzo articolo:
  *  - bottoni Vinted / eBay (link diretti ai marketplace)
+ *  - bottone WhatsApp (se contact_whatsapp e' configurato nelle settings)
  *  - bottone "Paga con PayPal" → apre PurchaseDialog (raccoglie dati,
  *    crea ordine PENDING, manda email, apre paypal.me)
  *  - bottone "Aggiungi al carrello" → toggle articolo nel carrello
@@ -22,9 +22,21 @@ interface Props {
 export function BuyControls({ article }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { has, toggle } = useCart();
+  const {
+    paymentsEnabled,
+    paypalMe,
+    contactWhatsapp,
+    handExchangeCities,
+  } = useSettings();
+  const paypalEnabled = paypalMe.length > 0;
   const ship = article.shipping_price ? Number(article.shipping_price) : 5;
   const grandTotal = Number(article.price || 0) + ship;
   const inCart = has(article.id);
+
+  const waText = `Ciao! Sono interessato a "${article.title}" — ${
+    typeof window !== "undefined" ? window.location.href : ""
+  }`;
+  const waUrl = contactWhatsapp ? whatsappUrl(contactWhatsapp, waText) : null;
 
   return (
     <>
@@ -57,7 +69,21 @@ export function BuyControls({ article }: Props) {
           </a>
         )}
 
-        {paymentsEnabled() && paypalEnabled() && article.status === "PUBLISHED" && (
+        {waUrl && article.status === "PUBLISHED" && (
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Scrivimi su WhatsApp per questo articolo"
+            className="btn text-sm font-bold px-4 py-2.5 inline-flex items-center gap-2 bg-[#25D366] text-white hover:brightness-105"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/whatsapp.png" alt="" width={16} height={16} />
+            <span>WhatsApp</span>
+          </a>
+        )}
+
+        {paymentsEnabled && paypalEnabled && article.status === "PUBLISHED" && (
           <button
             type="button"
             onClick={() => setDialogOpen(true)}
@@ -69,7 +95,7 @@ export function BuyControls({ article }: Props) {
           </button>
         )}
 
-        {paymentsEnabled() && article.status === "PUBLISHED" && (
+        {paymentsEnabled && article.status === "PUBLISHED" && (
           <button
             type="button"
             onClick={() => toggle(article.id)}
@@ -86,7 +112,7 @@ export function BuyControls({ article }: Props) {
 
       <p className="text-xs text-ink-soft mt-2">
         Prezzo: € {Number(article.price).toFixed(2)}
-        {paymentsEnabled() && (
+        {paymentsEnabled && (
           <>
             {" "}·{" "}
             <strong className="text-ink">Spedizione: € {ship.toFixed(2)}</strong>{" "}
@@ -94,13 +120,13 @@ export function BuyControls({ article }: Props) {
           </>
         )}
       </p>
-      {paymentsEnabled() && paypalEnabled() && article.status === "PUBLISHED" && (
+      {paymentsEnabled && paypalEnabled && article.status === "PUBLISHED" && (
         <>
           <div className="mt-3 inline-flex items-center gap-2 text-xs rounded-full bg-white text-ink px-3 py-1.5 font-semibold ring-2 ring-mint-deep shadow-soft">
             <span aria-hidden="true" className="text-base">🤝</span>
             <span>
               Consegna a mano <strong className="text-mint-deep">gratuita</strong>{" "}
-              a Livorno/Pisa
+              a {handExchangeCities}
               <span className="font-normal text-ink-soft ml-1">
                 (no spedizione)
               </span>
@@ -116,7 +142,7 @@ export function BuyControls({ article }: Props) {
         </>
       )}
 
-      {paymentsEnabled() && (
+      {paymentsEnabled && (
         <PurchaseDialog
           open={dialogOpen}
           onClose={() => setDialogOpen(false)}

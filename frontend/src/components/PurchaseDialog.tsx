@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createOrder, isHandExchangeEligible } from "@/lib/api";
-import { paypalUrl } from "@/lib/paypal";
+import { buildPaypalUrl } from "@/lib/paypal";
+import { useSettings } from "@/lib/settings-context";
 import type { Article } from "@/lib/types";
 
 interface Props {
@@ -55,12 +56,16 @@ export function PurchaseDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const { paypalMe, handExchangeCapPrefixes, handExchangeCities } = useSettings();
 
   const subtotal = articles.reduce(
     (acc, a) => acc + Number(a.price || 0),
     0,
   );
-  const capEligible = isHandExchangeEligible(state.ship_postal_code);
+  const capEligible = isHandExchangeEligible(
+    state.ship_postal_code, handExchangeCapPrefixes,
+  );
+  const capZonesLabel = handExchangeCapPrefixes.map((p) => `${p}xxx`).join("/");
   const effectiveShipping = state.hand_exchange ? 0 : shippingTotal;
   const grandTotal = subtotal + effectiveShipping;
   const currency = articles[0]?.currency || "EUR";
@@ -91,7 +96,7 @@ export function PurchaseDialog({
       // Se il CAP cambia e non e' piu' eligible per scambio a mano,
       // disattivo l'opzione automaticamente per evitare submit invalido
       if (k === "ship_postal_code" && next.hand_exchange) {
-        if (!isHandExchangeEligible(String(v))) {
+        if (!isHandExchangeEligible(String(v), handExchangeCapPrefixes)) {
           next.hand_exchange = false;
         }
       }
@@ -101,11 +106,11 @@ export function PurchaseDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Validazione client: hand_exchange richiede CAP LI/PI
+    // Validazione client: hand_exchange richiede CAP nelle zone abilitate
     if (state.hand_exchange && !capEligible) {
       setError(
-        "La consegna a mano è disponibile solo per CAP di Pisa (56xxx) o " +
-        "Livorno (57xxx). Cambia indirizzo o disattiva l'opzione.",
+        `La consegna a mano è disponibile solo per CAP ${capZonesLabel} ` +
+        `(${handExchangeCities}). Cambia indirizzo o disattiva l'opzione.`,
       );
       return;
     }
@@ -128,7 +133,7 @@ export function PurchaseDialog({
       });
 
       // Apri paypal.me col totale in una nuova tab
-      const url = paypalUrl(grandTotal, currency);
+      const url = buildPaypalUrl(paypalMe, grandTotal, currency);
       if (url) {
         window.open(url, "_blank", "noopener,noreferrer");
       }
@@ -347,8 +352,8 @@ export function PurchaseDialog({
                 </span>
                 <span className="block text-xs text-ink-soft mt-1 leading-snug">
                   {capEligible
-                    ? `CAP ${state.ship_postal_code} compatibile (Pisa/Livorno). Concorderemo via email luogo e orario per l'incontro.`
-                    : "Disponibile solo se l'indirizzo è in provincia di Pisa (56xxx) o Livorno (57xxx)."}
+                    ? `CAP ${state.ship_postal_code} compatibile (${handExchangeCities}). Concorderemo via email luogo e orario per l'incontro.`
+                    : `Disponibile solo se l'indirizzo è in zona ${handExchangeCities} (CAP ${capZonesLabel}).`}
                 </span>
               </span>
             </label>

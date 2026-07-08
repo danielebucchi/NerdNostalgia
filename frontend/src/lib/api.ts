@@ -150,16 +150,19 @@ export interface OrderCreateInput {
 }
 
 /**
- * Helper condiviso fra dialog e badge UI: il CAP rientra nelle province
- * di Livorno (57xxx) o Pisa (56xxx) — zone in cui il venditore propone
- * la consegna a mano. DEVE restare allineato a backend
- * `_is_hand_exchange_eligible` in api/orders.py.
+ * Helper condiviso fra dialog e badge UI: il CAP rientra nelle zone in cui
+ * il venditore propone la consegna a mano. I prefissi arrivano dalle
+ * settings runtime (useSettings().handExchangeCapPrefixes) e DEVONO restare
+ * allineati al backend `_is_hand_exchange_eligible` in api/orders.py
+ * (che legge la stessa setting).
  */
-export function isHandExchangeEligible(postalCode: string): boolean {
+export function isHandExchangeEligible(
+  postalCode: string,
+  prefixes: string[],
+): boolean {
   const digits = postalCode.replace(/\D/g, "").slice(0, 5);
   if (digits.length < 2) return false;
-  const prefix = digits.slice(0, 2);
-  return prefix === "56" || prefix === "57";
+  return prefixes.includes(digits.slice(0, 2));
 }
 
 export interface OrderConfirmation {

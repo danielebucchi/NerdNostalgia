@@ -1,18 +1,18 @@
 /**
- * Costruisce un link paypal.me/{handle}/{amount}{currency}.
- * Se NEXT_PUBLIC_PAYPAL_ME non e' settato (env var build-time), ritorna null
- * → i bottoni PayPal si nascondono automaticamente.
+ * Builder puro per link paypal.me/{handle}/{amount}{currency}.
  *
- * Setta NEXT_PUBLIC_PAYPAL_ME=tuohandle nel .env per attivarli.
+ * L'handle arriva dalle settings runtime (useSettings().paypalMe — con
+ * fallback sulla env di build NEXT_PUBLIC_PAYPAL_ME). Se l'handle e' vuoto
+ * ritorna null → i bottoni PayPal si nascondono automaticamente.
  */
-const PAYPAL_HANDLE = (process.env.NEXT_PUBLIC_PAYPAL_ME ?? "").trim();
-
-export function paypalUrl(
+export function buildPaypalUrl(
+  handle: string,
   amount?: number | string | null,
   currency: string = "EUR",
 ): string | null {
-  if (!PAYPAL_HANDLE) return null;
-  const base = `https://paypal.me/${encodeURIComponent(PAYPAL_HANDLE)}`;
+  const h = handle.trim();
+  if (!h) return null;
+  const base = `https://paypal.me/${encodeURIComponent(h)}`;
   if (amount == null || amount === "") return base;
   const n = typeof amount === "number" ? amount : Number(amount);
   if (!Number.isFinite(n) || n <= 0) return base;
@@ -20,8 +20,4 @@ export function paypalUrl(
   // Usa punto come separatore decimale e max 2 decimali.
   const formatted = n.toFixed(2);
   return `${base}/${formatted}${currency.toUpperCase()}`;
-}
-
-export function paypalEnabled(): boolean {
-  return PAYPAL_HANDLE.length > 0;
 }

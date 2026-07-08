@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArticleCard } from "@/components/ArticleCard";
+import { PUBLIC_API_BASE } from "@/lib/api";
 import type { Article, ArticleCondition } from "@/lib/types";
 
 // Persistenza preferenza aperto/chiuso del pannello filtri.
@@ -53,12 +54,22 @@ const EMPTY: FilterState = {
 
 type Dim = "search" | "category" | "subcategory" | "condition" | "brand" | "price";
 
+type SortKey = "recent" | "price_asc" | "price_desc" | "title";
+
+const SORT_LABEL: Record<SortKey, string> = {
+  recent: "Più recenti",
+  price_asc: "Prezzo ↑",
+  price_desc: "Prezzo ↓",
+  title: "Titolo A-Z",
+};
+
 interface Props {
   initialArticles: Article[];
 }
 
 export function CatalogSection({ initialArticles }: Props) {
   const [filters, setFilters] = useState<FilterState>(EMPTY);
+  const [sort, setSort] = useState<SortKey>("recent");
   // Pannello filtri: aperto di default, preferenza persistita in localStorage.
   // Vale per tutti i breakpoint (mobile + desktop): l'utente comanda.
   const [panelOpen, setPanelOpen] = useState(true);
@@ -73,7 +84,27 @@ export function CatalogSection({ initialArticles }: Props) {
     } catch {
       // ignore: storage non disponibile (private mode)
     }
+    // Deep-link ricerca: /?search=snes (dalla SearchBox in header o link
+    // esterni). Letto da window per non richiedere Suspense/useSearchParams.
+    try {
+      const q = new URLSearchParams(window.location.search).get("search");
+      if (q) setFilters((f) => ({ ...f, search: q }));
+    } catch {
+      // ignore
+    }
     setHydrated(true);
+  }, []);
+
+  // La SearchBox nell'header notifica le ricerche fatte mentre siamo GIA'
+  // sulla home (router.push con sola query non rimonta il client tree).
+  useEffect(() => {
+    function onSearch(e: Event) {
+      const q = (e as CustomEvent<string>).detail ?? "";
+      setFilters((f) => ({ ...f, search: q }));
+      document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" });
+    }
+    window.addEventListener("nn:catalog-search", onSearch);
+    return () => window.removeEventListener("nn:catalog-search", onSearch);
   }, []);
 
   function togglePanel() {
@@ -125,12 +156,25 @@ export function CatalogSection({ initialArticles }: Props) {
     return true;
   }
 
-  /** Articoli che soddisfano TUTTI i filtri correnti. */
-  const filtered = useMemo(
-    () => initialArticles.filter((a) => matches(a, null)),
+  /** Articoli che soddisfano TUTTI i filtri correnti, gia' ordinati. */
+  const filtered = useMemo(() => {
+    const arr = initialArticles.filter((a) => matches(a, null));
+    switch (sort) {
+      case "price_asc":
+        arr.sort((a, b) => Number(a.price) - Number(b.price));
+        break;
+      case "price_desc":
+        arr.sort((a, b) => Number(b.price) - Number(a.price));
+        break;
+      case "title":
+        arr.sort((a, b) => a.title.localeCompare(b.title, "it"));
+        break;
+      default:
+        break; // "recent": ordine del server (display_order, created desc)
+    }
+    return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [initialArticles, filters],
-  );
+  }, [initialArticles, filters, sort]);
 
   /**
    * Per ogni opzione di una dimensione (es. category=videogames) conta gli
@@ -284,6 +328,10 @@ export function CatalogSection({ initialArticles }: Props) {
         hydrated={hydrated}
         onTogglePanel={togglePanel}
         resultsCount={filtered.length}
+        sort={sort}
+        onSort={setSort}
+        articles={initialArticles}
+        activeCategorySlug={filters.category}
       />
 
       {filtered.length === 0 ? (
@@ -335,6 +383,10 @@ interface FiltersProps {
   hydrated: boolean;
   onTogglePanel: () => void;
   resultsCount: number;
+  sort: SortKey;
+  onSort: (s: SortKey) => void;
+  articles: Article[];
+  activeCategorySlug: string | null;
 }
 
 function Filters({
@@ -361,6 +413,10 @@ function Filters({
   hydrated,
   onTogglePanel,
   resultsCount,
+  sort,
+  onSort,
+  articles,
+  activeCategorySlug,
 }: FiltersProps) {
   // Prima dell'hydration, il pannello va renderizzato per evitare flash;
   // useremo la sua preferenza salvata appena disponibile.
@@ -441,6 +497,24 @@ function Filters({
             <span className="hidden sm:inline">✕ Azzera</span>
           </button>
         )}
+      </div>
+
+      {/* Riga secondaria: campanella avvisi a sinistra, ordinamento a destra */}
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <AlertBell articles={articles} activeCategorySlug={activeCategorySlug} />
+        <label className="inline-flex items-center gap-1.5 text-xs text-ink-soft">
+          <span className="hidden sm:inline">Ordina:</span>
+          <select
+            value={sort}
+            onChange={(e) => onSort(e.target.value as SortKey)}
+            aria-label="Ordina risultati"
+            className="filter-input py-1.5 text-xs"
+          >
+            {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+              <option key={k} value={k}>{SORT_LABEL[k]}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {/* Pannello filtri: collassabile sempre, persistito in localStorage */}
@@ -630,6 +704,187 @@ function FilterRow({
       </span>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
+  );
+}
+
+/**
+ * Campanella "Avvisami dei nuovi arrivi": apre un mini-dialog che iscrive
+ * l'email agli avvisi per una categoria (o tutte) via POST /api/alerts/.
+ * La categoria proposta di default e' quella attualmente filtrata.
+ */
+function AlertBell({
+  articles,
+  activeCategorySlug,
+}: {
+  articles: Article[];
+  activeCategorySlug: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [website, setWebsite] = useState(""); // honeypot
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Categorie top-level presenti nel catalogo: slug → {id, name}
+  const topCategories = useMemo(() => {
+    const map = new Map<string, { id: number; name: string }>();
+    for (const a of articles) {
+      const top = a.parent_category ?? a.category;
+      if (top && top.parent_id == null) {
+        map.set(top.slug, { id: top.id, name: top.name });
+      }
+    }
+    return Array.from(map.entries())
+      .map(([slug, v]) => ({ slug, ...v }))
+      .sort((a, b) => a.name.localeCompare(b.name, "it"));
+  }, [articles]);
+
+  // Pre-seleziona la categoria filtrata quando si apre il dialog
+  useEffect(() => {
+    if (open) {
+      const match = topCategories.find((c) => c.slug === activeCategorySlug);
+      setCategoryId(match ? String(match.id) : "");
+      setDone(false);
+      setError(null);
+    }
+  }, [open, activeCategorySlug, topCategories]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${PUBLIC_API_BASE}/api/alerts/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          category_id: categoryId ? Number(categoryId) : null,
+          website: website.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(
+          typeof body?.detail === "string" ? body.detail : `Errore ${res.status}`,
+        );
+      }
+      setDone(true);
+      setEmail("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 text-xs font-bold text-lilac-deep hover:underline"
+        title="Ricevi una mail quando arrivano nuovi articoli"
+      >
+        <span aria-hidden="true">🔔</span>
+        <span>Avvisami dei nuovi arrivi</span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-sm"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="card w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <h3 className="display text-xl text-ink">🔔 Avvisami dei nuovi arrivi</h3>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="w-8 h-8 rounded-full border-2 border-ink flex items-center justify-center text-ink hover:bg-pink shrink-0"
+                aria-label="Chiudi"
+              >
+                ✕
+              </button>
+            </div>
+
+            {done ? (
+              <div className="text-center py-4">
+                <div className="text-4xl mb-2">✨</div>
+                <p className="display text-lg text-ink mb-1">Iscrizione fatta!</p>
+                <p className="text-sm text-ink-soft">
+                  Ti scrivo appena arriva qualcosa di nuovo. Puoi disiscriverti
+                  dal link in fondo a ogni email.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="btn btn-primary mt-4 text-sm"
+                >
+                  Chiudi
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <p className="text-sm text-ink-soft">
+                  Lascia la tua email: quando pubblico un nuovo articolo ti
+                  arriva un avviso. Niente spam, solo nuovi arrivi.
+                </p>
+                {/* Honeypot nascosto */}
+                <input
+                  type="text"
+                  name="hp_bell"
+                  tabIndex={-1}
+                  autoComplete="new-password"
+                  aria-hidden="true"
+                  style={{ display: "none" }}
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="la-tua@email.it"
+                  className="filter-input w-full"
+                  maxLength={255}
+                />
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="filter-input w-full"
+                  aria-label="Categoria di interesse"
+                >
+                  <option value="">Tutte le novità</option>
+                  {topCategories.map((c) => (
+                    <option key={c.id} value={c.id}>Solo {c.name}</option>
+                  ))}
+                </select>
+                {error && (
+                  <p className="text-pink-deep text-sm font-semibold">⚠ {error}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="btn btn-primary w-full text-sm"
+                >
+                  {busy ? "Invio…" : "Iscrivimi"}
+                </button>
+                <p className="text-[11px] text-ink-soft">
+                  Usata solo per gli avvisi. Disiscrizione con un click.
+                </p>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
