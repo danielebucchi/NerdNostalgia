@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertBell } from "@/components/AlertBell";
 import { CartNavLink } from "@/components/CartNavLink";
 import { LogoImage } from "@/components/LogoImage";
 import { SearchBox } from "@/components/SearchBox";
@@ -58,12 +59,14 @@ export function Header() {
         <nav className="hidden md:flex items-center gap-2 flex-shrink-0">
           <Link href="/" className="btn btn-ghost text-sm">Catalogo</Link>
           <Link href="/cerco-compro" className="btn btn-ghost text-sm">Cerco/Compro</Link>
+          <AlertBell variant="desktop" />
           <WishlistNavLink variant="desktop" />
           <CartNavLink variant="desktop" />
           <Link href="/contatti" className="btn btn-primary text-sm">Contattami</Link>
         </nav>
 
         <nav className="flex md:hidden gap-1.5 flex-shrink-0">
+          <AlertBell variant="mobile" />
           <WishlistNavLink variant="mobile" />
           <CartNavLink variant="mobile" />
           <Link

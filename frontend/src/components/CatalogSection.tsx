@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArticleCard } from "@/components/ArticleCard";
-import { PUBLIC_API_BASE } from "@/lib/api";
 import type { Article, ArticleCondition } from "@/lib/types";
 
 // Persistenza preferenza aperto/chiuso del pannello filtri.
@@ -330,8 +329,6 @@ export function CatalogSection({ initialArticles }: Props) {
         resultsCount={filtered.length}
         sort={sort}
         onSort={setSort}
-        articles={initialArticles}
-        activeCategorySlug={filters.category}
       />
 
       {filtered.length === 0 ? (
@@ -385,8 +382,6 @@ interface FiltersProps {
   resultsCount: number;
   sort: SortKey;
   onSort: (s: SortKey) => void;
-  articles: Article[];
-  activeCategorySlug: string | null;
 }
 
 function Filters({
@@ -415,8 +410,6 @@ function Filters({
   resultsCount,
   sort,
   onSort,
-  articles,
-  activeCategorySlug,
 }: FiltersProps) {
   // Prima dell'hydration, il pannello va renderizzato per evitare flash;
   // useremo la sua preferenza salvata appena disponibile.
@@ -485,6 +478,19 @@ function Filters({
           </span>
         </button>
 
+        {/* Ordinamento: inline accanto ai filtri da sm+; su mobile vive
+            dentro il pannello collassabile (vedi FilterRow "Ordina") */}
+        <select
+          value={sort}
+          onChange={(e) => onSort(e.target.value as SortKey)}
+          aria-label="Ordina risultati"
+          className="filter-input hidden sm:block text-sm flex-shrink-0"
+        >
+          {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+            <option key={k} value={k}>{SORT_LABEL[k]}</option>
+          ))}
+        </select>
+
         {hasAnyFilter && (
           <button
             type="button"
@@ -499,30 +505,33 @@ function Filters({
         )}
       </div>
 
-      {/* Riga secondaria: campanella avvisi a sinistra, ordinamento a destra */}
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <AlertBell articles={articles} activeCategorySlug={activeCategorySlug} />
-        <label className="inline-flex items-center gap-1.5 text-xs text-ink-soft">
-          <span className="hidden sm:inline">Ordina:</span>
-          <select
-            value={sort}
-            onChange={(e) => onSort(e.target.value as SortKey)}
-            aria-label="Ordina risultati"
-            className="filter-input py-1.5 text-xs"
-          >
-            {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
-              <option key={k} value={k}>{SORT_LABEL[k]}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
       {/* Pannello filtri: collassabile sempre, persistito in localStorage */}
       <div
         id="catalog-filters-panel"
         className={panelVisible ? "block" : "hidden"}
       >
         <div className="card p-4 sm:p-5 space-y-4">
+          {/* Ordinamento (solo mobile: su sm+ la select sta accanto ai filtri) */}
+          <div className="sm:hidden">
+            <FilterRow label="Ordina">
+              {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => onSort(k)}
+                  className={
+                    "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold transition-all " +
+                    (sort === k
+                      ? "bg-gradient-to-br from-pink to-lilac-deep text-white shadow-soft"
+                      : "bg-white/70 text-ink ring-1 ring-ink/10 hover:bg-white hover:ring-ink/20")
+                  }
+                >
+                  {SORT_LABEL[k]}
+                </button>
+              ))}
+            </FilterRow>
+          </div>
+
           {/* Categoria */}
           {Object.keys(catCounts).length > 0 && (
             <FilterRow label="Categoria">
@@ -704,187 +713,6 @@ function FilterRow({
       </span>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
-  );
-}
-
-/**
- * Campanella "Avvisami dei nuovi arrivi": apre un mini-dialog che iscrive
- * l'email agli avvisi per una categoria (o tutte) via POST /api/alerts/.
- * La categoria proposta di default e' quella attualmente filtrata.
- */
-function AlertBell({
-  articles,
-  activeCategorySlug,
-}: {
-  articles: Article[];
-  activeCategorySlug: string | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [categoryId, setCategoryId] = useState<string>("");
-  const [website, setWebsite] = useState(""); // honeypot
-  const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Categorie top-level presenti nel catalogo: slug → {id, name}
-  const topCategories = useMemo(() => {
-    const map = new Map<string, { id: number; name: string }>();
-    for (const a of articles) {
-      const top = a.parent_category ?? a.category;
-      if (top && top.parent_id == null) {
-        map.set(top.slug, { id: top.id, name: top.name });
-      }
-    }
-    return Array.from(map.entries())
-      .map(([slug, v]) => ({ slug, ...v }))
-      .sort((a, b) => a.name.localeCompare(b.name, "it"));
-  }, [articles]);
-
-  // Pre-seleziona la categoria filtrata quando si apre il dialog
-  useEffect(() => {
-    if (open) {
-      const match = topCategories.find((c) => c.slug === activeCategorySlug);
-      setCategoryId(match ? String(match.id) : "");
-      setDone(false);
-      setError(null);
-    }
-  }, [open, activeCategorySlug, topCategories]);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`${PUBLIC_API_BASE}/api/alerts/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          category_id: categoryId ? Number(categoryId) : null,
-          website: website.trim() || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(
-          typeof body?.detail === "string" ? body.detail : `Errore ${res.status}`,
-        );
-      }
-      setDone(true);
-      setEmail("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 text-xs font-bold text-lilac-deep hover:underline"
-        title="Ricevi una mail quando arrivano nuovi articoli"
-      >
-        <span aria-hidden="true">🔔</span>
-        <span>Avvisami dei nuovi arrivi</span>
-      </button>
-
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-sm"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="card w-full max-w-md p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <h3 className="display text-xl text-ink">🔔 Avvisami dei nuovi arrivi</h3>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="w-8 h-8 rounded-full border-2 border-ink flex items-center justify-center text-ink hover:bg-pink shrink-0"
-                aria-label="Chiudi"
-              >
-                ✕
-              </button>
-            </div>
-
-            {done ? (
-              <div className="text-center py-4">
-                <div className="text-4xl mb-2">✨</div>
-                <p className="display text-lg text-ink mb-1">Iscrizione fatta!</p>
-                <p className="text-sm text-ink-soft">
-                  Ti scrivo appena arriva qualcosa di nuovo. Puoi disiscriverti
-                  dal link in fondo a ogni email.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="btn btn-primary mt-4 text-sm"
-                >
-                  Chiudi
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <p className="text-sm text-ink-soft">
-                  Lascia la tua email: quando pubblico un nuovo articolo ti
-                  arriva un avviso. Niente spam, solo nuovi arrivi.
-                </p>
-                {/* Honeypot nascosto */}
-                <input
-                  type="text"
-                  name="hp_bell"
-                  tabIndex={-1}
-                  autoComplete="new-password"
-                  aria-hidden="true"
-                  style={{ display: "none" }}
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="la-tua@email.it"
-                  className="filter-input w-full"
-                  maxLength={255}
-                />
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="filter-input w-full"
-                  aria-label="Categoria di interesse"
-                >
-                  <option value="">Tutte le novità</option>
-                  {topCategories.map((c) => (
-                    <option key={c.id} value={c.id}>Solo {c.name}</option>
-                  ))}
-                </select>
-                {error && (
-                  <p className="text-pink-deep text-sm font-semibold">⚠ {error}</p>
-                )}
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="btn btn-primary w-full text-sm"
-                >
-                  {busy ? "Invio…" : "Iscrivimi"}
-                </button>
-                <p className="text-[11px] text-ink-soft">
-                  Usata solo per gli avvisi. Disiscrizione con un click.
-                </p>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-    </>
   );
 }
 
