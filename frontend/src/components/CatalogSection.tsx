@@ -5,8 +5,10 @@ import { ArticleCard } from "@/components/ArticleCard";
 import type { Article, ArticleCondition } from "@/lib/types";
 
 // Persistenza preferenza aperto/chiuso del pannello filtri.
-// Default su primo accesso: aperto (utente nuovo vede subito le opzioni).
-const PANEL_STORAGE_KEY = "nn:catalog-filters-open:v1";
+// Default su primo accesso: CHIUSO (si vede subito il catalogo).
+// v2: bump della chiave quando e' cambiato il default aperto→chiuso,
+// cosi' anche i visitatori con la vecchia preferenza ripartono chiusi.
+const PANEL_STORAGE_KEY = "nn:catalog-filters-open:v2";
 
 /** Slug top-level di un articolo (sé stesso se categoria top, altrimenti il parent). */
 function topSlugOf(article: Article): string | null {
