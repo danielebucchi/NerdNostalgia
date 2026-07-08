@@ -48,7 +48,7 @@ export function Header() {
           />
           {/* Wordmark nascosto su mobile: il logo + aria-label del Link
               bastano per identita' / a11y, e lasciamo aria al nav buttons. */}
-          <span className="display hidden sm:inline text-2xl md:text-3xl text-ink leading-none truncate">
+          <span className="display hidden sm:inline text-lg md:text-xl text-ink leading-none truncate">
             Nerd<span className="text-lilac-deep">.</span>Nostalgia
           </span>
         </Link>

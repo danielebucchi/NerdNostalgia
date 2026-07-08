@@ -43,6 +43,20 @@ export function AlertBell({ variant = "desktop" }: { variant?: "desktop" | "mobi
     }
   }, [open]);
 
+  // Esc per chiudere + blocca lo scroll della pagina sotto al dialog
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -98,11 +112,13 @@ export function AlertBell({ variant = "desktop" }: { variant?: "desktop" | "mobi
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 bg-ink/40 backdrop-blur-sm overflow-y-auto"
           onClick={() => setOpen(false)}
         >
+          {/* items-start su mobile + my-*: se il contenuto supera il
+              viewport si scrolla, niente form tagliata in cima */}
           <div
-            className="card w-full max-w-md p-6"
+            className="card w-full max-w-md p-6 my-6 sm:my-8 max-h-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 mb-3">

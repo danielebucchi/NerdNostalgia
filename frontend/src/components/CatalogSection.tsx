@@ -69,9 +69,9 @@ interface Props {
 export function CatalogSection({ initialArticles }: Props) {
   const [filters, setFilters] = useState<FilterState>(EMPTY);
   const [sort, setSort] = useState<SortKey>("recent");
-  // Pannello filtri: aperto di default, preferenza persistita in localStorage.
-  // Vale per tutti i breakpoint (mobile + desktop): l'utente comanda.
-  const [panelOpen, setPanelOpen] = useState(true);
+  // Pannello filtri: CHIUSO di default (si vede subito il catalogo),
+  // preferenza persistita in localStorage. Vale per tutti i breakpoint.
+  const [panelOpen, setPanelOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -411,9 +411,9 @@ function Filters({
   sort,
   onSort,
 }: FiltersProps) {
-  // Prima dell'hydration, il pannello va renderizzato per evitare flash;
-  // useremo la sua preferenza salvata appena disponibile.
-  const panelVisible = hydrated ? panelOpen : true;
+  // Prima dell'hydration teniamo il pannello CHIUSO (coerente col nuovo
+  // default): niente flash di filtri aperti al primo paint.
+  const panelVisible = hydrated ? panelOpen : false;
 
   return (
     <div className="mb-6 sm:mb-8">
