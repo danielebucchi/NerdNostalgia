@@ -57,7 +57,6 @@ export function Header() {
         <SearchBox className="hidden md:block flex-1 max-w-xs mx-2" />
 
         <nav className="hidden md:flex items-center gap-2 flex-shrink-0">
-          <Link href="/" className="btn btn-ghost text-sm">Catalogo</Link>
           <Link href="/cerco-compro" className="btn btn-ghost text-sm">Cerco/Compro</Link>
           <AlertBell variant="desktop" />
           <WishlistNavLink variant="desktop" />
