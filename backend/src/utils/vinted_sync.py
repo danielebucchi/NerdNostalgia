@@ -403,6 +403,15 @@ def _apply_item_to_article(
         db.commit()
         db.refresh(article)
 
+    # Avviso "nuovo arrivo" agli iscritti (best-effort, dopo le foto cosi'
+    # il link nell'email punta a un articolo gia' completo).
+    if not sold_on_vinted:
+        try:
+            from utils.category_alerts import notify_new_article
+            notify_new_article(db, article)
+        except Exception:  # noqa: BLE001
+            LOGGER.exception("Notifica nuovo arrivo fallita per %s", article.id)
+
     return article, "created"
 
 

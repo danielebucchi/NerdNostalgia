@@ -30,6 +30,7 @@ from models.entities.article import (
     ReorderRequest,
     VintedSyncUpdate,
 )
+from utils.category_alerts import notify_new_article
 from utils.storage import (
     UploadValidationError,
     delete_article_dir,
@@ -295,7 +296,16 @@ def update_article(
                 detail=f"SKU '{article_data.sku}' gia' utilizzato",
             )
 
+    was_published = article.status == ArticleStatus.PUBLISHED
     article_helper.update(article_data, article)
+
+    # Avvisi "nuovo arrivo" solo sulla transizione a PUBLISHED (best-effort)
+    if not was_published and article.status == ArticleStatus.PUBLISHED:
+        try:
+            notify_new_article(article_helper.db, article)
+        except Exception:  # noqa: BLE001
+            pass
+
     return _to_response(article)
 
 
@@ -330,7 +340,13 @@ def publish_article(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Articolo con ID {article_id} non trovato",
         )
+    was_published = article.status == ArticleStatus.PUBLISHED
     article_helper.set_status(article, ArticleStatus.PUBLISHED)
+    if not was_published:
+        try:
+            notify_new_article(article_helper.db, article)
+        except Exception:  # noqa: BLE001
+            pass
     return _to_response(article)
 
 

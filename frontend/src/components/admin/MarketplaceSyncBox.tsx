@@ -12,8 +12,10 @@ interface MarketplaceConfig {
   label: string;
   emoji: string;
   newListingUrl: string;
-  /** Testo aggiunto in fondo alla descrizione "copia formattata". */
-  descriptionFooter: string;
+  /** Chiave settings del footer aggiunto alla descrizione copiata. */
+  footerSettingKey: string;
+  /** Fallback se la setting non e' ancora caricata/configurata. */
+  defaultFooter: string;
 }
 
 const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
@@ -22,7 +24,8 @@ const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
     label: "Vinted",
     emoji: "🛍",
     newListingUrl: "https://www.vinted.it/items/new",
-    descriptionFooter:
+    footerSettingKey: "marketplace_footer_vinted",
+    defaultFooter:
       "Spedizione tracciata in tutta Italia.\nAltri pezzi nerd su nerdnostalgia.it",
   },
   ebay: {
@@ -30,11 +33,30 @@ const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
     label: "eBay",
     emoji: "🏷",
     newListingUrl: "https://www.ebay.it/sl/sell",
-    descriptionFooter:
+    footerSettingKey: "marketplace_footer_ebay",
+    defaultFooter:
       "Spedizione tracciata in tutta Italia con corriere assicurato.\n" +
       "Altri pezzi nerd su nerdnostalgia.it",
   },
 };
+
+// Cache module-level: la pagina articolo monta 2 SyncBox (Vinted + eBay),
+// una sola GET /api/settings/ basta per entrambe.
+let footersPromise: Promise<Record<string, string>> | null = null;
+function fetchFooters(): Promise<Record<string, string>> {
+  if (!footersPromise) {
+    footersPromise = adminApi
+      .get<{ key: string; effective: string }[]>("/api/settings/")
+      .then((entries) =>
+        Object.fromEntries(entries.map((e) => [e.key, e.effective])),
+      )
+      .catch(() => {
+        footersPromise = null; // ritenta al prossimo mount
+        return {};
+      });
+  }
+  return footersPromise;
+}
 
 export function calcMarkup(basePrice: string | number, percent: number): string {
   const base = typeof basePrice === "string" ? Number(basePrice) : basePrice;
@@ -118,6 +140,18 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
   const [error, setError] = useState<string | null>(null);
   // Feedback per copia: null = nessuna, altrimenti nome del campo appena copiato.
   const [copiedField, setCopiedField] = useState<"title" | "description" | "price" | null>(null);
+  const [footer, setFooter] = useState(config.defaultFooter);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchFooters().then((values) => {
+      const v = values[config.footerSettingKey];
+      if (!cancelled && v) setFooter(v);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [config.footerSettingKey]);
 
   useEffect(() => {
     setStatus(current.status);
@@ -167,7 +201,7 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
     if (field === "title") {
       text = article.title;
     } else if (field === "description") {
-      text = buildDescription(article, config.descriptionFooter);
+      text = buildDescription(article, footer);
     } else {
       // Prezzo: number puro (senza simbolo/valuta) — Vinted/eBay hanno un
       // input numerico che vuole solo cifre + punto/virgola decimale.

@@ -205,7 +205,7 @@ export function ImageGalleryEditor({
         </div>
       )}
 
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-1 flex-wrap">
         <label
           className={`btn btn-ghost text-xs cursor-pointer ${
             !canAdd ? "opacity-50 cursor-not-allowed pointer-events-none" : ""
@@ -217,6 +217,23 @@ export function ImageGalleryEditor({
             type="file"
             accept="image/*"
             multiple
+            className="sr-only"
+            onChange={(e) => handleFiles(e.target.files)}
+            disabled={!canAdd}
+          />
+        </label>
+        {/* Scatto diretto dalla camera: capture apre la fotocamera
+            posteriore sui telefoni; su desktop degrada nel file picker. */}
+        <label
+          className={`btn btn-ghost text-xs cursor-pointer ${
+            !canAdd ? "opacity-50 cursor-not-allowed pointer-events-none" : ""
+          }`}
+        >
+          📸 Scatta
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
             className="sr-only"
             onChange={(e) => handleFiles(e.target.files)}
             disabled={!canAdd}

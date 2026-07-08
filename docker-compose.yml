@@ -30,6 +30,9 @@ services:
       - APP_TIMEZONE=${APP_TIMEZONE:-Europe/Rome}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-change-me}
       - DISABLE_SCHEDULER=${DISABLE_SCHEDULER:-}
+      # URL pubblico del sito, usato nei link delle email (avvisi nuovi
+      # arrivi, inquiry). Riusa la stessa var del frontend.
+      - SITE_PUBLIC_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3737}
       # SMTP
       - EMAIL_ENABLED=${EMAIL_ENABLED:-0}
       - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}

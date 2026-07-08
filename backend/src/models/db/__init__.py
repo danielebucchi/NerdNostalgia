@@ -12,6 +12,7 @@ from .articles import (
     VintedStatus,
 )
 from .card_purchases import CardPurchase
+from .category_alert import CategoryAlert
 from .consignment_sale import ConsignmentSale
 from .expense import Expense
 from .inquiries import Inquiry, InquiryStatus
@@ -20,6 +21,7 @@ from .lot import Lot, LotStatus
 from .marketplace_fees import MarketplaceFee
 from .orders import Order, OrderItem, OrderStatus
 from .platform import Platform
+from .setting import Setting
 from .misc_sales import MiscSale, MiscSaleKind
 from .personal_card import PersonalCard, PersonalCardStatus
 from .vinted import VintedSettings, VintedSyncLog
@@ -37,6 +39,7 @@ __all__ = [
     "VintedStatus",
     "EbayStatus",
     "CardPurchase",
+    "CategoryAlert",
     "ConsignmentSale",
     "Expense",
     "Inquiry",
@@ -58,4 +61,5 @@ __all__ = [
     "OrderItem",
     "OrderStatus",
     "Platform",
+    "Setting",
 ]

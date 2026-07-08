@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/admin/AuthProvider";
-import { paymentsEnabled } from "@/lib/features";
+import { useSettings } from "@/lib/settings-context";
 
 const ALL_NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: "📊", exact: true },
@@ -18,17 +18,19 @@ const ALL_NAV_ITEMS = [
   { href: "/admin/tassonomia", label: "Tassonomia", icon: "🏷" },
   { href: "/admin/import-vinted", label: "Sync Vinted", icon: "🛍" },
   { href: "/admin/markups", label: "Commissioni", icon: "💸" },
+  { href: "/admin/impostazioni", label: "Impostazioni", icon: "⚙️" },
 ];
-
-const NAV_ITEMS = ALL_NAV_ITEMS.filter(
-  (item) => !item.requiresPayments || paymentsEnabled(),
-);
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { paymentsEnabled } = useSettings();
+
+  const NAV_ITEMS = ALL_NAV_ITEMS.filter(
+    (item) => !item.requiresPayments || paymentsEnabled,
+  );
 
   useEffect(() => {
     if (!loading && !user) {

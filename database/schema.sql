@@ -461,3 +461,25 @@ CREATE TABLE IF NOT EXISTS consignment_sales (
 CREATE INDEX IF NOT EXISTS idx_consignment_sale_date ON consignment_sales(sale_date DESC);
 CREATE INDEX IF NOT EXISTS idx_consignment_consignor ON consignment_sales(consignor);
 CREATE INDEX IF NOT EXISTS idx_consignment_paid_out ON consignment_sales(paid_out);
+
+-- ============================================================
+-- settings (config runtime chiave/valore, vedi migrazione 0008)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS settings (
+    key VARCHAR(100) PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- category_alerts (avvisi nuovi arrivi, vedi migrazione 0009)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS category_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email VARCHAR(255) NOT NULL,
+    category_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (email, category_id)
+);
+CREATE INDEX IF NOT EXISTS idx_category_alerts_category
+    ON category_alerts(category_id);

@@ -122,20 +122,33 @@ def _calc_shipping(articles: list[Article]) -> Decimal:
     return max(ships) if ships else DEFAULT_SHIPPING
 
 
-# CAP italiani per scambio a mano:
-#   56xxx → provincia di Pisa
-#   57xxx → provincia di Livorno
-HAND_EXCHANGE_CAP_PREFIXES = ("56", "57")
+# CAP per consegna a mano: prefissi (prime 2 cifre) configurabili da
+# /admin/impostazioni (chiave hand_exchange_cap_prefixes). Default 56,57
+# = province di Pisa e Livorno.
+DEFAULT_HAND_EXCHANGE_CAP_PREFIXES = ("56", "57")
 
 
-def _is_hand_exchange_eligible(postal_code: str) -> bool:
-    """True se il CAP rientra nelle province LI/PI dove il venditore
-    propone lo scambio a mano. Tolleriamo spazi e lettere extra,
-    teniamo le prime 2 cifre numeriche."""
+def _hand_exchange_prefixes(db: Session) -> tuple:
+    """Prefissi CAP correnti dalle settings, fallback sul default."""
+    try:
+        from helpers.setting import SettingHelper
+        raw = SettingHelper(db=db).get_value("hand_exchange_cap_prefixes")
+        prefixes = tuple(
+            p.strip() for p in raw.split(",") if p.strip().isdigit()
+        )
+        return prefixes or DEFAULT_HAND_EXCHANGE_CAP_PREFIXES
+    except Exception:  # noqa: BLE001
+        return DEFAULT_HAND_EXCHANGE_CAP_PREFIXES
+
+
+def _is_hand_exchange_eligible(postal_code: str, db: Session) -> bool:
+    """True se il CAP rientra nelle zone dove il venditore propone la
+    consegna a mano. Tolleriamo spazi e lettere extra, teniamo le prime
+    2 cifre numeriche."""
     digits = "".join(ch for ch in postal_code if ch.isdigit())[:5]
     if len(digits) < 2:
         return False
-    return digits[:2] in HAND_EXCHANGE_CAP_PREFIXES
+    return digits[:2] in _hand_exchange_prefixes(db)
 
 
 # ─────────────────── Public endpoint: crea ordine ───────────────────
@@ -202,12 +215,15 @@ def create_order(
     # l'utente sta cercando di evitare le spese senza diritto.
     hand_exchange = bool(payload.hand_exchange)
     if hand_exchange:
-        if not _is_hand_exchange_eligible(payload.ship_postal_code):
+        if not _is_hand_exchange_eligible(payload.ship_postal_code, db):
+            prefixes = ", ".join(
+                f"{p}xxx" for p in _hand_exchange_prefixes(db)
+            )
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "Scambio a mano disponibile solo per CAP di Pisa (56xxx) "
-                    "o Livorno (57xxx). Togli la spunta o cambia indirizzo."
+                    f"Consegna a mano disponibile solo per CAP {prefixes}. "
+                    "Togli la spunta o cambia indirizzo."
                 ),
             )
         shipping_total = Decimal("0")
