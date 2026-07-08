@@ -23,8 +23,9 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Hero */}
-      <section className="hero-blob p-6 sm:p-10 md:p-12 mb-10 sm:mb-12 relative overflow-hidden">
+      {/* Hero — compatto su desktop cosi' il catalogo si intravede subito
+          sotto la fold senza dover scrollare */}
+      <section className="hero-blob p-6 sm:p-8 md:p-8 mb-8 sm:mb-10 relative overflow-hidden">
         {/* Logo mobile (sopra il testo) */}
         <div className="md:hidden flex justify-center mb-5">
           <LogoImage
@@ -33,21 +34,21 @@ export default async function HomePage() {
             alt="NerdNostalgia logo"
           />
         </div>
-        <div className="grid gap-8 md:grid-cols-[1.4fr_1fr] items-center">
+        <div className="grid gap-6 md:grid-cols-[1.7fr_1fr] items-center">
           <div className="text-center md:text-left">
-            <span className="chip chip-pink mb-4 inline-flex">
+            <span className="chip chip-pink mb-3 inline-flex">
               ★ nuovi arrivi ogni settimana
             </span>
-            <h1 className="display text-3xl sm:text-4xl md:text-5xl text-ink leading-[1.1] mb-4">
+            <h1 className="display text-3xl sm:text-4xl text-ink leading-[1.1] mb-3">
               Le tue <span className="text-pink-deep">nerderie</span>,
               <br className="hidden sm:inline" />{" "}
               casa dolce casa.
             </h1>
-            <p className="text-ink-soft text-base sm:text-lg max-w-md mx-auto md:mx-0 leading-relaxed">
+            <p className="text-ink-soft text-base max-w-md mx-auto md:mx-0 leading-relaxed">
               Videogiochi vintage, carte Pokémon, Funko e gadget retro selezionati
               con cura. Spedizione veloce in tutta Italia.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3 justify-center md:justify-start">
+            <div className="mt-5 flex flex-wrap gap-3 justify-center md:justify-start">
               <Link href="#catalogo" className="btn btn-primary">
                 Sfoglia il catalogo →
               </Link>
@@ -58,8 +59,8 @@ export default async function HomePage() {
           </div>
           <div className="hidden md:flex items-center justify-center relative">
             <LogoImage
-              size={256}
-              className="w-64 h-64 rounded-full ring-1 ring-lilac-deep/20 shadow-glow object-cover bg-white"
+              size={160}
+              className="w-40 h-40 rounded-full ring-1 ring-lilac-deep/20 shadow-glow object-cover bg-white"
               alt="NerdNostalgia logo"
             />
           </div>
