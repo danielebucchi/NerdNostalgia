@@ -510,28 +510,32 @@ function Filters({
         id="catalog-filters-panel"
         className={panelVisible ? "block" : "hidden"}
       >
-        <div className="card p-4 sm:p-5 space-y-4">
-          {/* Ordinamento (solo mobile: su sm+ la select sta accanto ai filtri) */}
-          <div className="sm:hidden">
-            <FilterRow label="Ordina">
-              {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => onSort(k)}
-                  className={
-                    "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold transition-all " +
-                    (sort === k
-                      ? "bg-gradient-to-br from-pink to-lilac-deep text-white shadow-soft"
-                      : "bg-white/70 text-ink ring-1 ring-ink/10 hover:bg-white hover:ring-ink/20")
-                  }
-                >
-                  {SORT_LABEL[k]}
-                </button>
-              ))}
-            </FilterRow>
+        {/* Ordinamento (solo mobile): card separata dai filtri per non
+            confonderlo con essi — su sm+ la select sta accanto ai filtri */}
+        <div className="sm:hidden card p-4 mb-3">
+          <p className="text-xs font-bold uppercase tracking-wider text-ink-soft mb-2">
+            ↕ Ordinamento
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => onSort(k)}
+                className={
+                  "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold transition-all " +
+                  (sort === k
+                    ? "bg-gradient-to-br from-pink to-lilac-deep text-white shadow-soft"
+                    : "bg-white/70 text-ink ring-1 ring-ink/10 hover:bg-white hover:ring-ink/20")
+                }
+              >
+                {SORT_LABEL[k]}
+              </button>
+            ))}
           </div>
+        </div>
 
+        <div className="card p-4 sm:p-5 space-y-4">
           {/* Categoria */}
           {Object.keys(catCounts).length > 0 && (
             <FilterRow label="Categoria">
