@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { CameraCapture, supportsInAppCamera } from "@/components/admin/CameraCapture";
 import { adminApi, ApiError } from "@/lib/admin-api";
-import { downloadUrl, saveBlob, shareImageUrl } from "@/lib/download";
+import { downloadUrl, shareImageUrl, shareOrDownloadAll } from "@/lib/download";
 import { compressImage } from "@/lib/image-compress";
 import { uploadWithRetry } from "@/lib/upload-retry";
 
@@ -151,12 +151,13 @@ export function ImageGalleryEditor({
     }
   }
 
-  async function downloadAllZip() {
+  async function downloadAll() {
     setBusy(true);
     setError(null);
     try {
-      const blob = await adminApi.getBlob(`${base}/images.zip`);
-      saveBlob(blob, `${scope}-${entityId}-foto.zip`);
+      // Mobile: share sheet con TUTTI i file → salva in galleria o
+      // dritti a Vinted. Desktop: un download per foto.
+      await shareOrDownloadAll(images, `${scope}-${entityId}`);
     } catch (err) {
       reportError(err);
     } finally {
@@ -301,10 +302,10 @@ export function ImageGalleryEditor({
         {images.length > 0 && (
           <button
             type="button"
-            onClick={downloadAllZip}
+            onClick={downloadAll}
             disabled={busy}
             className="btn btn-ghost text-xs disabled:opacity-50"
-            title="Scarica tutte le foto in uno zip"
+            title="Salva tutte le foto sul dispositivo (galleria su mobile)"
           >
             ⬇ Tutte
           </button>
