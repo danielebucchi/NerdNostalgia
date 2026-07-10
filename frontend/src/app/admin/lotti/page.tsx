@@ -493,7 +493,9 @@ function LotCard({ lot }: { lot: Lot }) {
   return (
     <Link
       href={`/admin/lotti/${lot.id}`}
-      className="card p-4 hover:shadow-soft transition-all"
+      // "block" obbligatorio: <a> e' inline e dentro il wrapper SwipeRow
+      // (non piu' grid item) lo sfondo card si spezzerebbe in frammenti.
+      className="card block p-4 hover:shadow-soft transition-all"
     >
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
