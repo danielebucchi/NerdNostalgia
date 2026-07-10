@@ -1,0 +1,342 @@
+"use client";
+
+/**
+ * "Scatta e cataloga": inserimento rapido da telefono.
+ * Foto (camera/galleria) + titolo + listino + lotto → crea l'inventory item,
+ * carica le foto (compresse) e opzionalmente pubblica subito sul catalogo.
+ * Aperto dal FAB 📸 sulla dashboard admin.
+ */
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { adminApi } from "@/lib/admin-api";
+import { compressImage } from "@/lib/image-compress";
+import { useCategories } from "@/lib/useCategories";
+import type { Lot, LotListResponse } from "@/lib/types";
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+}
+
+export function QuickAddDialog({ open, onClose }: Props) {
+  const { flat: categories } = useCategories();
+  const [lots, setLots] = useState<Lot[]>([]);
+  const [lotId, setLotId] = useState<string>("");
+  const [title, setTitle] = useState("");
+  const [listPrice, setListPrice] = useState("");
+  const [cost, setCost] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [publishNow, setPublishNow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<{ itemId: number; lotId: number } | null>(null);
+
+  // Anteprime foto (object URL, revocate al cleanup)
+  const previews = useMemo(() => photos.map((f) => URL.createObjectURL(f)), [photos]);
+  useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
+
+  // Lotti OPEN alla prima apertura; preseleziona il piu' recente
+  useEffect(() => {
+    if (!open) return;
+    setDone(null);
+    setError(null);
+    adminApi
+      .get<LotListResponse>("/api/lots/?status=OPEN")
+      .then((d) => {
+        setLots(d.items);
+        if (d.items.length > 0) {
+          setLotId((curr) => curr || String(d.items[0].id));
+        }
+      })
+      .catch(() => {});
+  }, [open]);
+
+  // Esc + scroll lock
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !busy) onClose();
+    }
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, busy, onClose]);
+
+  if (!open) return null;
+
+  function addPhotos(files: FileList | null) {
+    if (!files) return;
+    setPhotos((curr) => [...curr, ...Array.from(files)]);
+  }
+
+  async function createQuickLot() {
+    const name = `Quick ${new Date().toISOString().slice(0, 10)}`;
+    try {
+      const lot = await adminApi.post<Lot>("/api/lots/", {
+        title: name,
+        purchase_date: new Date().toISOString().slice(0, 10),
+      });
+      setLots((curr) => [lot, ...curr]);
+      setLotId(String(lot.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!lotId) {
+      setError("Scegli un lotto (o creane uno rapido).");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      setProgress("Creo l'item…");
+      const item = await adminApi.post<{ id: number }>("/api/inventory/", {
+        lot_id: Number(lotId),
+        title: title.trim(),
+        quantity: 1,
+        cost: cost.trim() ? Number(cost) : null,
+        list_price: listPrice.trim() ? Number(listPrice) : null,
+        category_id: categoryId ? Number(categoryId) : null,
+      });
+      for (let i = 0; i < photos.length; i++) {
+        setProgress(`Foto ${i + 1} di ${photos.length}…`);
+        const prepared = await compressImage(photos[i]);
+        const fd = new FormData();
+        fd.append("file", prepared);
+        await adminApi.postForm(`/api/inventory/${item.id}/upload-image`, fd);
+      }
+      if (publishNow && listPrice.trim()) {
+        setProgress("Pubblico sul catalogo…");
+        await adminApi.post(`/api/inventory/${item.id}/publish`, { publish_now: true });
+      }
+      setDone({ itemId: item.id, lotId: Number(lotId) });
+      // reset per il prossimo giro (tenendo il lotto selezionato)
+      setTitle("");
+      setListPrice("");
+      setCost("");
+      setPhotos([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-ink/50 backdrop-blur-sm overflow-y-auto"
+      onClick={busy ? undefined : onClose}
+    >
+      <div
+        className="card w-full max-w-lg p-5 sm:p-6 my-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <h2 className="display text-xl text-ink">📸 Scatta e cataloga</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="w-8 h-8 rounded-full border-2 border-ink flex items-center justify-center text-ink hover:bg-pink shrink-0 disabled:opacity-40"
+            aria-label="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+
+        {done ? (
+          <div className="text-center py-4">
+            <div className="text-4xl mb-2">✨</div>
+            <p className="display text-lg text-ink mb-1">Catalogato!</p>
+            <p className="text-sm text-ink-soft mb-4">
+              Item #{done.itemId} salvato nel lotto.
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <button
+                type="button"
+                onClick={() => setDone(null)}
+                className="btn btn-primary text-sm"
+              >
+                📸 Aggiungi un altro
+              </button>
+              <Link href={`/admin/lotti/${done.lotId}`} className="btn btn-ghost text-sm">
+                Apri il lotto
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {/* Foto: prima cosa, e' il gesto principale del flusso */}
+            <div>
+              <div className="flex gap-2 flex-wrap items-center">
+                <label className="btn btn-primary text-sm cursor-pointer">
+                  📸 Scatta
+                  <input
+                    type="file" accept="image/*" capture="environment"
+                    className="sr-only"
+                    onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }}
+                    disabled={busy}
+                  />
+                </label>
+                <label className="btn btn-ghost text-sm cursor-pointer">
+                  📷 Galleria
+                  <input
+                    type="file" accept="image/*" multiple
+                    className="sr-only"
+                    onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }}
+                    disabled={busy}
+                  />
+                </label>
+              </div>
+              {photos.length > 0 && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {previews.map((src, i) => (
+                    <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden ring-1 ring-ink/10">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setPhotos((c) => c.filter((_, j) => j !== i))}
+                        className="absolute top-0 right-0 w-5 h-5 bg-ink/70 text-white text-xs rounded-bl-lg"
+                        aria-label="Rimuovi foto"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Cosa hai in mano? *"
+              className="qa-input"
+              maxLength={500}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="number" step="0.01" min="0" inputMode="decimal"
+                value={listPrice}
+                onChange={(e) => setListPrice(e.target.value)}
+                placeholder="Listino €"
+                className="qa-input"
+              />
+              <input
+                type="number" step="0.01" min="0" inputMode="decimal"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                placeholder="Costo €"
+                className="qa-input"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="qa-input"
+                aria-label="Categoria"
+              >
+                <option value="">— categoria —</option>
+                {categories
+                  .filter((c) => c.parent_id == null)
+                  .map((top) => (
+                    <optgroup key={top.id} label={top.name}>
+                      <option value={top.id}>{top.name}</option>
+                      {categories
+                        .filter((c) => c.parent_id === top.id)
+                        .map((sub) => (
+                          <option key={sub.id} value={sub.id}>↳ {sub.name}</option>
+                        ))}
+                    </optgroup>
+                  ))}
+              </select>
+              <div className="flex gap-1.5">
+                <select
+                  value={lotId}
+                  onChange={(e) => setLotId(e.target.value)}
+                  className="qa-input flex-1 min-w-0"
+                  aria-label="Lotto di destinazione"
+                >
+                  <option value="">— lotto * —</option>
+                  {lots.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.code} {l.title ? `· ${l.title}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={createQuickLot}
+                  disabled={busy}
+                  className="btn btn-ghost text-xs px-2 flex-shrink-0"
+                  title="Crea un lotto rapido per oggi"
+                >
+                  ＋
+                </button>
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <input
+                type="checkbox"
+                checked={publishNow}
+                onChange={(e) => setPublishNow(e.target.checked)}
+                disabled={!listPrice.trim()}
+              />
+              <span className={listPrice.trim() ? "" : "opacity-50"}>
+                🚀 Pubblica subito sul catalogo
+                {!listPrice.trim() && " (serve il listino)"}
+              </span>
+            </label>
+
+            {error && (
+              <p className="text-pink-deep text-sm font-semibold">⚠ {error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={busy || !title.trim() || !lotId}
+              className="btn btn-primary w-full text-sm"
+            >
+              {busy ? (progress ?? "Salvo…") : "✨ Cataloga"}
+            </button>
+          </form>
+        )}
+
+        <style>{`
+          .qa-input {
+            display: block;
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            border: 1px solid rgba(61, 42, 92, 0.12);
+            border-radius: 12px;
+            background: #fffaf3;
+            color: #3d2a5c;
+            font-family: "Manrope", sans-serif;
+            font-size: 16px;
+            outline: none;
+          }
+          .qa-input:focus {
+            box-shadow: 0 0 0 3px rgba(248, 168, 200, 0.45);
+            border-color: #e879a8;
+          }
+        `}</style>
+      </div>
+    </div>
+  );
+}

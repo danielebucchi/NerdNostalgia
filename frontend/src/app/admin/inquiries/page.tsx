@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { SwipeRow } from "@/components/admin/SwipeRow";
 import { adminApi } from "@/lib/admin-api";
 import type { Inquiry, InquiryStatus } from "@/lib/types";
 
@@ -53,6 +54,29 @@ function InquiriesListContent() {
     };
   }, [status]);
 
+  async function swipeReplied(i: Inquiry) {
+    if (i.status === "REPLIED") return;
+    try {
+      await adminApi.patch(`/api/inquiries/${i.id}`, { status: "REPLIED" });
+      setItems((curr) =>
+        curr.map((x) => (x.id === i.id ? { ...x, status: "REPLIED" as InquiryStatus } : x)),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function swipeDelete(i: Inquiry) {
+    if (!confirm(`Eliminare la richiesta di ${i.name}?`)) return;
+    try {
+      await adminApi.delete(`/api/inquiries/${i.id}`);
+      setItems((curr) => curr.filter((x) => x.id !== i.id));
+      setTotal((t) => Math.max(0, t - 1));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return (
     <AdminShell>
       <h1 className="display text-3xl text-ink mb-1">Richieste</h1>
@@ -79,10 +103,23 @@ function InquiriesListContent() {
         </div>
       )}
 
+      {items.length > 0 && (
+        <p className="text-[11px] text-ink-soft mb-2 sm:hidden">
+          ✅ swipe destra risposta · sinistra elimina 🗑
+        </p>
+      )}
       <div className="space-y-3">
         {items.map((i) => (
-          <Link
+          <SwipeRow
             key={i.id}
+            rightAction={
+              i.status !== "REPLIED"
+                ? { label: "Risposta", icon: "✅", onTrigger: () => swipeReplied(i) }
+                : undefined
+            }
+            leftAction={{ label: "Elimina", icon: "🗑", onTrigger: () => swipeDelete(i) }}
+          >
+          <Link
             href={`/admin/inquiries/${i.id}`}
             className="card card-clickable p-4 flex items-start gap-4"
           >
@@ -102,6 +139,7 @@ function InquiriesListContent() {
               </span>
             )}
           </Link>
+          </SwipeRow>
         ))}
       </div>
     </AdminShell>

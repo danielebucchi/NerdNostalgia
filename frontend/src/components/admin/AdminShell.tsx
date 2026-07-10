@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/admin/AuthProvider";
+import { QuickAddDialog } from "@/components/admin/QuickAddDialog";
 import { useSettings } from "@/lib/settings-context";
 
 const ALL_NAV_ITEMS = [
@@ -21,16 +22,49 @@ const ALL_NAV_ITEMS = [
   { href: "/admin/impostazioni", label: "Impostazioni", icon: "⚙️" },
 ];
 
+// Bottom bar mobile: le 4 sezioni a uso quotidiano, il resto sotto ≡.
+const BOTTOM_NAV = [
+  { href: "/admin", label: "Home", icon: "📊", exact: true },
+  { href: "/admin/articles", label: "Articoli", icon: "🎮" },
+  { href: "/admin/lotti", label: "Lotti", icon: "📦" },
+  { href: "/admin/inquiries", label: "Richieste", icon: "💬" },
+];
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const { paymentsEnabled } = useSettings();
 
   const NAV_ITEMS = ALL_NAV_ITEMS.filter(
     (item) => !item.requiresPayments || paymentsEnabled,
   );
+
+  // FAB contestuale (solo mobile): l'azione "aggiungi" della pagina corrente.
+  type FabConfig = {
+    label: string;
+    icon: string;
+    href?: string;
+    action?: "quickadd" | "event";
+  };
+  const fab = useMemo((): FabConfig | null => {
+    if (pathname === "/admin") {
+      return { label: "Scatta e cataloga", icon: "📸", action: "quickadd" };
+    }
+    if (pathname === "/admin/articles") {
+      return { label: "Nuovo articolo", icon: "＋", href: "/admin/articles/new" };
+    }
+    if (pathname === "/admin/lotti") {
+      return { label: "Nuovo lotto", icon: "＋", href: "/admin/lotti/new" };
+    }
+    if (/^\/admin\/lotti\/\d+$/.test(pathname)) {
+      // La pagina lotto ascolta l'evento e porta al form "aggiungi item"
+      return { label: "Aggiungi item", icon: "＋", action: "event" };
+    }
+    return null;
+  }, [pathname]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -55,18 +89,30 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen md:grid md:grid-cols-[260px_1fr]">
       {/* Topbar mobile */}
       <div className="md:hidden sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-ink/10">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3 gap-2">
           <Link href="/admin" className="display text-lg text-ink">
             Nerd<span className="text-lilac-deep">.</span>Nostalgia
           </Link>
-          <button
-            type="button"
-            onClick={() => setMobileNavOpen((v) => !v)}
-            className="btn btn-ghost text-xs"
-            aria-expanded={mobileNavOpen}
-          >
-            {mobileNavOpen ? "✕" : "☰"} Menu
-          </button>
+          <div className="flex items-center gap-1.5">
+            {/* La PWA standalone non ha la barra del browser: refresh manuale */}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="btn btn-ghost text-xs px-2.5"
+              aria-label="Ricarica"
+              title="Ricarica"
+            >
+              ↻
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen((v) => !v)}
+              className="btn btn-ghost text-xs"
+              aria-expanded={mobileNavOpen}
+            >
+              {mobileNavOpen ? "✕" : "☰"} Menu
+            </button>
+          </div>
         </div>
         {mobileNavOpen && (
           <nav className="px-4 pb-4 space-y-1">
@@ -153,10 +199,80 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        {/* pb-28 mobile: spazio per bottom bar + FAB */}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 pb-28 md:pb-10">
           {children}
         </div>
       </main>
+
+      {/* FAB contestuale (solo mobile), sopra la bottom bar */}
+      {fab && (
+        fab.href ? (
+          <Link
+            href={fab.href}
+            aria-label={fab.label}
+            title={fab.label}
+            className="md:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-pink to-lilac-deep text-white text-2xl flex items-center justify-center shadow-hover active:scale-95 transition-transform"
+          >
+            {fab.icon}
+          </Link>
+        ) : (
+          <button
+            type="button"
+            aria-label={fab.label}
+            title={fab.label}
+            onClick={() => {
+              if (fab.action === "quickadd") setQuickAddOpen(true);
+              else window.dispatchEvent(new CustomEvent("nn:admin-fab"));
+            }}
+            className="md:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-pink to-lilac-deep text-white text-2xl flex items-center justify-center shadow-hover active:scale-95 transition-transform"
+          >
+            {fab.icon}
+          </button>
+        )
+      )}
+
+      {/* Bottom navigation bar (solo mobile) */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/90 backdrop-blur-xl border-t border-ink/10 flex items-stretch"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        {BOTTOM_NAV.map((item) => {
+          const active = item.exact
+            ? pathname === item.href
+            : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] font-bold ${
+                active ? "text-lilac-deep" : "text-ink-soft"
+              }`}
+            >
+              <span className={`text-xl leading-none ${active ? "" : "grayscale opacity-70"}`}>
+                {item.icon}
+              </span>
+              {item.label}
+            </Link>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => {
+            setMobileNavOpen((v) => !v);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] font-bold ${
+            mobileNavOpen ? "text-lilac-deep" : "text-ink-soft"
+          }`}
+          aria-expanded={mobileNavOpen}
+        >
+          <span className="text-xl leading-none">≡</span>
+          Menu
+        </button>
+      </nav>
+
+      <QuickAddDialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
     </div>
   );
 }

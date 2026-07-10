@@ -82,6 +82,17 @@ export default function AdminLotDetailPage() {
     }
   }, []);
 
+  // FAB "＋" di AdminShell su questa pagina → scrolla al form aggiungi item
+  useEffect(() => {
+    function onFab() {
+      const form = document.getElementById("add-item-form");
+      form?.scrollIntoView({ behavior: "smooth", block: "start" });
+      (form?.querySelector('input[name="title"]') as HTMLInputElement | null)?.focus();
+    }
+    window.addEventListener("nn:admin-fab", onFab);
+    return () => window.removeEventListener("nn:admin-fab", onFab);
+  }, []);
+
   function switchView(v: "table" | "cards") {
     setViewMode(v);
     try {
@@ -350,7 +361,7 @@ export default function AdminLotDetailPage() {
 
       <DistributeBox busy={busy} onDistribute={handleDistribute} suggested={lot.total_cost} />
 
-      <form onSubmit={handleAddItem} className="card p-4 mb-4">
+      <form onSubmit={handleAddItem} id="add-item-form" className="card p-4 mb-4">
         <div className="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
           <h2 className="display text-base text-ink">+ Aggiungi item al lotto</h2>
           <button
@@ -876,7 +887,9 @@ function ItemEditDialog({
             <p className="text-pink-deep text-sm font-semibold">⚠ {error}</p>
           )}
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-ink/10">
+          {/* Sticky: nei form lunghi da mobile il Salva resta sempre a
+              portata di pollice mentre l'overlay scrolla */}
+          <div className="sticky bottom-0 -mx-5 sm:-mx-6 px-5 sm:px-6 py-3 bg-white/95 backdrop-blur border-t border-ink/10 flex justify-end gap-2 rounded-b-3xl">
             <button type="button" onClick={onClose} disabled={saving} className="btn btn-ghost text-sm">
               Annulla
             </button>
