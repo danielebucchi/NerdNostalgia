@@ -76,10 +76,16 @@ class DistributeLotCostResponse(BaseModel):
 
 
 class BulkPublishRequest(BaseModel):
-    """Crea Article per la lista di item_id selezionati nel Lot."""
-    item_ids: List[int] = Field(..., min_length=1)
+    """Crea Article per gli item del Lot.
+
+    item_ids None = TUTTI gli item del lotto (usato dallo swipe "pubblica
+    lotto"); only_priced True = salta gli item senza prezzo di listino.
+    """
+    item_ids: Optional[List[int]] = Field(None, min_length=1)
     # False = bozze DRAFT; True = direttamente PUBLISHED sul catalogo.
     publish_now: bool = False
+    # True = pubblica solo gli item con list_price valorizzato.
+    only_priced: bool = False
 
 
 class BulkPublishResponse(BaseModel):
