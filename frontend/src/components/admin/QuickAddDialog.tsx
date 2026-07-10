@@ -8,6 +8,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { CameraCapture, supportsInAppCamera } from "@/components/admin/CameraCapture";
 import { adminApi } from "@/lib/admin-api";
 import { compressImage } from "@/lib/image-compress";
 import { useCategories } from "@/lib/useCategories";
@@ -28,6 +29,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
   const [categoryId, setCategoryId] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
   const [publishNow, setPublishNow] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -178,15 +180,28 @@ export function QuickAddDialog({ open, onClose }: Props) {
             {/* Foto: prima cosa, e' il gesto principale del flusso */}
             <div>
               <div className="flex gap-2 flex-wrap items-center">
-                <label className="btn btn-primary text-sm cursor-pointer">
-                  📸 Scatta
-                  <input
-                    type="file" accept="image/*" capture="environment"
-                    className="sr-only"
-                    onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }}
+                {/* Camera in-app dove possibile: l'app fotocamera esterna
+                    fa killare la PWA su Android (perdendo lo scatto) */}
+                {supportsInAppCamera() ? (
+                  <button
+                    type="button"
+                    onClick={() => setCameraOpen(true)}
                     disabled={busy}
-                  />
-                </label>
+                    className="btn btn-primary text-sm"
+                  >
+                    📸 Scatta
+                  </button>
+                ) : (
+                  <label className="btn btn-primary text-sm cursor-pointer">
+                    📸 Scatta
+                    <input
+                      type="file" accept="image/*" capture="environment"
+                      className="sr-only"
+                      onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }}
+                      disabled={busy}
+                    />
+                  </label>
+                )}
                 <label className="btn btn-ghost text-sm cursor-pointer">
                   📷 Galleria
                   <input
@@ -317,6 +332,12 @@ export function QuickAddDialog({ open, onClose }: Props) {
             </button>
           </form>
         )}
+
+        <CameraCapture
+          open={cameraOpen}
+          onClose={() => setCameraOpen(false)}
+          onCapture={(file) => setPhotos((curr) => [...curr, file])}
+        />
 
         <style>{`
           .qa-input {

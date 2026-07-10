@@ -1,3 +1,4 @@
+import { BackToTop } from "@/components/BackToTop";
 import { CookieBanner } from "@/components/CookieBanner";
 import { Footer, Header, Topbar } from "@/components/Header";
 import { PaypalFab } from "@/components/PaypalFab";
@@ -12,6 +13,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <Footer />
       <WhatsappFab />
       <PaypalFab />
+      <BackToTop />
       <CookieBanner />
     </>
   );

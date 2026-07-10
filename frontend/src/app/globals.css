@@ -440,3 +440,16 @@ h2.display {
     font-size: 16px !important;
   }
 }
+
+/* Pagina articolo mobile: la StickyCtaBar occupa il fondo schermo,
+   i FAB (Donazione/WhatsApp) salgono sopra di essa. */
+@media (max-width: 639px) {
+  body.has-ctabar .public-fab {
+    bottom: 5.5rem;
+  }
+}
+
+/* Nasconde la scrollbar della strip galleria swipeable (WebKit) */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
