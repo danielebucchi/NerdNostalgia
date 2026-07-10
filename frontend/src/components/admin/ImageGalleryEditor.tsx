@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { adminApi, ApiError } from "@/lib/admin-api";
+import { compressImage } from "@/lib/image-compress";
 
 interface Props {
   /** Nome dell'endpoint di scope: "inventory" | "articles" */
@@ -57,9 +58,13 @@ export function ImageGalleryEditor({
       const toUpload = Array.from(files).slice(0, maxImages - images.length);
       let latest = images;
       for (let i = 0; i < toUpload.length; i++) {
+        // Comprime lato client: le foto da fotocamera superano il limite
+        // 5MB del backend (e su iPhone escono in HEIC non accettato).
+        setProgress(`Preparo ${i + 1} di ${toUpload.length}…`);
+        const prepared = await compressImage(toUpload[i]);
         setProgress(`Carico ${i + 1} di ${toUpload.length}…`);
         const fd = new FormData();
-        fd.append("file", toUpload[i]);
+        fd.append("file", prepared);
         const item = await adminApi.postForm<{ images: string[] }>(
           `${base}/upload-image`,
           fd,

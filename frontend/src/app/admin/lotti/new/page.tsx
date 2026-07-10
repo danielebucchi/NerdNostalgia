@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { adminApi } from "@/lib/admin-api";
+import { compressImage } from "@/lib/image-compress";
 import { useCategories } from "@/lib/useCategories";
 import { usePlatforms } from "@/lib/usePlatforms";
 import type { Category, Lot } from "@/lib/types";
 
 const PEOPLE = ["", "C", "D"];
+
+type PublishMode = "none" | "draft" | "live";
 
 interface DraftItem {
   tempId: string;
@@ -17,9 +20,12 @@ interface DraftItem {
   category_id: string;
   quantity: number;
   cost: string;
+  list_price: string;
   card_collection: string;
   card_number: string;
   card_finish: string;
+  /** Foto scattate/scelte prima del submit; upload dopo la creazione item. */
+  photos: File[];
 }
 
 function newDraftItem(): DraftItem {
@@ -29,9 +35,11 @@ function newDraftItem(): DraftItem {
     category_id: "",
     quantity: 1,
     cost: "",
+    list_price: "",
     card_collection: "",
     card_number: "",
     card_finish: "",
+    photos: [],
   };
 }
 
@@ -62,7 +70,8 @@ export default function NewLotPage() {
   const [createdLot, setCreatedLot] = useState<Lot | null>(null);
   const [createdItemIds, setCreatedItemIds] = useState<number[]>([]);
   const [autoDistribute, setAutoDistribute] = useState(true);
-  const [publishAll, setPublishAll] = useState(false);
+  const [publishMode, setPublishMode] = useState<PublishMode>("none");
+  const [progress, setProgress] = useState<string | null>(null);
 
   const totalQty = items.reduce((s, i) => s + Number(i.quantity || 0), 0);
   const unitCost = autoDistribute && meta.total_cost && totalQty > 0
@@ -79,7 +88,8 @@ export default function NewLotPage() {
   function duplicateItem(tempId: string) {
     const src = items.find((i) => i.tempId === tempId);
     if (!src) return;
-    setItems([...items, { ...src, tempId: newDraftItem().tempId }]);
+    // Foto NON copiate: sono del pezzo fisico, non del "tipo" articolo.
+    setItems([...items, { ...src, tempId: newDraftItem().tempId, photos: [] }]);
   }
 
   async function handleCreate() {
@@ -98,33 +108,51 @@ export default function NewLotPage() {
       const lot = await adminApi.post<Lot>("/api/lots/", lotPayload);
 
       const createdIds: number[] = [];
-      for (const it of items) {
-        if (!it.title.trim()) continue;
+      const validItems = items.filter((it) => it.title.trim());
+      for (let idx = 0; idx < validItems.length; idx++) {
+        const it = validItems[idx];
+        setProgress(`Creo item ${idx + 1} di ${validItems.length}…`);
         const itemPayload = {
           lot_id: lot.id,
           title: it.title.trim(),
           category_id: it.category_id ? Number(it.category_id) : null,
           quantity: Number(it.quantity || 1),
           cost: it.cost ? Number(it.cost) : null,
+          list_price: it.list_price ? Number(it.list_price) : null,
           card_collection: it.card_collection.trim() || null,
           card_number: it.card_number.trim() || null,
           card_finish: it.card_finish.trim() || null,
         };
         const created = await adminApi.post<{ id: number }>("/api/inventory/", itemPayload);
         createdIds.push(created.id);
+
+        // Upload foto (compresse client-side: reggono anche gli scatti
+        // da fotocamera che superano i 5MB del backend)
+        for (let p = 0; p < it.photos.length; p++) {
+          setProgress(
+            `Item ${idx + 1}/${validItems.length}: foto ${p + 1} di ${it.photos.length}…`,
+          );
+          const prepared = await compressImage(it.photos[p]);
+          const fd = new FormData();
+          fd.append("file", prepared);
+          await adminApi.postForm(`/api/inventory/${created.id}/upload-image`, fd);
+        }
       }
 
       // Auto-distribute (se richiesto e c'e' un total_cost)
       if (autoDistribute && meta.total_cost && Number(meta.total_cost) > 0 && createdIds.length > 0) {
+        setProgress("Distribuisco il costo…");
         await adminApi.post(`/api/lots/${lot.id}/distribute-cost`, {
           total_cost: Number(meta.total_cost),
         });
       }
 
-      // Bulk publish DRAFT articles
-      if (publishAll && createdIds.length > 0) {
+      // Creazione Article: bozze o direttamente online
+      if (publishMode !== "none" && createdIds.length > 0) {
+        setProgress(publishMode === "live" ? "Pubblico sul catalogo…" : "Creo le bozze…");
         await adminApi.post(`/api/lots/${lot.id}/bulk-publish`, {
           item_ids: createdIds,
+          publish_now: publishMode === "live",
         });
       }
 
@@ -135,6 +163,7 @@ export default function NewLotPage() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -179,8 +208,8 @@ export default function NewLotPage() {
           unitCost={unitCost}
           autoDistribute={autoDistribute}
           setAutoDistribute={setAutoDistribute}
-          publishAll={publishAll}
-          setPublishAll={setPublishAll}
+          publishMode={publishMode}
+          setPublishMode={setPublishMode}
         />
       )}
 
@@ -217,7 +246,7 @@ export default function NewLotPage() {
               disabled={busy}
               className="btn btn-primary text-sm"
             >
-              {busy ? "Creo…" : "✨ Crea lotto + items"}
+              {busy ? (progress ?? "Creo…") : "✨ Crea lotto + items"}
             </button>
           )}
         </div>
@@ -335,7 +364,7 @@ function Step2({
       </p>
       <div className="space-y-2">
         {items.map((it) => (
-          <div key={it.tempId} className="grid sm:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_auto] gap-2 items-center">
+          <div key={it.tempId} className="grid sm:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-2 items-center border-b border-ink/5 pb-2 sm:border-0 sm:pb-0">
             <input
               value={it.title}
               onChange={(e) => updateItem(it.tempId, { title: e.target.value })}
@@ -365,6 +394,14 @@ function Step2({
               className="input"
             />
             <input
+              type="number" step="0.01"
+              value={it.list_price}
+              onChange={(e) => updateItem(it.tempId, { list_price: e.target.value })}
+              placeholder="Listino €"
+              title="Prezzo di listino sul catalogo"
+              className="input"
+            />
+            <input
               value={it.card_collection}
               onChange={(e) => updateItem(it.tempId, { card_collection: e.target.value })}
               placeholder="Collezione"
@@ -376,12 +413,56 @@ function Step2({
               placeholder="N°"
               className="input"
             />
-            <div className="flex gap-1">
+            <div className="flex gap-1 items-center flex-wrap">
+              {/* Foto: galleria multipla + scatto diretto da fotocamera.
+                  Upload dopo la creazione (serve l'id), compresse client-side. */}
+              <label className="btn btn-ghost text-xs cursor-pointer relative" title="Aggiungi foto dalla galleria">
+                📷
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    if (files.length) {
+                      updateItem(it.tempId, { photos: [...it.photos, ...files] });
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <label className="btn btn-ghost text-xs cursor-pointer" title="Scatta una foto">
+                📸
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    if (files.length) {
+                      updateItem(it.tempId, { photos: [...it.photos, ...files] });
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {it.photos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => updateItem(it.tempId, { photos: [] })}
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-mint text-mint-deep"
+                  title={`${it.photos.length} foto pronte — click per svuotare`}
+                >
+                  {it.photos.length}📸✕
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => duplicateItem(it.tempId)}
                 className="btn btn-ghost text-xs"
-                title="Duplica riga"
+                title="Duplica riga (senza foto)"
               >⎘</button>
               <button
                 type="button"
@@ -399,7 +480,7 @@ function Step2({
 }
 
 function Step3({
-  meta, items, totalQty, unitCost, autoDistribute, setAutoDistribute, publishAll, setPublishAll,
+  meta, items, totalQty, unitCost, autoDistribute, setAutoDistribute, publishMode, setPublishMode,
 }: {
   meta: any;
   items: DraftItem[];
@@ -407,10 +488,11 @@ function Step3({
   unitCost: number | null;
   autoDistribute: boolean;
   setAutoDistribute: (v: boolean) => void;
-  publishAll: boolean;
-  setPublishAll: (v: boolean) => void;
+  publishMode: PublishMode;
+  setPublishMode: (v: PublishMode) => void;
 }) {
   const validItems = items.filter((i) => i.title.trim() !== "");
+  const totalPhotos = validItems.reduce((s, i) => s + i.photos.length, 0);
 
   return (
     <div className="card p-5 space-y-4">
@@ -423,6 +505,7 @@ function Step3({
         <KV label="Chi compra">{meta.bought_by || "—"}</KV>
         <KV label="Item totali">{validItems.length}</KV>
         <KV label="Pezzi totali">{totalQty}</KV>
+        <KV label="Foto pronte">{totalPhotos > 0 ? `${totalPhotos} 📸` : "—"}</KV>
         <KV label="Costo totale lotto">{meta.total_cost ? `${Number(meta.total_cost).toFixed(2)} €` : "—"}</KV>
         {unitCost != null && (
           <KV label="Costo unitario stimato">{unitCost.toFixed(2)} €/pezzo</KV>
@@ -442,17 +525,44 @@ function Step3({
             su tutti gli item (sovrascrive eventuali costi unitari).
           </span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={publishAll}
-            onChange={(e) => setPublishAll(e.target.checked)}
-          />
-          <span className="text-sm">
-            📝 Crea subito una bozza Article (DRAFT) per ogni item. Dovrai aggiungere
-            foto + descrizione in <code>/admin/articles</code> prima di pubblicarle sul sito.
-          </span>
-        </label>
+        <div className="space-y-1.5">
+          <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+            Pubblicazione sul sito
+          </p>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="publish-mode"
+              checked={publishMode === "none"}
+              onChange={() => setPublishMode("none")}
+            />
+            <span className="text-sm">Non creare Article (solo inventario interno)</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="publish-mode"
+              checked={publishMode === "draft"}
+              onChange={() => setPublishMode("draft")}
+            />
+            <span className="text-sm">
+              📝 Crea bozze Article (DRAFT) — rifinisci in <code>/admin/articles</code> prima
+              di andare online
+            </span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="publish-mode"
+              checked={publishMode === "live"}
+              onChange={() => setPublishMode("live")}
+            />
+            <span className="text-sm">
+              🚀 Pubblica <strong>subito online</strong> — usa foto e prezzo di listino
+              inseriti qui (gli iscritti agli avvisi ricevono l&apos;email)
+            </span>
+          </label>
+        </div>
       </div>
     </div>
   );

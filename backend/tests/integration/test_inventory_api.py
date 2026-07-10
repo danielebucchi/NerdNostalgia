@@ -236,6 +236,60 @@ def test_publish_uses_list_price_when_set(client, admin_headers, lot_id):
     assert float(art["price"]) == 25.00
 
 
+def test_publish_now_goes_live(client, admin_headers, lot_id):
+    """publish_now=True → Article PUBLISHED con published_at, item LISTED."""
+    item = client.post(
+        "/api/inventory/",
+        headers=admin_headers,
+        json={"lot_id": lot_id, "title": "Diretto online", "quantity": 1,
+              "list_price": "30.00"},
+    ).json()
+
+    r = client.post(
+        f"/api/inventory/{item['id']}/publish",
+        headers=admin_headers,
+        json={"publish_now": True},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "LISTED"
+
+    art = client.get(f"/api/articles/{body['article_id']}").json()
+    assert art["status"] == "PUBLISHED"
+    assert float(art["price"]) == 30.00
+
+
+def test_bulk_publish_now(client, admin_headers, lot_id):
+    """bulk-publish con publish_now=True pubblica direttamente e usa list_price."""
+    ids = []
+    for n in range(2):
+        item = client.post(
+            "/api/inventory/",
+            headers=admin_headers,
+            json={"lot_id": lot_id, "title": f"Bulk {n}", "quantity": 1,
+                  "list_price": "12.00"},
+        ).json()
+        ids.append(item["id"])
+
+    r = client.post(
+        f"/api/lots/{lot_id}/bulk-publish",
+        headers=admin_headers,
+        json={"item_ids": ids, "publish_now": True},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["created"] == 2
+
+    for item_id in ids:
+        items = client.get(
+            f"/api/inventory/?lot_id={lot_id}", headers=admin_headers,
+        ).json()["items"]
+        it = next(i for i in items if i["id"] == item_id)
+        assert it["status"] == "LISTED"
+        art = client.get(f"/api/articles/{it['article_id']}").json()
+        assert art["status"] == "PUBLISHED"
+        assert float(art["price"]) == 12.00
+
+
 def test_publish_falls_back_to_sale_price(client, admin_headers, lot_id):
     """Se list_price e' None, la vecchia logica su sale_price resta valida."""
     item = client.post(
