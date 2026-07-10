@@ -489,6 +489,12 @@ function SearchRow({
 function LotCard({ lot }: { lot: Lot }) {
   const breakdown = lot.status_breakdown || {};
   const profit = Number(lot.profit_sum || 0);
+  // Avanzamento lavorazione: quanti item sono arrivati sul catalogo
+  // (LISTED) o oltre (SOLD) rispetto al totale del lotto.
+  const advanced = (breakdown.LISTED ?? 0) + (breakdown.SOLD ?? 0);
+  const progressPct = lot.items_count > 0
+    ? Math.round((advanced / lot.items_count) * 100)
+    : 0;
 
   return (
     <Link
@@ -542,6 +548,24 @@ function LotCard({ lot }: { lot: Lot }) {
           </div>
         </div>
       </div>
+
+      {/* Avanzamento: quanti item sono online/venduti sul totale */}
+      {lot.items_count > 0 && (
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-[10px] text-ink-soft mb-1">
+            <span>Lavorazione</span>
+            <span className="tabular-nums font-semibold">
+              {advanced}/{lot.items_count} online · {progressPct}%
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-ink/10 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-mint to-mint-deep transition-all"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {Object.keys(breakdown).length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">

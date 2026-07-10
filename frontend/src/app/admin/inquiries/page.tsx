@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { SwipeRow } from "@/components/admin/SwipeRow";
+import { useUndo } from "@/components/admin/useUndo";
 import { adminApi } from "@/lib/admin-api";
 import type { Inquiry, InquiryStatus } from "@/lib/types";
 
@@ -54,27 +55,45 @@ function InquiriesListContent() {
     };
   }, [status]);
 
-  async function swipeReplied(i: Inquiry) {
+  const { perform: performUndoable, snackbar } = useUndo();
+
+  function swipeReplied(i: Inquiry) {
     if (i.status === "REPLIED") return;
-    try {
-      await adminApi.patch(`/api/inquiries/${i.id}`, { status: "REPLIED" });
-      setItems((curr) =>
-        curr.map((x) => (x.id === i.id ? { ...x, status: "REPLIED" as InquiryStatus } : x)),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
+    const prevStatus = i.status;
+    performUndoable({
+      message: `Richiesta di ${i.name} → risposta`,
+      apply: () =>
+        setItems((curr) =>
+          curr.map((x) => (x.id === i.id ? { ...x, status: "REPLIED" as InquiryStatus } : x)),
+        ),
+      revert: () =>
+        setItems((curr) =>
+          curr.map((x) => (x.id === i.id ? { ...x, status: prevStatus } : x)),
+        ),
+      commit: async () => {
+        await adminApi.patch(`/api/inquiries/${i.id}`, { status: "REPLIED" });
+      },
+      onCommitError: () => setError("Aggiornamento non riuscito (rete?)"),
+    });
   }
 
-  async function swipeDelete(i: Inquiry) {
-    if (!confirm(`Eliminare la richiesta di ${i.name}?`)) return;
-    try {
-      await adminApi.delete(`/api/inquiries/${i.id}`);
-      setItems((curr) => curr.filter((x) => x.id !== i.id));
-      setTotal((t) => Math.max(0, t - 1));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
+  function swipeDelete(i: Inquiry) {
+    const prev = items;
+    performUndoable({
+      message: `Richiesta di ${i.name} eliminata`,
+      apply: () => {
+        setItems((curr) => curr.filter((x) => x.id !== i.id));
+        setTotal((t) => Math.max(0, t - 1));
+      },
+      revert: () => {
+        setItems(prev);
+        setTotal((t) => t + 1);
+      },
+      commit: async () => {
+        await adminApi.delete(`/api/inquiries/${i.id}`);
+      },
+      onCommitError: () => setError("Eliminazione non riuscita (rete?)"),
+    });
   }
 
   return (
@@ -142,6 +161,8 @@ function InquiriesListContent() {
           </SwipeRow>
         ))}
       </div>
+
+      {snackbar}
     </AdminShell>
   );
 }

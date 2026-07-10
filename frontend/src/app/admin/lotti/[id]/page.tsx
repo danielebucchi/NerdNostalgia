@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { CameraCapture, supportsInAppCamera } from "@/components/admin/CameraCapture";
 import { ImageGalleryEditor } from "@/components/admin/ImageGalleryEditor";
 import { SwipeRow } from "@/components/admin/SwipeRow";
+import { useSoldPriceHint } from "@/components/admin/useSoldPriceHint";
+import { useUndo } from "@/components/admin/useUndo";
 import { adminApi } from "@/lib/admin-api";
+import { compressImage } from "@/lib/image-compress";
+import { uploadWithRetry } from "@/lib/upload-retry";
 import { useCategories } from "@/lib/useCategories";
 import { usePlatforms } from "@/lib/usePlatforms";
 import type {
@@ -72,6 +77,13 @@ export default function AdminLotDetailPage() {
   // Vista item: tabella spreadsheet o card stile /admin/articles (con swipe)
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
+  // Checklist di lavorazione: filtra gli item per "cosa manca"
+  const [workFilter, setWorkFilter] = useState<null | "nophoto" | "nolist" | "ready">(null);
+  const { perform: performUndoable, snackbar } = useUndo();
+  // Modalita' raffica: uno scatto = un item (titolo placeholder da rifinire)
+  const [burstOpen, setBurstOpen] = useState(false);
+  const burstChain = useRef<Promise<void>>(Promise.resolve());
+  const burstCount = useRef(0);
 
   useEffect(() => {
     try {
@@ -114,6 +126,84 @@ export default function AdminLotDetailPage() {
       setBusy(false);
     }
   }
+
+  // Delete con ANNULLA (5s): UI subito, DELETE differita — piu' veloce e
+  // piu' sicuro del confirm sugli swipe.
+  function undoableDeleteItem(it: InventoryItem) {
+    const prev = items;
+    performUndoable({
+      message: `"${it.title.slice(0, 24)}" eliminato`,
+      apply: () => setItems((curr) => curr.filter((x) => x.id !== it.id)),
+      revert: () => setItems(prev),
+      commit: async () => {
+        await adminApi.delete(`/api/inventory/${it.id}`);
+      },
+      onCommitError: () => {
+        setError("Eliminazione non riuscita (rete?) — ricarico la lista.");
+        reload();
+      },
+    });
+  }
+
+  // Raffica: ogni scatto crea un item col solo placeholder + la foto.
+  // Coda sequenziale: gli scatti possono arrivare piu' veloci degli upload.
+  function onBurstCapture(file: File) {
+    burstCount.current += 1;
+    const n = burstCount.current;
+    burstChain.current = burstChain.current
+      .then(async () => {
+        const item = await adminApi.post<{ id: number }>("/api/inventory/", {
+          lot_id: lotId,
+          title: `Da titolare ${n}`,
+          quantity: 1,
+        });
+        const prepared = await compressImage(file);
+        const fd = new FormData();
+        fd.append("file", prepared);
+        await uploadWithRetry(`/api/inventory/${item.id}/upload-image`, fd);
+      })
+      .catch((err) => {
+        setError(
+          `Raffica: scatto ${n} non salvato (${err instanceof Error ? err.message : "errore"})`,
+        );
+      });
+  }
+
+  function closeBurst() {
+    setBurstOpen(false);
+    burstCount.current = 0;
+    // aspetta la coda upload, poi mostra i nuovi item
+    burstChain.current.finally(() => reload());
+  }
+
+  // Checklist di lavorazione: cosa manca per andare online
+  const workCounts = useMemo(() => {
+    const active = items.filter(
+      (i) => i.status !== "SOLD" && i.status !== "ARCHIVED",
+    );
+    return {
+      nophoto: active.filter((i) => (i.images?.length ?? 0) === 0).length,
+      nolist: active.filter((i) => i.list_price == null).length,
+      ready: active.filter(
+        (i) => (i.images?.length ?? 0) > 0 && i.list_price != null && !i.article_id,
+      ).length,
+    };
+  }, [items]);
+
+  const displayedItems = useMemo(() => {
+    if (!workFilter) return items;
+    const active = (i: InventoryItem) =>
+      i.status !== "SOLD" && i.status !== "ARCHIVED";
+    if (workFilter === "nophoto") {
+      return items.filter((i) => active(i) && (i.images?.length ?? 0) === 0);
+    }
+    if (workFilter === "nolist") {
+      return items.filter((i) => active(i) && i.list_price == null);
+    }
+    return items.filter(
+      (i) => active(i) && (i.images?.length ?? 0) > 0 && i.list_price != null && !i.article_id,
+    );
+  }, [items, workFilter]);
 
   async function reload() {
     setLoading(true);
@@ -410,6 +500,34 @@ export default function AdminLotDetailPage() {
         </div>
       )}
 
+      {/* Checklist di lavorazione: chips-filtro "cosa manca" */}
+      {items.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {(
+            [
+              { key: null, label: `Tutti (${items.length})` },
+              { key: "nophoto", label: `📷 senza foto (${workCounts.nophoto})` },
+              { key: "nolist", label: `💶 senza listino (${workCounts.nolist})` },
+              { key: "ready", label: `🚀 pronti (${workCounts.ready})` },
+            ] as const
+          ).map((c) => (
+            <button
+              key={c.key ?? "all"}
+              type="button"
+              onClick={() => setWorkFilter(c.key)}
+              className={
+                "px-3 py-1.5 rounded-full text-xs font-semibold transition-all " +
+                (workFilter === c.key
+                  ? "bg-gradient-to-br from-pink to-lilac-deep text-white shadow-soft"
+                  : "bg-white/70 text-ink ring-1 ring-ink/10 hover:bg-white")
+              }
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {items.length > 0 && (
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <div className="inline-flex rounded-full ring-1 ring-ink/15 bg-white/70 p-0.5">
@@ -432,11 +550,23 @@ export default function AdminLotDetailPage() {
               ▦ Card
             </button>
           </div>
-          {viewMode === "cards" && (
-            <span className="text-[11px] text-ink-soft sm:hidden">
-              🚀 swipe destra pubblica · sinistra elimina 🗑
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {supportsInAppCamera() && (
+              <button
+                type="button"
+                onClick={() => setBurstOpen(true)}
+                className="btn btn-ghost text-xs"
+                title="Raffica: uno scatto = un item (titolo dopo)"
+              >
+                📸 Raffica
+              </button>
+            )}
+            {viewMode === "cards" && (
+              <span className="text-[11px] text-ink-soft sm:hidden">
+                🚀 swipe → pubblica · ← elimina 🗑
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -446,7 +576,12 @@ export default function AdminLotDetailPage() {
         </div>
       ) : viewMode === "cards" ? (
         <div className="space-y-3">
-          {items.map((it) => (
+          {displayedItems.length === 0 && (
+            <div className="card p-6 text-center text-ink-soft text-sm">
+              Nessun item in questo filtro ✨
+            </div>
+          )}
+          {displayedItems.map((it) => (
             <SwipeRow
               key={it.id}
               rightAction={
@@ -454,7 +589,7 @@ export default function AdminLotDetailPage() {
                   ? { label: "Pubblica", icon: "🚀", onTrigger: () => swipePublishItem(it) }
                   : undefined
               }
-              leftAction={{ label: "Elimina", icon: "🗑", onTrigger: () => handleDeleteItem(it.id) }}
+              leftAction={{ label: "Elimina", icon: "🗑", onTrigger: () => undoableDeleteItem(it) }}
             >
               <div
                 role="button"
@@ -517,9 +652,9 @@ export default function AdminLotDetailPage() {
                 <Th>
                   <input
                     type="checkbox"
-                    checked={selected.size === items.length && items.length > 0}
+                    checked={selected.size === displayedItems.length && displayedItems.length > 0}
                     onChange={(e) => {
-                      setSelected(e.target.checked ? new Set(items.map((i) => i.id)) : new Set());
+                      setSelected(e.target.checked ? new Set(displayedItems.map((i) => i.id)) : new Set());
                     }}
                   />
                 </Th>
@@ -542,7 +677,7 @@ export default function AdminLotDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((it) => (
+              {displayedItems.map((it) => (
                 <Row
                   key={it.id}
                   item={it}
@@ -557,7 +692,7 @@ export default function AdminLotDetailPage() {
                     setSelected(next);
                   }}
                   onSave={(patch) => handleSaveItem(it.id, patch)}
-                  onDelete={() => handleDeleteItem(it.id)}
+                  onDelete={() => undoableDeleteItem(it)}
                   onOpenPhotos={() => setPhotosOpen(it.id)}
                 />
               ))}
@@ -622,6 +757,14 @@ export default function AdminLotDetailPage() {
           />
         );
       })()}
+
+      {snackbar}
+
+      <CameraCapture
+        open={burstOpen}
+        onClose={closeBurst}
+        onCapture={onBurstCapture}
+      />
 
       <style>{styles}</style>
     </AdminShell>
@@ -712,6 +855,7 @@ function ItemEditDialog({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const priceHint = useSoldPriceHint(f.title);
 
   function set<K extends keyof typeof f>(key: K, value: string) {
     setF((s) => ({ ...s, [key]: value }));
@@ -822,6 +966,9 @@ function ItemEditDialog({
               <input type="number" step="0.01" value={f.list_price} onChange={(e) => set("list_price", e.target.value)} className="input" />
             </Field>
           </div>
+          {priceHint && (
+            <p className="text-[11px] text-ink-soft -mt-1">{priceHint}</p>
+          )}
 
           <div className="border-t border-ink/10 pt-3">
             <p className="text-[10px] uppercase tracking-wider text-ink-soft font-bold mb-2">

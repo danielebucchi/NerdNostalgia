@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { adminApi } from "@/lib/admin-api";
 import { compressImage } from "@/lib/image-compress";
+import { uploadWithRetry } from "@/lib/upload-retry";
 import { useCategories } from "@/lib/useCategories";
 import { usePlatforms } from "@/lib/usePlatforms";
 import type { Category, Lot } from "@/lib/types";
@@ -135,7 +136,7 @@ export default function NewLotPage() {
           const prepared = await compressImage(it.photos[p]);
           const fd = new FormData();
           fd.append("file", prepared);
-          await adminApi.postForm(`/api/inventory/${created.id}/upload-image`, fd);
+          await uploadWithRetry(`/api/inventory/${created.id}/upload-image`, fd);
         }
       }
 

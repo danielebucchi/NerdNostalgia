@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { Sortable } from "@/components/admin/Sortable";
 import { SwipeRow } from "@/components/admin/SwipeRow";
+import { useUndo } from "@/components/admin/useUndo";
 import { adminApi } from "@/lib/admin-api";
 import { formatPrice } from "@/lib/api";
 import type { Article, ArticleListResponse } from "@/lib/types";
@@ -94,30 +95,47 @@ function ArticlesListContent() {
   const visible = debouncedQuery ? extraFiltered : items;
   const reorderEnabled = !debouncedQuery && !status;
 
-  // Azioni swipe (mobile): ← elimina, → segna venduto. Conferma nativa su
-  // entrambe: gli swipe accidentali capitano.
-  async function swipeDelete(a: Article) {
-    if (!confirm(`Eliminare "${a.title}"?\nL'operazione cancella anche le foto.`)) return;
-    try {
-      await adminApi.delete(`/api/articles/${a.id}`);
-      setItems((curr) => curr.filter((x) => x.id !== a.id));
-      setTotal((t) => Math.max(0, t - 1));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
+  // Azioni swipe (mobile): ← elimina, → segna venduto. Ottimistiche con
+  // ANNULLA (5s): piu' veloci e piu' sicure dei confirm.
+  const { perform: performUndoable, snackbar } = useUndo();
+
+  function swipeDelete(a: Article) {
+    const prev = items;
+    performUndoable({
+      message: `"${a.title.slice(0, 24)}" eliminato`,
+      apply: () => {
+        setItems((curr) => curr.filter((x) => x.id !== a.id));
+        setTotal((t) => Math.max(0, t - 1));
+      },
+      revert: () => {
+        setItems(prev);
+        setTotal((t) => t + 1);
+      },
+      commit: async () => {
+        await adminApi.delete(`/api/articles/${a.id}`);
+      },
+      onCommitError: () => setError("Eliminazione non riuscita (rete?) — ricarica la pagina."),
+    });
   }
 
-  async function swipeSold(a: Article) {
+  function swipeSold(a: Article) {
     if (a.status === "SOLD") return;
-    if (!confirm(`Segnare "${a.title}" come VENDUTO?`)) return;
-    try {
-      const updated = await adminApi.post<Article>(`/api/articles/${a.id}/sell`);
-      setItems((curr) =>
-        curr.map((x) => (x.id === a.id ? { ...x, status: updated.status } : x)),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
+    const prevStatus = a.status;
+    performUndoable({
+      message: `"${a.title.slice(0, 24)}" → VENDUTO`,
+      apply: () =>
+        setItems((curr) =>
+          curr.map((x) => (x.id === a.id ? { ...x, status: "SOLD" } : x)),
+        ),
+      revert: () =>
+        setItems((curr) =>
+          curr.map((x) => (x.id === a.id ? { ...x, status: prevStatus } : x)),
+        ),
+      commit: async () => {
+        await adminApi.post(`/api/articles/${a.id}/sell`);
+      },
+      onCommitError: () => setError("Segna-venduto non riuscito (rete?) — ricarica la pagina."),
+    });
   }
 
   return (
@@ -243,6 +261,8 @@ function ArticlesListContent() {
           ))}
         </div>
       )}
+
+      {snackbar}
 
       <style>{`
         .search-input {

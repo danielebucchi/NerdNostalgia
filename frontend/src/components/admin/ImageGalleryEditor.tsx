@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { CameraCapture, supportsInAppCamera } from "@/components/admin/CameraCapture";
 import { adminApi, ApiError } from "@/lib/admin-api";
 import { compressImage } from "@/lib/image-compress";
+import { uploadWithRetry } from "@/lib/upload-retry";
 
 interface Props {
   /** Nome dell'endpoint di scope: "inventory" | "articles" */
@@ -67,7 +68,7 @@ export function ImageGalleryEditor({
         setProgress(`Carico ${i + 1} di ${toUpload.length}…`);
         const fd = new FormData();
         fd.append("file", prepared);
-        const item = await adminApi.postForm<{ images: string[] }>(
+        const item = await uploadWithRetry<{ images: string[] }>(
           `${base}/upload-image`,
           fd,
         );

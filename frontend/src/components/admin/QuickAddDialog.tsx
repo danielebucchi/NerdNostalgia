@@ -2,17 +2,39 @@
 
 /**
  * "Scatta e cataloga": inserimento rapido da telefono.
- * Foto (camera/galleria) + titolo + listino + lotto → crea l'inventory item,
- * carica le foto (compresse) e opzionalmente pubblica subito sul catalogo.
- * Aperto dal FAB 📸 sulla dashboard admin.
+ * Foto (camera in-app/galleria) + titolo + listino + lotto → crea l'item,
+ * carica le foto e opzionalmente pubblica subito.
+ *
+ * Robustezza rete/processo:
+ * - upload con retry esponenziale (uploadWithRetry) e stato PER FOTO
+ * - se l'invio fallisce a meta', l'item gia' creato viene ricordato
+ *   (draftItemId) e "Riprova" riparte dalle foto mancanti — niente doppioni
+ * - la bozza (titolo/prezzi/lotto) vive in sessionStorage: sopravvive anche
+ *   se Android killa la PWA mentre sei in giro
  */
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CameraCapture, supportsInAppCamera } from "@/components/admin/CameraCapture";
+import { useSoldPriceHint } from "@/components/admin/useSoldPriceHint";
 import { adminApi } from "@/lib/admin-api";
 import { compressImage } from "@/lib/image-compress";
+import { uploadWithRetry } from "@/lib/upload-retry";
 import { useCategories } from "@/lib/useCategories";
 import type { Lot, LotListResponse } from "@/lib/types";
+
+const DRAFT_KEY = "nn:quickadd-draft:v1";
+
+interface Draft {
+  title: string;
+  listPrice: string;
+  cost: string;
+  categoryId: string;
+  lotId: string;
+  publishNow: boolean;
+  draftItemId: number | null;
+}
+
+type PhotoStatus = "pending" | "done" | "error";
 
 interface Props {
   open: boolean;
@@ -28,22 +50,71 @@ export function QuickAddDialog({ open, onClose }: Props) {
   const [cost, setCost] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
+  const [photoStatus, setPhotoStatus] = useState<PhotoStatus[]>([]);
   const [publishNow, setPublishNow] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  // Item gia' creato da un tentativo precedente fallito: si riprende da qui
+  const [draftItemId, setDraftItemId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ itemId: number; lotId: number } | null>(null);
 
+  const priceHint = useSoldPriceHint(title);
+
   // Anteprime foto (object URL, revocate al cleanup)
   const previews = useMemo(() => photos.map((f) => URL.createObjectURL(f)), [photos]);
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
 
-  // Lotti OPEN alla prima apertura; preseleziona il piu' recente
+  // Ripristino bozza (una volta, all'apertura)
   useEffect(() => {
     if (!open) return;
     setDone(null);
     setError(null);
+    try {
+      const raw = window.sessionStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const d: Draft = JSON.parse(raw);
+        if (d.title) setTitle(d.title);
+        if (d.listPrice) setListPrice(d.listPrice);
+        if (d.cost) setCost(d.cost);
+        if (d.categoryId) setCategoryId(d.categoryId);
+        if (d.lotId) setLotId(d.lotId);
+        if (d.publishNow) setPublishNow(d.publishNow);
+        if (d.draftItemId) setDraftItemId(d.draftItemId);
+      }
+    } catch {
+      // bozza corrotta: ignora
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Persistenza bozza a ogni modifica (foto escluse: i File non si
+  // serializzano — al kill del processo si riscattano, il resto resta)
+  useEffect(() => {
+    if (!open) return;
+    const draft: Draft = { title, listPrice, cost, categoryId, lotId, publishNow, draftItemId };
+    try {
+      if (title.trim() || draftItemId) {
+        window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      }
+    } catch {
+      // storage pieno/negato: pazienza
+    }
+  }, [open, title, listPrice, cost, categoryId, lotId, publishNow, draftItemId]);
+
+  function clearDraft() {
+    try {
+      window.sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // ignore
+    }
+    setDraftItemId(null);
+  }
+
+  // Lotti OPEN alla prima apertura; preseleziona il piu' recente
+  useEffect(() => {
+    if (!open) return;
     adminApi
       .get<LotListResponse>("/api/lots/?status=OPEN")
       .then((d) => {
@@ -71,9 +142,16 @@ export function QuickAddDialog({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  function addPhotos(files: FileList | null) {
+  function addPhotos(files: FileList | File[] | null) {
     if (!files) return;
-    setPhotos((curr) => [...curr, ...Array.from(files)]);
+    const arr = Array.from(files);
+    setPhotos((curr) => [...curr, ...arr]);
+    setPhotoStatus((curr) => [...curr, ...arr.map(() => "pending" as PhotoStatus)]);
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((c) => c.filter((_, j) => j !== index));
+    setPhotoStatus((c) => c.filter((_, j) => j !== index));
   }
 
   async function createQuickLot() {
@@ -99,32 +177,55 @@ export function QuickAddDialog({ open, onClose }: Props) {
     setBusy(true);
     setError(null);
     try {
-      setProgress("Creo l'item…");
-      const item = await adminApi.post<{ id: number }>("/api/inventory/", {
-        lot_id: Number(lotId),
-        title: title.trim(),
-        quantity: 1,
-        cost: cost.trim() ? Number(cost) : null,
-        list_price: listPrice.trim() ? Number(listPrice) : null,
-        category_id: categoryId ? Number(categoryId) : null,
-      });
-      for (let i = 0; i < photos.length; i++) {
-        setProgress(`Foto ${i + 1} di ${photos.length}…`);
-        const prepared = await compressImage(photos[i]);
-        const fd = new FormData();
-        fd.append("file", prepared);
-        await adminApi.postForm(`/api/inventory/${item.id}/upload-image`, fd);
+      // 1) Item: crea SOLO se non esiste gia' da un tentativo precedente
+      let itemId = draftItemId;
+      if (!itemId) {
+        setProgress("Creo l'item…");
+        const item = await adminApi.post<{ id: number }>("/api/inventory/", {
+          lot_id: Number(lotId),
+          title: title.trim(),
+          quantity: 1,
+          cost: cost.trim() ? Number(cost) : null,
+          list_price: listPrice.trim() ? Number(listPrice) : null,
+          category_id: categoryId ? Number(categoryId) : null,
+        });
+        itemId = item.id;
+        setDraftItemId(itemId);
       }
+
+      // 2) Foto: salta quelle gia' caricate, retry su rete instabile
+      for (let i = 0; i < photos.length; i++) {
+        if (photoStatus[i] === "done") continue;
+        setProgress(`Foto ${i + 1} di ${photos.length}…`);
+        try {
+          const prepared = await compressImage(photos[i]);
+          const fd = new FormData();
+          fd.append("file", prepared);
+          await uploadWithRetry(`/api/inventory/${itemId}/upload-image`, fd);
+          setPhotoStatus((c) => c.map((s, j) => (j === i ? "done" : s)));
+        } catch (err) {
+          setPhotoStatus((c) => c.map((s, j) => (j === i ? "error" : s)));
+          throw new Error(
+            `Foto ${i + 1} non caricata (${err instanceof Error ? err.message : "rete?"}). ` +
+              `L'item #${itemId} è salvo: premi Riprova per completare.`,
+          );
+        }
+      }
+
+      // 3) Pubblicazione opzionale
       if (publishNow && listPrice.trim()) {
         setProgress("Pubblico sul catalogo…");
-        await adminApi.post(`/api/inventory/${item.id}/publish`, { publish_now: true });
+        await adminApi.post(`/api/inventory/${itemId}/publish`, { publish_now: true });
       }
-      setDone({ itemId: item.id, lotId: Number(lotId) });
+
+      setDone({ itemId, lotId: Number(lotId) });
+      clearDraft();
       // reset per il prossimo giro (tenendo il lotto selezionato)
       setTitle("");
       setListPrice("");
       setCost("");
       setPhotos([]);
+      setPhotoStatus([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -132,6 +233,12 @@ export function QuickAddDialog({ open, onClose }: Props) {
       setProgress(null);
     }
   }
+
+  const statusIcon: Record<PhotoStatus, string> = {
+    pending: "",
+    done: "✓",
+    error: "⚠",
+  };
 
   return (
     <div
@@ -177,6 +284,13 @@ export function QuickAddDialog({ open, onClose }: Props) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
+            {draftItemId && (
+              <p className="text-xs rounded-lg bg-lilac-soft/50 text-lilac-deep px-3 py-2">
+                ↻ Ripresa: item <strong>#{draftItemId}</strong> già creato — mancano
+                solo le foto/pubblicazione.
+              </p>
+            )}
+
             {/* Foto: prima cosa, e' il gesto principale del flusso */}
             <div>
               <div className="flex gap-2 flex-wrap items-center">
@@ -215,17 +329,39 @@ export function QuickAddDialog({ open, onClose }: Props) {
               {photos.length > 0 && (
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {previews.map((src, i) => (
-                    <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden ring-1 ring-ink/10">
+                    <div
+                      key={i}
+                      className={`relative w-16 h-16 rounded-lg overflow-hidden ring-2 ${
+                        photoStatus[i] === "done"
+                          ? "ring-mint-deep"
+                          : photoStatus[i] === "error"
+                            ? "ring-red-500"
+                            : "ring-ink/10"
+                      }`}
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={src} alt="" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setPhotos((c) => c.filter((_, j) => j !== i))}
-                        className="absolute top-0 right-0 w-5 h-5 bg-ink/70 text-white text-xs rounded-bl-lg"
-                        aria-label="Rimuovi foto"
-                      >
-                        ✕
-                      </button>
+                      {photoStatus[i] !== "pending" && (
+                        <span
+                          className={`absolute bottom-0 left-0 text-[10px] font-bold px-1 rounded-tr ${
+                            photoStatus[i] === "done"
+                              ? "bg-mint-deep text-white"
+                              : "bg-red-500 text-white"
+                          }`}
+                        >
+                          {statusIcon[photoStatus[i]]}
+                        </span>
+                      )}
+                      {photoStatus[i] !== "done" && (
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(i)}
+                          className="absolute top-0 right-0 w-5 h-5 bg-ink/70 text-white text-xs rounded-bl-lg"
+                          aria-label="Rimuovi foto"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -242,21 +378,26 @@ export function QuickAddDialog({ open, onClose }: Props) {
               maxLength={500}
             />
 
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                type="number" step="0.01" min="0" inputMode="decimal"
-                value={listPrice}
-                onChange={(e) => setListPrice(e.target.value)}
-                placeholder="Listino €"
-                className="qa-input"
-              />
-              <input
-                type="number" step="0.01" min="0" inputMode="decimal"
-                value={cost}
-                onChange={(e) => setCost(e.target.value)}
-                placeholder="Costo €"
-                className="qa-input"
-              />
+            <div>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number" step="0.01" min="0" inputMode="decimal"
+                  value={listPrice}
+                  onChange={(e) => setListPrice(e.target.value)}
+                  placeholder="Listino €"
+                  className="qa-input"
+                />
+                <input
+                  type="number" step="0.01" min="0" inputMode="decimal"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
+                  placeholder="Costo €"
+                  className="qa-input"
+                />
+              </div>
+              {priceHint && (
+                <p className="text-[11px] text-ink-soft mt-1">{priceHint}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -328,7 +469,11 @@ export function QuickAddDialog({ open, onClose }: Props) {
               disabled={busy || !title.trim() || !lotId}
               className="btn btn-primary w-full text-sm"
             >
-              {busy ? (progress ?? "Salvo…") : "✨ Cataloga"}
+              {busy
+                ? (progress ?? "Salvo…")
+                : draftItemId
+                  ? "↻ Riprova (completa item)"
+                  : "✨ Cataloga"}
             </button>
           </form>
         )}
@@ -336,7 +481,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
         <CameraCapture
           open={cameraOpen}
           onClose={() => setCameraOpen(false)}
-          onCapture={(file) => setPhotos((curr) => [...curr, file])}
+          onCapture={(file) => addPhotos([file])}
         />
 
         <style>{`
