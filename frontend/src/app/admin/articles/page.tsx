@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { Sortable } from "@/components/admin/Sortable";
+import { SwipeRow } from "@/components/admin/SwipeRow";
 import { adminApi } from "@/lib/admin-api";
 import { formatPrice } from "@/lib/api";
 import type { Article, ArticleListResponse } from "@/lib/types";
@@ -93,6 +94,32 @@ function ArticlesListContent() {
   const visible = debouncedQuery ? extraFiltered : items;
   const reorderEnabled = !debouncedQuery && !status;
 
+  // Azioni swipe (mobile): ← elimina, → segna venduto. Conferma nativa su
+  // entrambe: gli swipe accidentali capitano.
+  async function swipeDelete(a: Article) {
+    if (!confirm(`Eliminare "${a.title}"?\nL'operazione cancella anche le foto.`)) return;
+    try {
+      await adminApi.delete(`/api/articles/${a.id}`);
+      setItems((curr) => curr.filter((x) => x.id !== a.id));
+      setTotal((t) => Math.max(0, t - 1));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function swipeSold(a: Article) {
+    if (a.status === "SOLD") return;
+    if (!confirm(`Segnare "${a.title}" come VENDUTO?`)) return;
+    try {
+      const updated = await adminApi.post<Article>(`/api/articles/${a.id}/sell`);
+      setItems((curr) =>
+        curr.map((x) => (x.id === a.id ? { ...x, status: updated.status } : x)),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return (
     <AdminShell>
       <div className="flex items-center justify-between mb-6">
@@ -160,8 +187,13 @@ function ArticlesListContent() {
       )}
 
       {reorderEnabled && visible.length > 1 && (
-        <p className="text-xs text-ink-soft mb-3">
+        <p className="text-xs text-ink-soft mb-3 hidden sm:block">
           Trascina la maniglia ⋮⋮ per riordinare il catalogo.
+        </p>
+      )}
+      {visible.length > 0 && (
+        <p className="text-xs text-ink-soft mb-3 sm:hidden">
+          💰 swipe a destra = venduto · swipe a sinistra = elimina 🗑
         </p>
       )}
 
@@ -182,13 +214,32 @@ function ArticlesListContent() {
           strategy="vertical"
           className="space-y-3"
           renderItem={(a, _idx, { listeners, attributes, isDragging }) => (
-            <ArticleRow article={a} isDragging={isDragging} dragProps={{ listeners, attributes }} />
+            <SwipeRow
+              rightAction={
+                a.status !== "SOLD"
+                  ? { label: "Venduto", icon: "💰", onTrigger: () => swipeSold(a) }
+                  : undefined
+              }
+              leftAction={{ label: "Elimina", icon: "🗑", onTrigger: () => swipeDelete(a) }}
+            >
+              <ArticleRow article={a} isDragging={isDragging} dragProps={{ listeners, attributes }} />
+            </SwipeRow>
           )}
         />
       ) : (
         <div className="space-y-3">
           {visible.map((a) => (
-            <ArticleRow key={a.id} article={a} />
+            <SwipeRow
+              key={a.id}
+              rightAction={
+                a.status !== "SOLD"
+                  ? { label: "Venduto", icon: "💰", onTrigger: () => swipeSold(a) }
+                  : undefined
+              }
+              leftAction={{ label: "Elimina", icon: "🗑", onTrigger: () => swipeDelete(a) }}
+            >
+              <ArticleRow article={a} />
+            </SwipeRow>
           ))}
         </div>
       )}
