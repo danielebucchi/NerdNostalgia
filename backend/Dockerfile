@@ -1,4 +1,4 @@
-FROM python:3.13
+FROM python:3.14
 
 # SQLite CLI (debug) + curl (healthcheck) + system deps richieste da Chromium di Playwright
 RUN apt-get update && apt-get install -y --no-install-recommends \
