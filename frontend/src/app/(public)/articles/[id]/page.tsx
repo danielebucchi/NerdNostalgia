@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatPrice, getArticle } from "@/lib/api";
+import { formatPrice, getArticle, listArticles } from "@/lib/api";
+import type { Article } from "@/lib/types";
 import { ArticleActions } from "@/components/ArticleActions";
+import { ArticleCard } from "@/components/ArticleCard";
 import { ArticleGallery } from "@/components/ArticleGallery";
 import { BuyControls } from "@/components/BuyControls";
 import { ShareButtons } from "@/components/ShareButtons";
@@ -76,6 +78,30 @@ export default async function ArticleDetailPage({ params }: PageProps) {
 
   if (!article) {
     notFound();
+  }
+
+  // Correlati: stessa famiglia di categoria (parent se esiste, cosi' pesca
+  // anche dalle sottocategorie sorelle), escluso l'articolo corrente. Se il
+  // paniere e' magro si riempie con gli ultimi arrivi. Best-effort: la
+  // pagina non deve fallire per un errore qui.
+  let related: Article[] = [];
+  try {
+    const familyId = article.parent_category?.id ?? article.category?.id;
+    if (familyId) {
+      const r = await listArticles({ category_id: familyId, limit: 8 });
+      related = r.items.filter((a) => a.id !== article.id);
+    }
+    if (related.length < 4) {
+      const latest = await listArticles({ limit: 8 });
+      for (const a of latest.items) {
+        if (a.id !== article.id && !related.some((x) => x.id === a.id)) {
+          related.push(a);
+        }
+      }
+    }
+    related = related.slice(0, 4);
+  } catch {
+    related = [];
   }
 
   const cover = article.images?.[0];
@@ -196,6 +222,20 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           </div>
         </div>
       </div>
+
+      {/* Correlati: tiene l'utente nel catalogo */}
+      {related.length > 0 && (
+        <section className="mt-12 sm:mt-16" aria-label="Articoli correlati">
+          <h2 className="display text-2xl sm:text-3xl text-ink mb-5">
+            Potrebbero piacerti
+          </h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            {related.map((a) => (
+              <ArticleCard key={a.id} article={a} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Mobile: prezzo + CTA sempre a portata di pollice; il padding evita
           che la barra copra il fondo pagina */}
