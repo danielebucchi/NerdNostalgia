@@ -42,3 +42,45 @@ export async function shareImageUrl(url: string, filename: string): Promise<bool
   }
   return true;
 }
+
+/**
+ * Porta TUTTE le foto sul dispositivo in un colpo:
+ * - mobile: share sheet con tutti i file insieme → "Salva in Galleria"/
+ *   Google Foto (o direttamente Vinted/WhatsApp)
+ * - fallback desktop/browser senza share: un download per file
+ *   (niente zip: sul telefono non ci si fa nulla)
+ */
+export async function shareOrDownloadAll(
+  urls: string[],
+  baseName: string,
+): Promise<void> {
+  const files: File[] = [];
+  for (let i = 0; i < urls.length; i++) {
+    const res = await fetch(urls[i]);
+    if (!res.ok) throw new Error(`Download foto ${i + 1} fallito (${res.status})`);
+    const blob = await res.blob();
+    const ext = blob.type === "image/jpeg" ? "jpg" : "webp";
+    files.push(
+      new File([blob], `${baseName}-${String(i + 1).padStart(2, "0")}.${ext}`, {
+        type: blob.type || "image/webp",
+      }),
+    );
+  }
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.canShare &&
+    navigator.canShare({ files })
+  ) {
+    try {
+      await navigator.share({ files });
+    } catch {
+      // annullato dall'utente
+    }
+    return;
+  }
+  for (const f of files) {
+    saveBlob(f, f.name);
+    // pausa breve: alcuni browser bloccano i download a raffica
+    await new Promise((r) => setTimeout(r, 300));
+  }
+}

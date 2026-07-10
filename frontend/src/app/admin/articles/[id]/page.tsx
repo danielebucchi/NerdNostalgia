@@ -8,7 +8,7 @@ import { ArticleForm } from "@/components/admin/ArticleForm";
 import { MarketplaceSyncBox } from "@/components/admin/MarketplaceSyncBox";
 import { Sortable } from "@/components/admin/Sortable";
 import { adminApi } from "@/lib/admin-api";
-import { saveBlob } from "@/lib/download";
+import { shareOrDownloadAll } from "@/lib/download";
 import type { Article } from "@/lib/types";
 
 interface PageProps {
@@ -195,16 +195,17 @@ export default function AdminArticleEditPage({ params }: PageProps) {
                     type="button"
                     onClick={async () => {
                       try {
-                        const blob = await adminApi.getBlob(`/api/articles/${id}/images.zip`);
-                        saveBlob(blob, `articolo-${id}-foto.zip`);
+                        // Mobile: share sheet con tutti i file → galleria/
+                        // Vinted. Desktop: un download per foto.
+                        await shareOrDownloadAll(article.images, `articolo-${id}`);
                       } catch (err) {
                         setError(err instanceof Error ? err.message : String(err));
                       }
                     }}
                     className="btn btn-ghost text-xs"
-                    title="Scarica tutte le foto in uno zip (per Vinted/eBay)"
+                    title="Salva tutte le foto sul dispositivo (galleria su mobile)"
                   >
-                    ⬇ Scarica foto (zip)
+                    ⬇ Scarica foto
                   </button>
                 )}
                 {article.images.length > 1 && (
