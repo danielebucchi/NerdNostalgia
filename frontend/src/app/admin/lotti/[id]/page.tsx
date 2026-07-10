@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ImageGalleryEditor } from "@/components/admin/ImageGalleryEditor";
+import { SwipeRow } from "@/components/admin/SwipeRow";
 import { adminApi } from "@/lib/admin-api";
 import { useCategories } from "@/lib/useCategories";
 import { usePlatforms } from "@/lib/usePlatforms";
@@ -68,6 +69,40 @@ export default function AdminLotDetailPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [photosOpen, setPhotosOpen] = useState<number | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  // Vista item: tabella spreadsheet o card stile /admin/articles (con swipe)
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [editItem, setEditItem] = useState<InventoryItem | null>(null);
+
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem("nn:lot-items-view:v1");
+      if (v === "cards" || v === "table") setViewMode(v);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  function switchView(v: "table" | "cards") {
+    setViewMode(v);
+    try {
+      window.localStorage.setItem("nn:lot-items-view:v1", v);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function swipePublishItem(it: InventoryItem) {
+    if (!confirm(`Pubblicare subito online "${it.title}"?\n(usa foto e prezzo di listino dell'item)`)) return;
+    setBusy(true);
+    try {
+      await adminApi.post(`/api/inventory/${it.id}/publish`, { publish_now: true });
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function reload() {
     setLoading(true);
@@ -176,17 +211,23 @@ export default function AdminLotDetailPage() {
     }
   }
 
-  async function handleBulkPublish() {
+  async function handleBulkPublish(publishNow: boolean) {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    if (!confirm(`Creare ${ids.length} bozze Article DRAFT?`)) return;
+    const msg = publishNow
+      ? `Pubblicare ${ids.length} item DIRETTAMENTE sul catalogo online?\n(usano foto e prezzo di listino dell'item)`
+      : `Creare ${ids.length} bozze Article DRAFT?`;
+    if (!confirm(msg)) return;
     setBusy(true);
     try {
       const resp = await adminApi.post<{ created: number; skipped: number }>(
         `/api/lots/${lotId}/bulk-publish`,
-        { item_ids: ids },
+        { item_ids: ids, publish_now: publishNow },
       );
-      alert(`Create: ${resp.created}\nSaltate (già pubblicate): ${resp.skipped}`);
+      alert(
+        `${publishNow ? "Pubblicati" : "Create bozze"}: ${resp.created}\n` +
+        `Saltati (già pubblicati): ${resp.skipped}`,
+      );
       setSelected(new Set());
       await reload();
     } catch (err) {
@@ -344,9 +385,12 @@ export default function AdminLotDetailPage() {
           <span className="text-sm font-semibold text-lilac-deep">
             {selected.size} item selezionati
           </span>
-          <div className="flex gap-2">
-            <button onClick={handleBulkPublish} disabled={busy} className="btn btn-primary text-xs">
-              📝 Crea bozze Article ({selected.size})
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={() => handleBulkPublish(true)} disabled={busy} className="btn btn-primary text-xs">
+              🚀 Pubblica online ({selected.size})
+            </button>
+            <button onClick={() => handleBulkPublish(false)} disabled={busy} className="btn btn-ghost text-xs">
+              📝 Crea bozze ({selected.size})
             </button>
             <button onClick={() => setSelected(new Set())} className="btn btn-ghost text-xs">
               Deseleziona
@@ -355,9 +399,90 @@ export default function AdminLotDetailPage() {
         </div>
       )}
 
+      {items.length > 0 && (
+        <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+          <div className="inline-flex rounded-full ring-1 ring-ink/15 bg-white/70 p-0.5">
+            <button
+              type="button"
+              onClick={() => switchView("table")}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                viewMode === "table" ? "bg-ink text-white" : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              ☰ Tabella
+            </button>
+            <button
+              type="button"
+              onClick={() => switchView("cards")}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                viewMode === "cards" ? "bg-ink text-white" : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              ▦ Card
+            </button>
+          </div>
+          {viewMode === "cards" && (
+            <span className="text-[11px] text-ink-soft sm:hidden">
+              🚀 swipe destra pubblica · sinistra elimina 🗑
+            </span>
+          )}
+        </div>
+      )}
+
       {items.length === 0 ? (
         <div className="card p-10 text-center">
           <p className="text-ink-soft">Nessun item nel lotto. Aggiungine uno qui sopra.</p>
+        </div>
+      ) : viewMode === "cards" ? (
+        <div className="space-y-3">
+          {items.map((it) => (
+            <SwipeRow
+              key={it.id}
+              rightAction={
+                !it.article_id
+                  ? { label: "Pubblica", icon: "🚀", onTrigger: () => swipePublishItem(it) }
+                  : undefined
+              }
+              leftAction={{ label: "Elimina", icon: "🗑", onTrigger: () => handleDeleteItem(it.id) }}
+            >
+              <button
+                type="button"
+                onClick={() => setEditItem(it)}
+                className="card w-full p-3 flex items-center gap-3 text-left hover:ring-2 hover:ring-lilac-deep/30 transition-all"
+              >
+                <div className="w-14 h-14 rounded-xl ring-1 ring-ink/8 overflow-hidden bg-white/60 flex-shrink-0 flex items-center justify-center">
+                  {it.images?.[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={it.images[0].endsWith(".webp") && !it.images[0].endsWith(".thumb.webp")
+                        ? it.images[0].slice(0, -5) + ".thumb.webp"
+                        : it.images[0]}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="text-xl text-ink-soft/40" aria-hidden="true">📦</span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="display text-base text-ink truncate">{it.title}</p>
+                  <p className="text-xs text-ink-soft truncate">
+                    {it.category?.name ?? "—"}
+                    {it.quantity > 1 ? ` · x${it.quantity}` : ""}
+                    {it.cost ? ` · costo €${Number(it.cost).toFixed(2)}` : ""}
+                    {it.article_id ? ` · Art. #${it.article_id}` : ""}
+                  </p>
+                </div>
+                <span className={`chip text-[10px] flex-shrink-0 ${STATUS_COLOR[it.status]}`}>
+                  {STATUS_LABEL[it.status]}
+                </span>
+                <span className="display text-base text-pink-deep w-16 text-right flex-shrink-0">
+                  {it.list_price ? `€${Number(it.list_price).toFixed(0)}` : "—"}
+                </span>
+              </button>
+            </SwipeRow>
+          ))}
         </div>
       ) : (
         <div className="card overflow-x-auto">
@@ -436,6 +561,25 @@ export default function AdminLotDetailPage() {
         />
       )}
 
+      {editItem && (
+        <ItemEditDialog
+          item={editItem}
+          categories={categories}
+          platformNames={platformNames}
+          onClose={() => setEditItem(null)}
+          onSaved={async () => {
+            setEditItem(null);
+            await reload();
+          }}
+          onImagesChange={(imgs) => {
+            setItems((curr) =>
+              curr.map((i) => (i.id === editItem.id ? { ...i, images: imgs } : i)),
+            );
+            setEditItem((e) => (e ? { ...e, images: imgs } : e));
+          }}
+        />
+      )}
+
       {photosOpen !== null && (() => {
         const target = items.find((i) => i.id === photosOpen);
         if (!target) return null;
@@ -499,6 +643,239 @@ function PhotosDialog({
           images={item.images ?? []}
           onChange={onImagesChange}
         />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Dialog di modifica completa di un item del lotto (usato dalla vista card):
+ * tutti i campi della tabella + galleria foto + link all'Article se esiste.
+ */
+function ItemEditDialog({
+  item,
+  categories,
+  platformNames,
+  onClose,
+  onSaved,
+  onImagesChange,
+}: {
+  item: InventoryItem;
+  categories: Category[];
+  platformNames: string[];
+  onClose: () => void;
+  onSaved: () => void;
+  onImagesChange: (images: string[]) => void;
+}) {
+  const [f, setF] = useState({
+    title: item.title,
+    status: item.status,
+    category_id: item.category_id != null ? String(item.category_id) : "",
+    quantity: String(item.quantity),
+    cost: item.cost ?? "",
+    list_price: item.list_price ?? "",
+    sold_date: item.sold_date ?? "",
+    sale_price: item.sale_price ?? "",
+    fee_amount: item.fee_amount ?? "",
+    shipping_cost: item.shipping_cost ?? "",
+    sold_platform: item.sold_platform ?? "",
+    sold_by: item.sold_by ?? "",
+    card_collection: item.card_collection ?? "",
+    card_number: item.card_number ?? "",
+    card_finish: item.card_finish ?? "",
+    notes: item.notes ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function set<K extends keyof typeof f>(key: K, value: string) {
+    setF((s) => ({ ...s, [key]: value }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const num = (s: string) => (String(s).trim() === "" ? null : Number(s));
+      await adminApi.patch(`/api/inventory/${item.id}`, {
+        title: f.title.trim(),
+        status: f.status,
+        category_id: f.category_id ? Number(f.category_id) : null,
+        quantity: Math.max(0, Number(f.quantity) || 1),
+        cost: num(String(f.cost)),
+        list_price: num(String(f.list_price)),
+        sold_date: f.sold_date || null,
+        sale_price: num(String(f.sale_price)),
+        fee_amount: num(String(f.fee_amount)),
+        shipping_cost: num(String(f.shipping_cost)),
+        sold_platform: f.sold_platform || null,
+        sold_by: f.sold_by || null,
+        card_collection: f.card_collection.trim() || null,
+        card_number: f.card_number.trim() || null,
+        card_finish: f.card_finish.trim() || null,
+        notes: f.notes.trim() || null,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-ink/50 backdrop-blur-sm overflow-y-auto"
+      onClick={saving ? undefined : onClose}
+    >
+      <div
+        className="card w-full max-w-2xl p-5 sm:p-6 my-6 sm:my-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <h2 className="display text-xl text-ink truncate">✏️ {item.title}</h2>
+            <p className="text-xs text-ink-soft mt-0.5">
+              Item #{item.id}
+              {item.article_id && (
+                <>
+                  {" · "}
+                  <Link
+                    href={`/admin/articles/${item.article_id}`}
+                    className="text-lilac-deep underline"
+                  >
+                    Article #{item.article_id} ↗
+                  </Link>
+                </>
+              )}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="w-8 h-8 rounded-full border-2 border-ink flex items-center justify-center text-ink hover:bg-pink shrink-0 disabled:opacity-40"
+            aria-label="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <Field label="Oggetto *">
+            <input value={f.title} onChange={(e) => set("title", e.target.value)} className="input" />
+          </Field>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Field label="Stato">
+              <select
+                value={f.status}
+                onChange={(e) => set("status", e.target.value)}
+                className="input"
+              >
+                {ITEM_STATUSES.map((s) => (
+                  <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Categoria">
+              <select
+                value={f.category_id}
+                onChange={(e) => set("category_id", e.target.value)}
+                className="input"
+              >
+                <option value="">—</option>
+                {renderCategoryOptions(categories)}
+              </select>
+            </Field>
+            <Field label="Quantità">
+              <input type="number" min="0" value={f.quantity} onChange={(e) => set("quantity", e.target.value)} className="input" />
+            </Field>
+            <Field label="Costo €">
+              <input type="number" step="0.01" value={f.cost} onChange={(e) => set("cost", e.target.value)} className="input" />
+            </Field>
+            <Field label="Listino €">
+              <input type="number" step="0.01" value={f.list_price} onChange={(e) => set("list_price", e.target.value)} className="input" />
+            </Field>
+          </div>
+
+          <div className="border-t border-ink/10 pt-3">
+            <p className="text-[10px] uppercase tracking-wider text-ink-soft font-bold mb-2">
+              Vendita (compilare a vendita avvenuta)
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <Field label="Data vendita">
+                <input type="date" value={f.sold_date} onChange={(e) => set("sold_date", e.target.value)} className="input" />
+              </Field>
+              <Field label="Ricavo €">
+                <input type="number" step="0.01" value={f.sale_price} onChange={(e) => set("sale_price", e.target.value)} className="input" />
+              </Field>
+              <Field label="Fee €">
+                <input type="number" step="0.01" value={f.fee_amount} onChange={(e) => set("fee_amount", e.target.value)} className="input" />
+              </Field>
+              <Field label="Spedizione €">
+                <input type="number" step="0.01" value={f.shipping_cost} onChange={(e) => set("shipping_cost", e.target.value)} className="input" />
+              </Field>
+              <Field label="Piattaforma">
+                <select value={f.sold_platform} onChange={(e) => set("sold_platform", e.target.value)} className="input">
+                  {platformNames.map((p) => <option key={p || "_"} value={p}>{p || "—"}</option>)}
+                </select>
+              </Field>
+              <Field label="Chi vende">
+                <select value={f.sold_by} onChange={(e) => set("sold_by", e.target.value)} className="input">
+                  {PEOPLE.map((p) => <option key={p || "_"} value={p}>{p || "—"}</option>)}
+                </select>
+              </Field>
+            </div>
+          </div>
+
+          <div className="border-t border-ink/10 pt-3">
+            <p className="text-[10px] uppercase tracking-wider text-ink-soft font-bold mb-2">
+              Carte (opzionale)
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <Field label="Collezione">
+                <input value={f.card_collection} onChange={(e) => set("card_collection", e.target.value)} className="input" />
+              </Field>
+              <Field label="N° carta">
+                <input value={f.card_number} onChange={(e) => set("card_number", e.target.value)} className="input" />
+              </Field>
+              <Field label="Finish">
+                <input value={f.card_finish} onChange={(e) => set("card_finish", e.target.value)} className="input" />
+              </Field>
+            </div>
+          </div>
+
+          <Field label="Note">
+            <textarea rows={2} value={f.notes} onChange={(e) => set("notes", e.target.value)} className="input" />
+          </Field>
+
+          <div className="border-t border-ink/10 pt-3">
+            <ImageGalleryEditor
+              scope="inventory"
+              entityId={item.id}
+              images={item.images ?? []}
+              onChange={onImagesChange}
+            />
+          </div>
+
+          {error && (
+            <p className="text-pink-deep text-sm font-semibold">⚠ {error}</p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-ink/10">
+            <button type="button" onClick={onClose} disabled={saving} className="btn btn-ghost text-sm">
+              Annulla
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || !f.title.trim()}
+              className="btn btn-primary text-sm"
+            >
+              {saving ? "Salvataggio…" : "💾 Salva"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

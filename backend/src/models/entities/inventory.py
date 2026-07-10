@@ -135,8 +135,10 @@ class InventoryListResponse(BaseModel):
 
 
 class PublishToSiteRequest(BaseModel):
-    """Opzioni publish. Per ora vuoto (futuro: override fields)."""
-    pass
+    """Opzioni publish dell'item verso Article."""
+    # False = crea DRAFT (rifinisci in /admin/articles prima di andare live);
+    # True  = pubblica direttamente sul catalogo (status PUBLISHED).
+    publish_now: bool = False
 
 
 class StatusUpdateRequest(BaseModel):

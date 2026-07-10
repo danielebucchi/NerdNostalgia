@@ -5,6 +5,7 @@ CRUD lots, distribute_cost, bulk_publish (crea Article DRAFT per piu' item),
 e KPI aggregati per ogni lotto.
 """
 from collections import Counter
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -218,15 +219,19 @@ def bulk_publish(
     inv_helper: InventoryHelper = Depends(get_inventory_helper),
     admin: User = Depends(require_admin),
 ):
-    """Crea Article DRAFT in batch per la lista item_ids del Lot."""
+    """Crea Article in batch per la lista item_ids del Lot.
+    publish_now=False → bozze DRAFT; True → direttamente PUBLISHED."""
     lot = helper.get(lot_id)
     if not lot:
         raise HTTPException(404, f"Lot {lot_id} non trovato")
 
+    publish_now = bool(payload.publish_now)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     valid_item_ids = {it.id for it in lot.items}
     created = 0
     skipped = 0
     created_ids = []
+    published_articles = []
     for item_id in payload.item_ids:
         if item_id not in valid_item_ids:
             skipped += 1
@@ -246,10 +251,12 @@ def bulk_publish(
             user_id=admin.id,
             title=item.title,
             description=item.description,
-            price=item.sale_price or Decimal("0"),
+            # listino esplicito > ricavo storico > 0 (come il publish singolo)
+            price=item.list_price or item.sale_price or Decimal("0"),
             currency="EUR",
             condition=ArticleCondition.USED,
-            status=ArticleStatus.DRAFT,
+            status=ArticleStatus.PUBLISHED if publish_now else ArticleStatus.DRAFT,
+            published_at=now if publish_now else None,
             quantity=item.quantity,
             category_id=item.category_id,
             images=item.images or [],
@@ -269,11 +276,24 @@ def bulk_publish(
         db.add(article)
         db.flush()
         item.article_id = article.id
-        item.status = InventoryItemStatus.LINKED
+        item.status = (
+            InventoryItemStatus.LISTED if publish_now else InventoryItemStatus.LINKED
+        )
         created += 1
         created_ids.append(item.id)
+        if publish_now:
+            published_articles.append(article)
 
     db.commit()
+
+    # Live sul catalogo → avvisi "nuovi arrivi" agli iscritti (best-effort)
+    for article in published_articles:
+        try:
+            from utils.category_alerts import notify_new_article
+            notify_new_article(db, article)
+        except Exception:  # noqa: BLE001
+            pass
+
     return BulkPublishResponse(
         created=created, skipped=skipped, item_ids_created=created_ids
     )

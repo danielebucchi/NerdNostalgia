@@ -4,6 +4,7 @@ API endpoint inventory_items (singolo item interno al lotto, admin only).
 CRUD piu' publish_to_site (crea Article DRAFT) e unpublish (scollega).
 La gestione del Lot e dei suoi metadati comuni sta in api/lots.py.
 """
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -254,6 +255,7 @@ def publish_to_site(
     # fallback su sale_price copre i vecchi item creati prima dell'aggiunta
     # del campo (o casi in cui l'utente ha compilato solo il ricavo).
     price = item.list_price or item.sale_price or Decimal("0")
+    publish_now = bool(payload.publish_now)
     article = Article(
         user_id=admin.id,
         title=item.title,
@@ -261,7 +263,8 @@ def publish_to_site(
         price=price,
         currency="EUR",
         condition=ArticleCondition.USED,
-        status=ArticleStatus.DRAFT,
+        status=ArticleStatus.PUBLISHED if publish_now else ArticleStatus.DRAFT,
+        published_at=datetime.now(timezone.utc).replace(tzinfo=None) if publish_now else None,
         quantity=item.quantity,
         category_id=item.category_id,
         images=item.images or [],
@@ -283,9 +286,19 @@ def publish_to_site(
     db.refresh(article)
 
     item.article_id = article.id
-    item.status = InventoryItemStatus.LINKED
+    item.status = (
+        InventoryItemStatus.LISTED if publish_now else InventoryItemStatus.LINKED
+    )
     db.commit()
     db.refresh(item)
+
+    # Live sul catalogo → avvisa gli iscritti "nuovi arrivi" (best-effort)
+    if publish_now:
+        try:
+            from utils.category_alerts import notify_new_article
+            notify_new_article(db, article)
+        except Exception:  # noqa: BLE001
+            pass
 
     return _to_response(item)
 

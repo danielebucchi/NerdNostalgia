@@ -76,8 +76,10 @@ class DistributeLotCostResponse(BaseModel):
 
 
 class BulkPublishRequest(BaseModel):
-    """Crea Article DRAFT per la lista di item_id selezionati nel Lot."""
+    """Crea Article per la lista di item_id selezionati nel Lot."""
     item_ids: List[int] = Field(..., min_length=1)
+    # False = bozze DRAFT; True = direttamente PUBLISHED sul catalogo.
+    publish_now: bool = False
 
 
 class BulkPublishResponse(BaseModel):
