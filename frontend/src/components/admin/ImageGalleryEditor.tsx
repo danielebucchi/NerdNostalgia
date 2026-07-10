@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { CameraCapture, supportsInAppCamera } from "@/components/admin/CameraCapture";
 import { adminApi, ApiError } from "@/lib/admin-api";
+import { downloadUrl, saveBlob, shareImageUrl } from "@/lib/download";
 import { compressImage } from "@/lib/image-compress";
 import { uploadWithRetry } from "@/lib/upload-retry";
 
@@ -136,6 +137,33 @@ export function ImageGalleryEditor({
     handleReorder(next);
   }
 
+  // Riporta le foto sul telefono (per Vinted/eBay: dopo l'upload gli
+  // originali vivono solo sul server).
+  async function downloadPhoto(url: string, index: number) {
+    try {
+      const name = `foto-${index + 1}.webp`;
+      // Su mobile lo share sheet e' piu' utile del download (salva in
+      // galleria / manda dritto a Vinted); fallback: download classico.
+      const shared = await shareImageUrl(url, name);
+      if (!shared) await downloadUrl(url, name);
+    } catch (err) {
+      reportError(err);
+    }
+  }
+
+  async function downloadAllZip() {
+    setBusy(true);
+    setError(null);
+    try {
+      const blob = await adminApi.getBlob(`${base}/images.zip`);
+      saveBlob(blob, `${scope}-${entityId}-foto.zip`);
+    } catch (err) {
+      reportError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       {!compact && (
@@ -170,7 +198,8 @@ export function ImageGalleryEditor({
                   COVER
                 </span>
               )}
-              <div className="absolute inset-x-0 bottom-0 bg-ink/70 opacity-0 group-hover:opacity-100 transition-opacity flex justify-between text-cream text-xs">
+              {/* Su touch non c'e' hover: la barra azioni resta visibile */}
+              <div className="absolute inset-x-0 bottom-0 bg-ink/70 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex justify-between text-cream text-xs">
                 <button
                   type="button"
                   disabled={busy || i === 0}
@@ -197,6 +226,15 @@ export function ImageGalleryEditor({
                   title="Sposta a destra"
                 >
                   →
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => downloadPhoto(url, i)}
+                  className="px-1.5 py-0.5 disabled:opacity-30"
+                  title="Scarica / condividi la foto"
+                >
+                  ⬇
                 </button>
                 <button
                   type="button"
@@ -259,6 +297,17 @@ export function ImageGalleryEditor({
               disabled={!canAdd}
             />
           </label>
+        )}
+        {images.length > 0 && (
+          <button
+            type="button"
+            onClick={downloadAllZip}
+            disabled={busy}
+            className="btn btn-ghost text-xs disabled:opacity-50"
+            title="Scarica tutte le foto in uno zip"
+          >
+            ⬇ Tutte
+          </button>
         )}
         {progress && <span className="text-xs text-ink-soft">{progress}</span>}
         {images.length >= maxImages && !progress && (

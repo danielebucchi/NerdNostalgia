@@ -196,6 +196,24 @@ def thumb_url_for(url: str) -> str:
     return url
 
 
+def zip_images(urls, base_name: str = "foto") -> bytes:
+    """Crea uno zip in memoria con i file (full-size) delle URL interne.
+    Le URL esterne o mancanti vengono saltate. Nomi progressivi 01, 02…
+    cosi' l'ordine della gallery si conserva."""
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED) as zf:
+        n = 0
+        for url in urls:
+            path = path_from_internal_url(url)
+            if path is None or not path.exists():
+                continue
+            n += 1
+            zf.write(path, f"{base_name}-{n:02d}{path.suffix}")
+    return buffer.getvalue()
+
+
 def delete_file_for_url(url: str) -> bool:
     """Cancella il file su disco corrispondente a un URL interno e il
     thumbnail associato. Ritorna True se almeno un file è stato rimosso."""

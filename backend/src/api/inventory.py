@@ -39,6 +39,7 @@ from utils.storage import (
     UploadValidationError,
     delete_file_for_url,
     save_inventory_image,
+    zip_images,
 )
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
@@ -363,6 +364,32 @@ def upload_inventory_image(
 
     helper.add_image(item, url)
     return _to_response(item)
+
+
+@router.get("/{item_id}/images.zip")
+def download_inventory_images(
+    item_id: int,
+    helper: InventoryHelper = Depends(get_inventory_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Zip con tutte le foto full-size dell'item del lotto."""
+    item = helper.get(item_id)
+    if not item:
+        raise HTTPException(404, f"Lot item {item_id} non trovato")
+    data = zip_images(item.images or [], base_name=f"item-{item_id}")
+    if not data or len(item.images or []) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nessuna foto interna da scaricare",
+        )
+    from fastapi.responses import Response
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="item-{item_id}-foto.zip"'
+        },
+    )
 
 
 @router.post("/{item_id}/images", response_model=InventoryItemResponse)

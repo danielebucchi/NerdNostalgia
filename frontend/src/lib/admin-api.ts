@@ -79,8 +79,21 @@ async function request<T>(
   return parsed as T;
 }
 
+/** GET autenticata che ritorna il body binario (zip, immagini…). */
+async function requestBlob(path: string): Promise<Blob> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${BASE}${path}`, { headers });
+  if (!res.ok) {
+    throw new ApiError(res.status, null, `HTTP ${res.status}`);
+  }
+  return res.blob();
+}
+
 export const adminApi = {
   get: <T>(path: string) => request<T>("GET", path),
+  getBlob: (path: string) => requestBlob(path),
   post: <T>(path: string, json?: unknown) => request<T>("POST", path, { json }),
   postForm: <T>(path: string, formData: FormData) => request<T>("POST", path, { formData }),
   postLogin: <T>(path: string, data: Record<string, string>) =>
