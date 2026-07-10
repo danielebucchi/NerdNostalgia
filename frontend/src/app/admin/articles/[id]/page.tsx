@@ -8,6 +8,7 @@ import { ArticleForm } from "@/components/admin/ArticleForm";
 import { MarketplaceSyncBox } from "@/components/admin/MarketplaceSyncBox";
 import { Sortable } from "@/components/admin/Sortable";
 import { adminApi } from "@/lib/admin-api";
+import { saveBlob } from "@/lib/download";
 import type { Article } from "@/lib/types";
 
 interface PageProps {
@@ -186,13 +187,32 @@ export default function AdminArticleEditPage({ params }: PageProps) {
 
           {/* Images */}
           <div className="card p-5 mb-6">
-            <div className="flex items-baseline justify-between mb-3">
+            <div className="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
               <h2 className="display text-lg text-ink">Immagini</h2>
-              {article.images.length > 1 && (
-                <p className="text-xs text-ink-soft">
-                  Trascina per riordinare · ⭐ per copertina · ← → per spostare
-                </p>
-              )}
+              <div className="flex items-baseline gap-3">
+                {article.images.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const blob = await adminApi.getBlob(`/api/articles/${id}/images.zip`);
+                        saveBlob(blob, `articolo-${id}-foto.zip`);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : String(err));
+                      }
+                    }}
+                    className="btn btn-ghost text-xs"
+                    title="Scarica tutte le foto in uno zip (per Vinted/eBay)"
+                  >
+                    ⬇ Scarica foto (zip)
+                  </button>
+                )}
+                {article.images.length > 1 && (
+                  <p className="text-xs text-ink-soft hidden sm:block">
+                    Trascina per riordinare · ⭐ per copertina · ← → per spostare
+                  </p>
+                )}
+              </div>
             </div>
             {article.images.length === 0 ? (
               <p className="text-ink-soft text-sm">Nessuna immagine caricata.</p>

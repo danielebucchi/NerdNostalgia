@@ -158,6 +158,33 @@ def test_upload_inventory_image_rejects_non_image(client, admin_headers, item_id
     assert r.status_code == 400
 
 
+def test_download_images_zip(client, admin_headers, item_id):
+    """Lo zip contiene le foto full-size dell'item, nominate in ordine."""
+    import io as _io
+    import zipfile
+
+    for color in ((10, 20, 30), (200, 100, 50)):
+        client.post(
+            f"/api/inventory/{item_id}/upload-image",
+            headers=admin_headers,
+            files={"file": ("a.png", _tiny_png_bytes(color), "image/png")},
+        )
+
+    r = client.get(f"/api/inventory/{item_id}/images.zip", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "application/zip"
+    zf = zipfile.ZipFile(_io.BytesIO(r.content))
+    names = sorted(zf.namelist())
+    assert names == [f"item-{item_id}-01.webp", f"item-{item_id}-02.webp"]
+    # I file dentro non sono vuoti
+    assert all(zf.getinfo(n).file_size > 0 for n in names)
+
+
+def test_download_images_zip_empty_404(client, admin_headers, item_id):
+    r = client.get(f"/api/inventory/{item_id}/images.zip", headers=admin_headers)
+    assert r.status_code == 404
+
+
 def test_delete_inventory_image_removes_url(client, admin_headers, item_id):
     up = client.post(
         f"/api/inventory/{item_id}/upload-image",

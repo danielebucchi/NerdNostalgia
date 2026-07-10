@@ -36,6 +36,7 @@ from utils.storage import (
     delete_article_dir,
     delete_file_for_url,
     save_article_image,
+    zip_images,
 )
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
@@ -468,6 +469,36 @@ def remove_article_image(
     article_helper.remove_image(article, url)
     delete_file_for_url(url)
     return _to_response(article)
+
+
+@router.get("/{article_id}/images.zip")
+def download_article_images(
+    article_id: int,
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Zip con tutte le foto full-size dell'articolo (per ri-usarle su
+    Vinted/eBay: gli originali dopo l'upload vivono solo qui)."""
+    article = article_helper.get("id", article_id)
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Articolo con ID {article_id} non trovato",
+        )
+    data = zip_images(article.images or [], base_name=f"articolo-{article_id}")
+    if not data or len(article.images or []) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nessuna foto interna da scaricare",
+        )
+    from fastapi.responses import Response
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="articolo-{article_id}-foto.zip"'
+        },
+    )
 
 
 @router.post("/{article_id}/upload-image", response_model=ArticleResponse)
