@@ -445,12 +445,26 @@ export default function AdminLotDetailPage() {
               }
               leftAction={{ label: "Elimina", icon: "🗑", onTrigger: () => handleDeleteItem(it.id) }}
             >
-              <button
-                type="button"
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => setEditItem(it)}
-                className="card w-full p-3 flex items-center gap-3 text-left hover:ring-2 hover:ring-lilac-deep/30 transition-all"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") setEditItem(it);
+                }}
+                className="card w-full p-3 flex items-center gap-3 text-left cursor-pointer hover:ring-2 hover:ring-lilac-deep/30 transition-all"
               >
-                <div className="w-14 h-14 rounded-xl ring-1 ring-ink/8 overflow-hidden bg-white/60 flex-shrink-0 flex items-center justify-center">
+                {/* Thumb: click dedicato → apre direttamente la gestione foto */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPhotosOpen(it.id);
+                  }}
+                  className="w-14 h-14 rounded-xl ring-1 ring-ink/8 overflow-hidden bg-white/60 flex-shrink-0 flex items-center justify-center hover:ring-2 hover:ring-pink-deep"
+                  aria-label={`Gestisci foto di ${it.title}`}
+                  title="Foto: aggiungi/scatta"
+                >
                   {it.images?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -462,9 +476,9 @@ export default function AdminLotDetailPage() {
                       loading="lazy"
                     />
                   ) : (
-                    <span className="text-xl text-ink-soft/40" aria-hidden="true">📦</span>
+                    <span className="text-xl text-ink-soft/40" aria-hidden="true">📷＋</span>
                   )}
-                </div>
+                </button>
                 <div className="flex-1 min-w-0">
                   <p className="display text-base text-ink truncate">{it.title}</p>
                   <p className="text-xs text-ink-soft truncate">
@@ -480,7 +494,7 @@ export default function AdminLotDetailPage() {
                 <span className="display text-base text-pink-deep w-16 text-right flex-shrink-0">
                   {it.list_price ? `€${Number(it.list_price).toFixed(0)}` : "—"}
                 </span>
-              </button>
+              </div>
             </SwipeRow>
           ))}
         </div>
