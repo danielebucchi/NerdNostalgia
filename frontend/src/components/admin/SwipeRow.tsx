@@ -83,17 +83,25 @@ export function SwipeRow({
     }
     const fireRight = dx >= threshold && rightAction;
     const fireLeft = dx <= -threshold && leftAction;
-    setSettling(true);
-    setDx(0);
+    if (dx !== 0) {
+      // Anima il rientro; onTransitionEnd toglie transform/overflow cosi'
+      // il backdrop-filter delle card torna a funzionare a riposo.
+      setSettling(true);
+      setDx(0);
+    }
     if (fireRight) rightAction.onTrigger();
     else if (fireLeft) leftAction.onTrigger();
   }
 
   const progress = Math.min(1, Math.abs(dx) / threshold);
+  // A riposo NIENTE transform/overflow: un ancestor con transform rompe il
+  // backdrop-filter delle .card (che diventano "slavate") e overflow-hidden
+  // taglia ombra e angoli. Si applicano solo durante il gesto.
+  const active = dx !== 0;
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl"
+      className={`relative rounded-3xl ${active ? "overflow-hidden" : ""}`}
       style={{ touchAction: "pan-y" }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -109,7 +117,7 @@ export function SwipeRow({
       {/* Pannello sinistro (swipe → destra): verde */}
       {rightAction && dx > 0 && (
         <div
-          className="absolute inset-y-0 left-0 right-0 flex items-center justify-start pl-5 rounded-2xl bg-mint-deep text-white font-bold text-sm gap-2"
+          className="absolute inset-y-0 left-0 right-0 flex items-center justify-start pl-5 rounded-3xl bg-mint-deep text-white font-bold text-sm gap-2"
           style={{ opacity: 0.35 + progress * 0.65 }}
           aria-hidden="true"
         >
@@ -125,7 +133,7 @@ export function SwipeRow({
       {/* Pannello destro (swipe → sinistra): rosso */}
       {leftAction && dx < 0 && (
         <div
-          className="absolute inset-y-0 left-0 right-0 flex items-center justify-end pr-5 rounded-2xl bg-red-500 text-white font-bold text-sm gap-2"
+          className="absolute inset-y-0 left-0 right-0 flex items-center justify-end pr-5 rounded-3xl bg-red-500 text-white font-bold text-sm gap-2"
           style={{ opacity: 0.35 + progress * 0.65 }}
           aria-hidden="true"
         >
@@ -140,10 +148,15 @@ export function SwipeRow({
       )}
 
       <div
-        style={{
-          transform: `translateX(${dx}px)`,
-          transition: settling ? "transform 200ms ease" : "none",
-        }}
+        style={
+          active || settling
+            ? {
+                transform: `translateX(${dx}px)`,
+                transition: settling ? "transform 200ms ease" : "none",
+              }
+            : undefined
+        }
+        onTransitionEnd={() => setSettling(false)}
       >
         {children}
       </div>
