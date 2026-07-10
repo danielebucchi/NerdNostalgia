@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { SwipeRow } from "@/components/admin/SwipeRow";
+import { useUndo } from "@/components/admin/useUndo";
 import { adminApi } from "@/lib/admin-api";
 
 interface OrderItem {
@@ -134,6 +135,41 @@ export default function AdminOrdersPage() {
     }
   }
 
+  // Swipe: ottimistici con ANNULLA (5s) al posto dei confirm
+  const { perform: performUndoable, snackbar } = useUndo();
+
+  function swipePaid(o: Order) {
+    const prevStatus = o.status;
+    performUndoable({
+      message: `Ordine #${o.id} → PAGATO`,
+      apply: () =>
+        setOrders((prev) =>
+          prev.map((x) => (x.id === o.id ? { ...x, status: "PAID" } : x)),
+        ),
+      revert: () =>
+        setOrders((prev) =>
+          prev.map((x) => (x.id === o.id ? { ...x, status: prevStatus } : x)),
+        ),
+      commit: async () => {
+        await adminApi.patch(`/api/orders/${o.id}`, { status: "PAID" });
+      },
+      onCommitError: () => setError("Aggiornamento non riuscito (rete?)"),
+    });
+  }
+
+  function swipeDeleteOrder(o: Order) {
+    const prev = orders;
+    performUndoable({
+      message: `Ordine #${o.id} eliminato`,
+      apply: () => setOrders((curr) => curr.filter((x) => x.id !== o.id)),
+      revert: () => setOrders(prev),
+      commit: async () => {
+        await adminApi.delete(`/api/orders/${o.id}`);
+      },
+      onCommitError: () => setError("Eliminazione non riuscita (rete?)"),
+    });
+  }
+
   return (
     <AdminShell>
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
@@ -180,21 +216,13 @@ export default function AdminOrdersPage() {
                 key={o.id}
                 rightAction={
                   o.status === "PENDING"
-                    ? {
-                        label: "Pagato",
-                        icon: "💶",
-                        onTrigger: () => {
-                          if (confirm(`Segnare l'ordine #${o.id} come PAGATO?`)) {
-                            setStatus(o.id, "PAID");
-                          }
-                        },
-                      }
+                    ? { label: "Pagato", icon: "💶", onTrigger: () => swipePaid(o) }
                     : undefined
                 }
                 leftAction={{
                   label: "Elimina",
                   icon: "🗑",
-                  onTrigger: () => deleteOrder(o.id),
+                  onTrigger: () => swipeDeleteOrder(o),
                 }}
               >
               <div className="card p-4 sm:p-5">
@@ -407,6 +435,8 @@ export default function AdminOrdersPage() {
         </div>
         </>
       )}
+
+      {snackbar}
 
       <style>{`
         .input {

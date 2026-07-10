@@ -10,7 +10,9 @@ from passlib.context import CryptContext
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-change-me")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "60"))
+# Default 7 giorni: admin single-user usato da telefono — il token da 60min
+# buttava fuori a meta' catalogazione. Override via JWT_EXPIRE_MINUTES.
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", str(60 * 24 * 7)))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
