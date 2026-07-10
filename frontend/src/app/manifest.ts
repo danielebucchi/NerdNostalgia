@@ -5,11 +5,15 @@ import type { MetadataRoute } from "next";
 // Servito da Next su /manifest.webmanifest e linkato in automatico.
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    // id esplicito: distingue quest'app dall'admin (/admin-manifest.webmanifest)
+    // che ha id/scope propri — due app installabili sulla stessa origin.
+    id: "/",
     name: "NerdNostalgia",
     short_name: "NerdNostalgia",
     description:
       "Videogiochi vintage, carte Pokémon, Funko Pop e nerderie — compro, vendo, scambio.",
     start_url: "/",
+    scope: "/",
     display: "standalone",
     background_color: "#fff7ed",
     theme_color: "#fff7ed",
