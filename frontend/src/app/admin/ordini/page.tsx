@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { SwipeRow } from "@/components/admin/SwipeRow";
 import { adminApi } from "@/lib/admin-api";
 
 interface OrderItem {
@@ -167,11 +168,36 @@ export default function AdminOrdersPage() {
           Nessun ordine{filterStatus ? ` con stato ${filterStatus}` : ""}.
         </div>
       ) : (
+        <>
+        <p className="text-[11px] text-ink-soft mb-2 sm:hidden">
+          💶 swipe destra segna pagato · sinistra elimina 🗑
+        </p>
         <div className="space-y-3">
           {orders.map((o) => {
             const expanded = expandedId === o.id;
             return (
-              <div key={o.id} className="card p-4 sm:p-5">
+              <SwipeRow
+                key={o.id}
+                rightAction={
+                  o.status === "PENDING"
+                    ? {
+                        label: "Pagato",
+                        icon: "💶",
+                        onTrigger: () => {
+                          if (confirm(`Segnare l'ordine #${o.id} come PAGATO?`)) {
+                            setStatus(o.id, "PAID");
+                          }
+                        },
+                      }
+                    : undefined
+                }
+                leftAction={{
+                  label: "Elimina",
+                  icon: "🗑",
+                  onTrigger: () => deleteOrder(o.id),
+                }}
+              >
+              <div className="card p-4 sm:p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -375,9 +401,11 @@ export default function AdminOrdersPage() {
                   </div>
                 )}
               </div>
+              </SwipeRow>
             );
           })}
         </div>
+        </>
       )}
 
       <style>{`
