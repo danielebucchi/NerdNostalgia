@@ -18,7 +18,7 @@ export function WhatsappFab() {
       rel="noopener noreferrer"
       aria-label="Entra nel gruppo WhatsApp NerdNostalgia"
       title="Entra nel gruppo WhatsApp NerdNostalgia"
-      className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-40 btn btn-whatsapp shadow-hover inline-flex items-center justify-center hover:scale-105 active:scale-100 transition-transform w-14 h-14 p-0"
+      className="public-fab fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-40 btn btn-whatsapp shadow-hover inline-flex items-center justify-center hover:scale-105 active:scale-100 transition-transform w-14 h-14 p-0"
     >
       {/* Logo WhatsApp inline SVG (Simple Icons, CC0). Path occupa l'intera
           viewBox 0 0 24 24 senza padding interno, scalato a w-7 h-7 = 28px

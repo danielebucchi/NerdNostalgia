@@ -73,38 +73,41 @@ export function ArticleCard({ article }: { article: Article }) {
         )}
       </div>
 
-      <div className="p-4 flex flex-col gap-2 flex-1">
-        <h3 className="display text-base sm:text-lg text-ink leading-snug line-clamp-2 min-h-[48px]">
+      {/* Compatta su mobile (griglia a 2 colonne), comoda da sm+ */}
+      <div className="p-2.5 sm:p-4 flex flex-col gap-1.5 sm:gap-2 flex-1">
+        <h3 className="display text-sm sm:text-lg text-ink leading-snug line-clamp-2 min-h-[36px] sm:min-h-[48px]">
           {article.title}
         </h3>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {article.category && (
-            <span className={`chip ${categoryClass}`}>
+            <span className={`chip ${categoryClass} max-w-full truncate`}>
               {article.parent_category
                 ? `${article.parent_category.name} › ${article.category.name}`
                 : article.category.name}
             </span>
           )}
-          {article.brand && <span className="chip">{article.brand}</span>}
+          {article.brand && (
+            <span className="chip hidden sm:inline-flex">{article.brand}</span>
+          )}
         </div>
 
         {/* Filler: spinge il footer in basso mantenendo prezzo alla stessa Y */}
         <div className="flex-1 min-h-2" aria-hidden="true" />
 
         {/* Linea + prezzo principale: stessa Y in tutte le card */}
-        <div className="pt-3 border-t-2 border-dashed border-ink/15 flex items-end justify-between">
-          <span className="display text-2xl text-pink-deep leading-none">
+        <div className="pt-2 sm:pt-3 border-t-2 border-dashed border-ink/15 flex items-end justify-between">
+          <span className="display text-lg sm:text-2xl text-pink-deep leading-none">
             {formatPrice(article)}
           </span>
-          <span className="text-2xl text-ink-soft leading-none" aria-hidden="true">
+          <span className="text-lg sm:text-2xl text-ink-soft leading-none" aria-hidden="true">
             →
           </span>
         </div>
 
         {/* Slot prezzi marketplace SOTTO al prezzo: altezza riservata
             anche se vuoto, cosi' tutte le card terminano alla stessa Y. */}
-        <div className="text-[11px] text-ink-soft flex flex-wrap items-center gap-x-3 gap-y-1 min-h-[18px]">
+        <div className="text-[10px] sm:text-[11px] text-ink-soft flex flex-wrap items-center gap-x-3 gap-y-1 min-h-[16px] sm:min-h-[18px]">
           {article.vinted_price && (
             <span className="inline-flex items-center gap-1.5">
               <MarketplaceLogo marketplace="vinted" height={12} />

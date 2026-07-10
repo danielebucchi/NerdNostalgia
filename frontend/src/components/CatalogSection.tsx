@@ -348,7 +348,8 @@ export function CatalogSection({ initialArticles }: Props) {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6">
+        // 2 colonne gia' da mobile (stile marketplace): densita' doppia
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
           {filtered.map((article) => (
             <ArticleCard key={article.id} article={article} />
           ))}
@@ -416,6 +417,16 @@ function Filters({
   // Prima dell'hydration teniamo il pannello CHIUSO (coerente col nuovo
   // default): niente flash di filtri aperti al primo paint.
   const panelVisible = hydrated ? panelOpen : false;
+
+  // Su mobile il pannello e' un bottom-sheet: blocca lo scroll sotto
+  useEffect(() => {
+    if (!panelVisible) return;
+    if (!window.matchMedia("(max-width: 639px)").matches) return;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [panelVisible]);
 
   return (
     <div className="mb-6 sm:mb-8">
@@ -507,11 +518,38 @@ function Filters({
         )}
       </div>
 
-      {/* Pannello filtri: collassabile sempre, persistito in localStorage */}
+      {/* Backdrop del bottom-sheet (solo mobile) */}
+      {panelVisible && (
+        <div
+          className="sm:hidden fixed inset-0 z-40 bg-ink/40 backdrop-blur-sm"
+          onClick={onTogglePanel}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Pannello filtri: su mobile e' un bottom-sheet fisso che sale dal
+          basso (stesso DOM, presentazione diversa); su sm+ resta inline. */}
       <div
         id="catalog-filters-panel"
-        className={panelVisible ? "block" : "hidden"}
+        className={
+          panelVisible
+            ? "fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-3xl p-4 pb-5 shadow-2xl bg-[#fbf7f4] sm:static sm:z-auto sm:max-h-none sm:overflow-visible sm:rounded-none sm:p-0 sm:shadow-none sm:bg-transparent"
+            : "hidden"
+        }
       >
+        {/* Header sheet (solo mobile) */}
+        <div className="sm:hidden flex items-center justify-between mb-3">
+          <h3 className="display text-lg text-ink">Filtri &amp; ordinamento</h3>
+          <button
+            type="button"
+            onClick={onTogglePanel}
+            className="w-8 h-8 rounded-full border-2 border-ink flex items-center justify-center text-ink"
+            aria-label="Chiudi filtri"
+          >
+            ✕
+          </button>
+        </div>
+
         {/* Ordinamento (solo mobile): card separata dai filtri per non
             confonderlo con essi — su sm+ la select sta accanto ai filtri */}
         <div className="sm:hidden card p-4 mb-3">
@@ -664,8 +702,8 @@ function Filters({
             </FilterRow>
           )}
 
-          {/* Riassunto risultati */}
-          <div className="flex items-center justify-between pt-3 border-t border-ink/8">
+          {/* Riassunto risultati (solo desktop: su mobile c'e' la CTA) */}
+          <div className="hidden sm:flex items-center justify-between pt-3 border-t border-ink/8">
             <span className="text-xs text-ink-soft">
               <strong className="text-ink">{resultsCount}</strong>{" "}
               risultat{resultsCount === 1 ? "o" : "i"}
@@ -679,6 +717,15 @@ function Filters({
             </span>
           </div>
         </div>
+
+        {/* CTA chiusura sheet (solo mobile) */}
+        <button
+          type="button"
+          onClick={onTogglePanel}
+          className="sm:hidden btn btn-primary w-full mt-3"
+        >
+          Mostra {resultsCount} risultat{resultsCount === 1 ? "o" : "i"}
+        </button>
       </div>
 
       <style>{`

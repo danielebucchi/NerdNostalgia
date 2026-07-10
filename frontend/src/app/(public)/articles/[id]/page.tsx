@@ -6,6 +6,7 @@ import { ArticleActions } from "@/components/ArticleActions";
 import { ArticleGallery } from "@/components/ArticleGallery";
 import { BuyControls } from "@/components/BuyControls";
 import { ShareButtons } from "@/components/ShareButtons";
+import { StickyCtaBar } from "@/components/StickyCtaBar";
 import { WishlistButton } from "@/components/WishlistButton";
 import { absUrl, clip, SITE_NAME } from "@/lib/seo";
 
@@ -195,6 +196,11 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           </div>
         </div>
       </div>
+
+      {/* Mobile: prezzo + CTA sempre a portata di pollice; il padding evita
+          che la barra copra il fondo pagina */}
+      <div className="sm:hidden h-20" aria-hidden="true" />
+      <StickyCtaBar article={article} />
     </article>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { CameraCapture, supportsInAppCamera } from "@/components/admin/CameraCapture";
 import { adminApi, ApiError } from "@/lib/admin-api";
 import { compressImage } from "@/lib/image-compress";
 
@@ -39,6 +40,7 @@ export function ImageGalleryEditor({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const base = `/api/${scope}/${entityId}`;
@@ -50,7 +52,7 @@ export function ImageGalleryEditor({
     else setError("Errore sconosciuto");
   }
 
-  async function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | File[] | null) {
     if (!files || files.length === 0) return;
     setBusy(true);
     setError(null);
@@ -227,23 +229,36 @@ export function ImageGalleryEditor({
             disabled={!canAdd}
           />
         </label>
-        {/* Scatto diretto dalla camera: capture apre la fotocamera
-            posteriore sui telefoni; su desktop degrada nel file picker. */}
-        <label
-          className={`btn btn-ghost text-xs cursor-pointer ${
-            !canAdd ? "opacity-50 cursor-not-allowed pointer-events-none" : ""
-          }`}
-        >
-          📸 Scatta
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="sr-only"
-            onChange={(e) => handleFiles(e.target.files)}
+        {/* Scatto: fotocamera IN-APP (getUserMedia) dove supportata — su
+            Android l'app fotocamera esterna fa killare la PWA in background
+            ("Memoria insufficiente") perdendo lo scatto. Fallback: input
+            capture per i browser senza getUserMedia. */}
+        {supportsInAppCamera() ? (
+          <button
+            type="button"
+            onClick={() => setCameraOpen(true)}
             disabled={!canAdd}
-          />
-        </label>
+            className="btn btn-ghost text-xs disabled:opacity-50"
+          >
+            📸 Scatta
+          </button>
+        ) : (
+          <label
+            className={`btn btn-ghost text-xs cursor-pointer ${
+              !canAdd ? "opacity-50 cursor-not-allowed pointer-events-none" : ""
+            }`}
+          >
+            📸 Scatta
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="sr-only"
+              onChange={(e) => handleFiles(e.target.files)}
+              disabled={!canAdd}
+            />
+          </label>
+        )}
         {progress && <span className="text-xs text-ink-soft">{progress}</span>}
         {images.length >= maxImages && !progress && (
           <span className="text-xs text-ink-soft">Limite raggiunto</span>
@@ -253,6 +268,12 @@ export function ImageGalleryEditor({
       {error && (
         <p className="text-xs text-pink-deep font-semibold">⚠ {error}</p>
       )}
+
+      <CameraCapture
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={(file) => handleFiles([file])}
+      />
     </div>
   );
 }
