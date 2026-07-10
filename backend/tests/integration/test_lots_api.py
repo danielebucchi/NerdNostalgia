@@ -186,3 +186,60 @@ def test_duplicate_lot_not_found(client, admin_headers):
         "/api/lots/99999/duplicate", headers=admin_headers, json={},
     )
     assert r.status_code == 404
+
+
+def test_bulk_publish_whole_lot_only_priced(client, admin_headers, lot_payload):
+    """Senza item_ids opera su tutto il lotto; only_priced salta chi non ha listino."""
+    lot = client.post("/api/lots/", headers=admin_headers, json=lot_payload).json()
+    client.post(
+        "/api/inventory/", headers=admin_headers,
+        json={"lot_id": lot["id"], "title": "Con listino", "quantity": 1,
+              "list_price": "20.00"},
+    )
+    client.post(
+        "/api/inventory/", headers=admin_headers,
+        json={"lot_id": lot["id"], "title": "Senza listino", "quantity": 1},
+    )
+
+    r = client.post(
+        f"/api/lots/{lot['id']}/bulk-publish",
+        headers=admin_headers,
+        json={"publish_now": True, "only_priced": True},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["created"] == 1
+    assert body["skipped"] == 1
+
+    items = client.get(
+        f"/api/inventory/?lot_id={lot['id']}", headers=admin_headers,
+    ).json()["items"]
+    priced = next(i for i in items if i["title"] == "Con listino")
+    unpriced = next(i for i in items if i["title"] == "Senza listino")
+    assert priced["status"] == "LISTED"
+    art = client.get(f"/api/articles/{priced['article_id']}").json()
+    assert art["status"] == "PUBLISHED"
+    assert float(art["price"]) == 20.00
+    assert unpriced["article_id"] is None
+    assert unpriced["status"] == "DRAFT"
+
+
+def test_delete_lot_force_removes_items(client, admin_headers, lot_payload):
+    lot = client.post("/api/lots/", headers=admin_headers, json=lot_payload).json()
+    item = client.post(
+        "/api/inventory/", headers=admin_headers,
+        json={"lot_id": lot["id"], "title": "Da cancellare", "quantity": 1},
+    ).json()
+
+    # Senza force: rifiuta (lotto non vuoto)
+    r = client.delete(f"/api/lots/{lot['id']}", headers=admin_headers)
+    assert r.status_code == 400
+
+    # Con force: elimina lotto + item
+    r = client.delete(f"/api/lots/{lot['id']}?force=true", headers=admin_headers)
+    assert r.status_code == 204
+    assert client.get(f"/api/lots/{lot['id']}", headers=admin_headers).status_code == 404
+    items = client.get(
+        f"/api/inventory/?search=Da cancellare", headers=admin_headers,
+    ).json()["items"]
+    assert all(i["id"] != item["id"] for i in items)

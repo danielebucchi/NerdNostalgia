@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { SwipeRow } from "@/components/admin/SwipeRow";
 import { adminApi } from "@/lib/admin-api";
 import { usePlatforms } from "@/lib/usePlatforms";
 import type {
@@ -79,6 +80,40 @@ export default function AdminLottiListPage() {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
+
+  // Swipe sulla card lotto: → pubblica online gli item con listino,
+  // ← elimina l'intero lotto (item + foto compresi).
+  async function swipePublishLot(lot: Lot) {
+    if (!confirm(
+      `Pubblicare online il lotto ${lot.code}?\n` +
+      `Vanno sul catalogo SOLO gli item con prezzo di Listino inserito; ` +
+      `gli altri (e quelli gia' pubblicati) vengono saltati.`,
+    )) return;
+    try {
+      const r = await adminApi.post<{ created: number; skipped: number }>(
+        `/api/lots/${lot.id}/bulk-publish`,
+        { publish_now: true, only_priced: true },
+      );
+      alert(`Pubblicati: ${r.created}\nSaltati (senza listino o già pubblicati): ${r.skipped}`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function swipeDeleteLot(lot: Lot) {
+    if (!confirm(
+      `⚠️ Eliminare TUTTO il lotto ${lot.code} con i suoi ${lot.items_count} item?\n` +
+      `Operazione irreversibile: le foto degli item vengono cancellate. ` +
+      `Gli Article gia' creati sul catalogo restano.`,
+    )) return;
+    try {
+      await adminApi.delete(`/api/lots/${lot.id}?force=true`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   // Debounced item search
   useEffect(() => {
@@ -212,9 +247,20 @@ export default function AdminLottiListPage() {
         </div>
       )}
 
+      {lots.length > 0 && (
+        <p className="text-[11px] text-ink-soft mb-2 sm:hidden">
+          🚀 swipe destra pubblica (solo item con listino) · sinistra elimina lotto 🗑
+        </p>
+      )}
       <div className="grid gap-3">
         {lots.map((lot) => (
-          <LotCard key={lot.id} lot={lot} />
+          <SwipeRow
+            key={lot.id}
+            rightAction={{ label: "Pubblica", icon: "🚀", onTrigger: () => swipePublishLot(lot) }}
+            leftAction={{ label: "Elimina", icon: "🗑", onTrigger: () => swipeDeleteLot(lot) }}
+          >
+            <LotCard lot={lot} />
+          </SwipeRow>
         ))}
       </div>
 

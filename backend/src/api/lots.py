@@ -157,17 +157,28 @@ def update_lot(
 @router.delete("/{lot_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_lot(
     lot_id: int,
+    force: bool = Query(
+        False,
+        description="True = elimina anche tutti gli item del lotto (con le loro foto). "
+                    "Gli Article gia' creati NON vengono toccati.",
+    ),
     helper: LotHelper = Depends(get_lot_helper),
     _admin: User = Depends(require_admin),
 ):
     lot = helper.get(lot_id)
     if not lot:
         raise HTTPException(404, f"Lot {lot_id} non trovato")
-    if lot.items:
+    if lot.items and not force:
         raise HTTPException(
             400,
             "Lot non vuoto: rimuovi prima tutti gli item, oppure imposta status=ARCHIVED.",
         )
+    if force:
+        # Pulizia best-effort delle foto su disco degli item; il cascade
+        # SQLAlchemy (all, delete-orphan) elimina le righe inventory_items.
+        from utils.storage import delete_upload_dir
+        for item in lot.items:
+            delete_upload_dir("inventory", item.id)
     helper.delete(lot)
     return None
 
@@ -228,16 +239,21 @@ def bulk_publish(
     publish_now = bool(payload.publish_now)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     valid_item_ids = {it.id for it in lot.items}
+    # item_ids assente = opera su tutto il lotto
+    target_ids = payload.item_ids if payload.item_ids is not None else sorted(valid_item_ids)
     created = 0
     skipped = 0
     created_ids = []
     published_articles = []
-    for item_id in payload.item_ids:
+    for item_id in target_ids:
         if item_id not in valid_item_ids:
             skipped += 1
             continue
         item = inv_helper.get(item_id)
         if not item:
+            skipped += 1
+            continue
+        if payload.only_priced and item.list_price is None:
             skipped += 1
             continue
         if item.article_id is not None:
