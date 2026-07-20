@@ -55,16 +55,22 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "label": "Zone consegna a mano (testo)",
         "help": "Testo mostrato nel badge sull'articolo e nel carrello.",
     },
+    "article_description_footer": {
+        "default": "Spedizione veloce",
+        "public": True,
+        "label": "Riga finale descrizione articolo",
+        "help": "Mostrata in fondo alla descrizione di OGNI articolo sul "
+                "catalogo (non salvata negli articoli: cambiarla qui li "
+                "aggiorna tutti). Vuoto per nasconderla.",
+    },
     "marketplace_footer_vinted": {
-        "default": "Spedizione tracciata in tutta Italia.\n"
-                   "Altri pezzi nerd su nerdnostalgia.it",
+        "default": "Spedizione Veloce\nAltri pezzi su www.nerdnostalgia.store",
         "public": False,
         "label": "Footer descrizione Vinted",
         "help": "Aggiunto in fondo alla descrizione copiata per Vinted.",
     },
     "marketplace_footer_ebay": {
-        "default": "Spedizione tracciata in tutta Italia con corriere assicurato.\n"
-                   "Altri pezzi nerd su nerdnostalgia.it",
+        "default": "Spedizione Veloce\nAltri pezzi su www.nerdnostalgia.store",
         "public": False,
         "label": "Footer descrizione eBay",
         "help": "Aggiunto in fondo alla descrizione copiata per eBay.",
