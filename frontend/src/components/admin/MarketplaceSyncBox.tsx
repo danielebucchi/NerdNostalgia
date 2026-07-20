@@ -25,8 +25,7 @@ const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
     emoji: "🛍",
     newListingUrl: "https://www.vinted.it/items/new",
     footerSettingKey: "marketplace_footer_vinted",
-    defaultFooter:
-      "Spedizione tracciata in tutta Italia.\nAltri pezzi nerd su nerdnostalgia.it",
+    defaultFooter: "Spedizione Veloce\nAltri pezzi su www.nerdnostalgia.store",
   },
   ebay: {
     key: "ebay",
@@ -34,9 +33,7 @@ const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
     emoji: "🏷",
     newListingUrl: "https://www.ebay.it/sl/sell",
     footerSettingKey: "marketplace_footer_ebay",
-    defaultFooter:
-      "Spedizione tracciata in tutta Italia con corriere assicurato.\n" +
-      "Altri pezzi nerd su nerdnostalgia.it",
+    defaultFooter: "Spedizione Veloce\nAltri pezzi su www.nerdnostalgia.store",
   },
 };
 
@@ -96,11 +93,21 @@ function getMarketplaceData(article: Article, key: MarketplaceKey) {
 // Costruisce SOLO la descrizione da incollare nel campo "Descrizione" del
 // marketplace. Titolo e prezzo si copiano separatamente perche' su mobile
 // vanno in campi form distinti (incollare tutto insieme era ingestibile).
+// Il footer del SITO ("Spedizione veloce") non e' mai salvato dentro
+// article.description, ma per sicurezza filtriamo eventuali righe uguali
+// scritte a mano nelle descrizioni vecchie: qui va il footer marketplace.
 function buildDescription(article: Article, footer: string): string {
   const lines: string[] = [];
   if (article.description) {
-    lines.push(article.description);
-    lines.push("");
+    const cleaned = article.description
+      .split("\n")
+      .filter((l) => l.trim().toLowerCase() !== "spedizione veloce")
+      .join("\n")
+      .trim();
+    if (cleaned) {
+      lines.push(cleaned);
+      lines.push("");
+    }
   }
   const meta: string[] = [];
   if (article.brand) meta.push(`Marca: ${article.brand}`);

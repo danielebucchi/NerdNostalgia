@@ -52,6 +52,20 @@ export async function listArticles(params: ListArticlesParams = {}): Promise<Art
   return res.json();
 }
 
+/** Settings pubbliche runtime (usabile anche server-side nei RSC). */
+export async function getPublicSettings(): Promise<Record<string, string>> {
+  try {
+    const res = await fetch(`${API_BASE}/api/settings/public`, {
+      // 60s di cache: le settings cambiano di rado, niente hit per pagina
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return {};
+    return res.json();
+  } catch {
+    return {};
+  }
+}
+
 export async function getArticle(id: number | string): Promise<Article | null> {
   const res = await fetch(`${API_BASE}/api/articles/${id}`, { cache: "no-store" });
   if (res.status === 404) return null;

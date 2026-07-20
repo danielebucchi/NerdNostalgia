@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatPrice, getArticle, listArticles } from "@/lib/api";
+import { formatPrice, getArticle, getPublicSettings, listArticles } from "@/lib/api";
 import type { Article } from "@/lib/types";
 import { ArticleActions } from "@/components/ArticleActions";
 import { ArticleCard } from "@/components/ArticleCard";
@@ -104,6 +104,11 @@ export default async function ArticleDetailPage({ params }: PageProps) {
     related = [];
   }
 
+  // Riga finale della descrizione (es. "Spedizione veloce"): setting
+  // runtime, vale per TUTTI gli articoli senza toccarne il testo.
+  const settings = await getPublicSettings();
+  const descriptionFooter = (settings.article_description_footer ?? "Spedizione veloce").trim();
+
   const cover = article.images?.[0];
 
   const productJsonLd = {
@@ -184,12 +189,19 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           <BuyControls article={article} />
         </div>
 
-        {/* Descrizione */}
-        {article.description && (
+        {/* Descrizione (+ riga finale da settings, es. "Spedizione veloce") */}
+        {(article.description || descriptionFooter) && (
           <div className="order-1 md:order-none md:col-start-2 md:row-start-3">
-            <p className="text-ink-soft text-lg whitespace-pre-line leading-relaxed">
-              {article.description}
-            </p>
+            {article.description && (
+              <p className="text-ink-soft text-lg whitespace-pre-line leading-relaxed">
+                {article.description}
+              </p>
+            )}
+            {descriptionFooter && (
+              <p className="text-ink text-base font-semibold mt-3 inline-flex items-center gap-1.5">
+                <span aria-hidden="true">🚚</span> {descriptionFooter}
+              </p>
+            )}
           </div>
         )}
 
