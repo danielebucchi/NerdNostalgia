@@ -26,6 +26,7 @@ const DRAFT_KEY = "nn:quickadd-draft:v1";
 
 interface Draft {
   title: string;
+  description: string;
   listPrice: string;
   cost: string;
   categoryId: string;
@@ -46,6 +47,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
   const [lots, setLots] = useState<Lot[]>([]);
   const [lotId, setLotId] = useState<string>("");
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [listPrice, setListPrice] = useState("");
   const [cost, setCost] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -76,6 +78,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
       if (raw) {
         const d: Draft = JSON.parse(raw);
         if (d.title) setTitle(d.title);
+        if (d.description) setDescription(d.description);
         if (d.listPrice) setListPrice(d.listPrice);
         if (d.cost) setCost(d.cost);
         if (d.categoryId) setCategoryId(d.categoryId);
@@ -93,7 +96,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
   // serializzano — al kill del processo si riscattano, il resto resta)
   useEffect(() => {
     if (!open) return;
-    const draft: Draft = { title, listPrice, cost, categoryId, lotId, publishNow, draftItemId };
+    const draft: Draft = { title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId };
     try {
       if (title.trim() || draftItemId) {
         window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -101,7 +104,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
     } catch {
       // storage pieno/negato: pazienza
     }
-  }, [open, title, listPrice, cost, categoryId, lotId, publishNow, draftItemId]);
+  }, [open, title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId]);
 
   function clearDraft() {
     try {
@@ -184,6 +187,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
         const item = await adminApi.post<{ id: number }>("/api/inventory/", {
           lot_id: Number(lotId),
           title: title.trim(),
+          description: description.trim() || null,
           quantity: 1,
           cost: cost.trim() ? Number(cost) : null,
           list_price: listPrice.trim() ? Number(listPrice) : null,
@@ -222,6 +226,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
       clearDraft();
       // reset per il prossimo giro (tenendo il lotto selezionato)
       setTitle("");
+      setDescription("");
       setListPrice("");
       setCost("");
       setPhotos([]);
@@ -376,6 +381,15 @@ export function QuickAddDialog({ open, onClose }: Props) {
               placeholder="Cosa hai in mano? *"
               className="qa-input"
               maxLength={500}
+            />
+
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descrizione (condizioni, difetti, cosa include…) — finisce sull'articolo quando pubblichi"
+              className="qa-input resize-none"
+              rows={3}
+              maxLength={4000}
             />
 
             <div>

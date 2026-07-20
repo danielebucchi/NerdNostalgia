@@ -837,6 +837,7 @@ function ItemEditDialog({
 }) {
   const [f, setF] = useState({
     title: item.title,
+    description: item.description ?? "",
     status: item.status,
     category_id: item.category_id != null ? String(item.category_id) : "",
     quantity: String(item.quantity),
@@ -868,6 +869,7 @@ function ItemEditDialog({
       const num = (s: string) => (String(s).trim() === "" ? null : Number(s));
       await adminApi.patch(`/api/inventory/${item.id}`, {
         title: f.title.trim(),
+        description: f.description.trim() || null,
         status: f.status,
         category_id: f.category_id ? Number(f.category_id) : null,
         quantity: Math.max(0, Number(f.quantity) || 1),
@@ -932,6 +934,17 @@ function ItemEditDialog({
         <div className="space-y-3">
           <Field label="Oggetto *">
             <input value={f.title} onChange={(e) => set("title", e.target.value)} className="input" />
+          </Field>
+
+          <Field label="Descrizione (va sull'articolo pubblico al publish)">
+            <textarea
+              rows={3}
+              value={f.description}
+              onChange={(e) => set("description", e.target.value)}
+              placeholder="Condizioni, difetti, cosa include…"
+              className="input resize-none"
+              maxLength={4000}
+            />
           </Field>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
