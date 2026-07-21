@@ -41,6 +41,8 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - EMAIL_FROM=${EMAIL_FROM:-}
       - EMAIL_TO_ADMIN=${EMAIL_TO_ADMIN:-nerdnostalgiaita@gmail.com}
+      # CardTrader API (JWT). In prod dal vault garganacl.
+      - CARDTRADER_JWT=${CARDTRADER_JWT:-}
       # Backup S3/R2 (opzionali)
       - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
       - BACKUP_S3_ENDPOINT=${BACKUP_S3_ENDPOINT:-}
