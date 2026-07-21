@@ -12,6 +12,7 @@ endpoint admin.
 """
 import logging
 import os
+import time
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -98,6 +99,28 @@ def expansions() -> List[dict]:
 def blueprints(expansion_id: int) -> List[dict]:
     """Tutti i blueprint di una espansione (per abbinare la carta)."""
     return _request("GET", "/blueprints/export", params={"expansion_id": expansion_id}) or []
+
+
+# Cache in-memory: espansioni ed export blueprint cambiano di rado, ma il
+# match automatico li interroga spesso → TTL 1h per non martellare l'API.
+_CACHE: Dict[str, Any] = {}
+
+
+def _cached(key: str, ttl: int, producer):
+    entry = _CACHE.get(key)
+    if entry and (time.time() - entry[0]) < ttl:
+        return entry[1]
+    val = producer()
+    _CACHE[key] = (time.time(), val)
+    return val
+
+
+def expansions_cached(ttl: int = 3600) -> List[dict]:
+    return _cached("expansions", ttl, expansions)
+
+
+def blueprints_cached(expansion_id: int, ttl: int = 3600) -> List[dict]:
+    return _cached(f"bp:{expansion_id}", ttl, lambda: blueprints(expansion_id))
 
 
 def _price_to_cents(price: Any) -> Optional[int]:

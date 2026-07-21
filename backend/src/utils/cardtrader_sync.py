@@ -6,8 +6,9 @@ CardTrader accetta solo carte agganciate a un blueprint: l'auto-push
 scatta SOLO per articoli di categoria "carte" gia' abbinati.
 """
 import logging
+import re
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from models.db import Article
 from utils import cardtrader_client as ct
@@ -24,6 +25,107 @@ def is_card_article(article: Article) -> bool:
         return False
     top_slug = cat.slug if cat.parent_id is None else (cat.parent.slug if cat.parent else cat.slug)
     return (top_slug or "").lower() in CARD_TOP_SLUGS
+
+
+# ── Risoluzione automatica blueprint da collezione + numero ────────
+
+def _norm_number(s: Optional[str]) -> str:
+    """Normalizza un numero carta per il confronto: prende la parte prima
+    di '/', tiene alfanumerici, toglie zeri iniziali. '004/102'→'4',
+    'TG12/TG30'→'tg12', '015'→'15'."""
+    if not s:
+        return ""
+    head = str(s).strip().lower().split("/")[0]
+    head = re.sub(r"[^0-9a-z]", "", head)
+    stripped = head.lstrip("0")
+    return stripped or head
+
+
+def _tokens(s: Optional[str]) -> set:
+    return set(re.findall(r"[a-z0-9]+", (s or "").lower()))
+
+
+def resolve_blueprints(
+    collection: Optional[str],
+    number: Optional[str],
+    name: Optional[str] = None,
+    game_id: Optional[int] = None,
+    limit: int = 8,
+) -> List[Dict[str, Any]]:
+    """Trova i blueprint candidati da collezione+numero (+nome opz.).
+    Ritorna lista ordinata per score: {blueprint, expansion, score,
+    number_match}. L'abbinamento espansione da testo libero e' euristico:
+    per questo si restituiscono candidati da confermare, non 1 secco."""
+    exps = ct.expansions_cached()
+    if game_id:
+        exps = [e for e in exps if e.get("game_id") == game_id]
+
+    coll_l = (collection or "").strip().lower()
+    ctoks = _tokens(collection)
+
+    # Espansioni candidate: match su code esatto, substring o token overlap
+    scored_exps = []
+    for e in exps:
+        code = (e.get("code") or "").lower()
+        ename = (e.get("name") or "").lower()
+        score = 0
+        if coll_l and code == coll_l:
+            score += 6
+        if coll_l and (coll_l in ename or ename in coll_l):
+            score += 4
+        overlap = len(ctoks & _tokens(e.get("name")))
+        score += overlap * 2
+        if score > 0:
+            scored_exps.append((score, e))
+    scored_exps.sort(key=lambda x: -x[0])
+
+    target = _norm_number(number)
+    ntoks = _tokens(name)
+    cands: List[Dict[str, Any]] = []
+    # Limita alle prime espansioni per non scaricare troppi export
+    for exp_score, e in scored_exps[:6]:
+        for bp in ct.blueprints_cached(e["id"]):
+            cn = _norm_number((bp.get("fixed_properties") or {}).get("collector_number"))
+            num_match = bool(target) and cn == target
+            name_overlap = len(ntoks & _tokens(bp.get("name"))) if ntoks else 0
+            if not num_match and name_overlap == 0:
+                continue
+            score = exp_score + (10 if num_match else 0) + name_overlap * 2
+            cands.append({
+                "blueprint": bp,
+                "expansion": {"id": e["id"], "name": e.get("name"), "code": e.get("code")},
+                "score": score,
+                "number_match": num_match,
+            })
+    cands.sort(key=lambda x: -x["score"])
+    return cands[:limit]
+
+
+def resolve_single(
+    collection: Optional[str],
+    number: Optional[str],
+    name: Optional[str] = None,
+    game_id: Optional[int] = None,
+) -> Optional[int]:
+    """Blueprint_id SOLO se il match e' inequivocabile: un unico candidato
+    col numero esatto, o il migliore col numero esatto nettamente sopra il
+    secondo. Altrimenti None (→ abbinamento manuale)."""
+    cands = resolve_blueprints(collection, number, name, game_id, limit=5)
+    exact = [c for c in cands if c["number_match"]]
+    if len(exact) == 1:
+        return exact[0]["blueprint"]["id"]
+    if len(exact) >= 2 and exact[0]["score"] >= exact[1]["score"] + 6:
+        return exact[0]["blueprint"]["id"]
+    return None
+
+
+def _default_game_id(db) -> Optional[int]:
+    try:
+        from helpers.setting import SettingHelper
+        v = SettingHelper(db=db).get_value("cardtrader_default_game_id")
+        return int(v) if v and v.strip().isdigit() else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _extract_product_id(resp: Any) -> Optional[int]:
@@ -114,11 +216,24 @@ def auto_publish_if_card(db, article: Article) -> Optional[int]:
         if not is_card_article(article):
             return None
         if not article.cardtrader_blueprint_id:
-            LOGGER.info(
-                "Auto-push CardTrader saltato: articolo %s carta ma senza blueprint",
-                article.id,
+            # Prova a risolvere il blueprint da collezione+numero, ma solo
+            # se il match e' inequivocabile (altrimenti niente auto-push:
+            # meglio abbinare a mano che pubblicare la carta sbagliata).
+            bp = resolve_single(
+                article.card_collection,
+                article.card_number,
+                article.title,
+                _default_game_id(db),
             )
-            return None
+            if not bp:
+                LOGGER.info(
+                    "Auto-push CardTrader saltato: articolo %s carta ma blueprint "
+                    "non abbinato ne' risolvibile univocamente", article.id,
+                )
+                return None
+            article.cardtrader_blueprint_id = bp
+            db.commit()
+            LOGGER.info("Auto-match blueprint %s per articolo %s", bp, article.id)
         res = publish_article(db, article)
         LOGGER.info(
             "Auto-push CardTrader: articolo %s → prodotto %s a %.2f€",

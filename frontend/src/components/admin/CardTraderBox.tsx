@@ -74,6 +74,30 @@ export function CardTraderBox({
       .catch((e) => setError(String(e)));
   }
 
+  async function autoResolve() {
+    setSearching(true);
+    setError(null);
+    try {
+      const r = await adminApi.get<{ candidates: Array<{ blueprint: Blueprint; expansion: { name: string }; number_match: boolean }> }>(
+        `/api/cardtrader/resolve?article_id=${article.id}`,
+      );
+      // Riuso la lista risultati: mostro espansione + ✓ se numero combacia
+      setResults(
+        r.candidates.map((c) => ({
+          ...c.blueprint,
+          version: `${c.expansion.name}${c.number_match ? " · n° ✓" : ""}`,
+        })),
+      );
+      if (r.candidates.length === 0) {
+        setError("Nessun candidato: cerca a mano (gioco → espansione).");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSearching(false);
+    }
+  }
+
   async function search() {
     if (!expansionId) return;
     setSearching(true);
@@ -251,6 +275,20 @@ export function CardTraderBox({
           <p className="text-sm text-ink-soft">
             Abbina questa carta al catalogo CardTrader per poterla pubblicare.
           </p>
+
+          {/* Auto-match da collezione + numero già presenti sull'articolo */}
+          {(article.card_collection || article.card_number) && (
+            <button
+              type="button"
+              onClick={autoResolve}
+              disabled={searching}
+              className="btn btn-primary text-sm w-full"
+              title={`Cerca da "${article.card_collection ?? ""}" n° ${article.card_number ?? ""}`}
+            >
+              {searching ? "Cerco…" : "✨ Trova automaticamente da collezione + numero"}
+            </button>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <select
               value={gameId ?? ""}
