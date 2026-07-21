@@ -19,10 +19,13 @@ import { useSoldPriceHint } from "@/components/admin/useSoldPriceHint";
 import { adminApi } from "@/lib/admin-api";
 import { compressImage } from "@/lib/image-compress";
 import { uploadWithRetry } from "@/lib/upload-retry";
-import { useCategories } from "@/lib/useCategories";
+import { findTopLevel, useCategories } from "@/lib/useCategories";
 import type { Lot, LotListResponse } from "@/lib/types";
 
 const DRAFT_KEY = "nn:quickadd-draft:v1";
+// Slug top-level "carte": abilita i campi collezione/numero per l'auto-match
+// del blueprint CardTrader (stessa logica di is_card_article lato backend).
+const CARD_TOP_SLUGS = new Set(["carte", "cards"]);
 
 interface Draft {
   title: string;
@@ -33,6 +36,8 @@ interface Draft {
   lotId: string;
   publishNow: boolean;
   draftItemId: number | null;
+  cardCollection: string;
+  cardNumber: string;
 }
 
 type PhotoStatus = "pending" | "done" | "error";
@@ -43,7 +48,7 @@ interface Props {
 }
 
 export function QuickAddDialog({ open, onClose }: Props) {
-  const { flat: categories } = useCategories();
+  const { flat: categories, byId: categoriesById } = useCategories();
   const [lots, setLots] = useState<Lot[]>([]);
   const [lotId, setLotId] = useState<string>("");
   const [title, setTitle] = useState("");
@@ -51,6 +56,8 @@ export function QuickAddDialog({ open, onClose }: Props) {
   const [listPrice, setListPrice] = useState("");
   const [cost, setCost] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [cardCollection, setCardCollection] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoStatus, setPhotoStatus] = useState<PhotoStatus[]>([]);
   const [publishNow, setPublishNow] = useState(false);
@@ -63,6 +70,14 @@ export function QuickAddDialog({ open, onClose }: Props) {
   const [done, setDone] = useState<{ itemId: number; lotId: number } | null>(null);
 
   const priceHint = useSoldPriceHint(title);
+
+  // È una carta? (categoria il cui top-level è "carte") → mostra i campi
+  // collezione/numero che alimentano l'auto-push CardTrader alla pubblicazione.
+  const isCard = useMemo(() => {
+    if (!categoryId) return false;
+    const top = findTopLevel(categoriesById, Number(categoryId));
+    return !!top && CARD_TOP_SLUGS.has((top.slug || "").toLowerCase());
+  }, [categoryId, categoriesById]);
 
   // Anteprime foto (object URL, revocate al cleanup)
   const previews = useMemo(() => photos.map((f) => URL.createObjectURL(f)), [photos]);
@@ -85,6 +100,8 @@ export function QuickAddDialog({ open, onClose }: Props) {
         if (d.lotId) setLotId(d.lotId);
         if (d.publishNow) setPublishNow(d.publishNow);
         if (d.draftItemId) setDraftItemId(d.draftItemId);
+        if (d.cardCollection) setCardCollection(d.cardCollection);
+        if (d.cardNumber) setCardNumber(d.cardNumber);
       }
     } catch {
       // bozza corrotta: ignora
@@ -96,7 +113,10 @@ export function QuickAddDialog({ open, onClose }: Props) {
   // serializzano — al kill del processo si riscattano, il resto resta)
   useEffect(() => {
     if (!open) return;
-    const draft: Draft = { title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId };
+    const draft: Draft = {
+      title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId,
+      cardCollection, cardNumber,
+    };
     try {
       if (title.trim() || draftItemId) {
         window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -104,7 +124,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
     } catch {
       // storage pieno/negato: pazienza
     }
-  }, [open, title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId]);
+  }, [open, title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId, cardCollection, cardNumber]);
 
   function clearDraft() {
     try {
@@ -192,6 +212,9 @@ export function QuickAddDialog({ open, onClose }: Props) {
           cost: cost.trim() ? Number(cost) : null,
           list_price: listPrice.trim() ? Number(listPrice) : null,
           category_id: categoryId ? Number(categoryId) : null,
+          // Solo per le carte: alimentano l'auto-match del blueprint CardTrader
+          card_collection: isCard && cardCollection.trim() ? cardCollection.trim() : null,
+          card_number: isCard && cardNumber.trim() ? cardNumber.trim() : null,
         });
         itemId = item.id;
         setDraftItemId(itemId);
@@ -229,6 +252,8 @@ export function QuickAddDialog({ open, onClose }: Props) {
       setDescription("");
       setListPrice("");
       setCost("");
+      setCardCollection("");
+      setCardNumber("");
       setPhotos([]);
       setPhotoStatus([]);
     } catch (err) {
@@ -460,6 +485,33 @@ export function QuickAddDialog({ open, onClose }: Props) {
                 </button>
               </div>
             </div>
+
+            {isCard && (
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={cardCollection}
+                  onChange={(e) => setCardCollection(e.target.value)}
+                  placeholder="Espansione/collezione"
+                  className="qa-input"
+                  maxLength={100}
+                  aria-label="Collezione carta"
+                />
+                <input
+                  type="text"
+                  value={cardNumber}
+                  onChange={(e) => setCardNumber(e.target.value)}
+                  placeholder="N° carta (es. 4/102)"
+                  className="qa-input"
+                  maxLength={50}
+                  aria-label="Numero carta"
+                />
+                <p className="col-span-2 text-[11px] text-ink-soft -mt-1">
+                  🃏 Collezione + numero servono per pubblicarla in automatico su
+                  CardTrader (prezzo = 4° più basso). Facoltativi.
+                </p>
+              </div>
+            )}
 
             <label className="flex items-center gap-2 cursor-pointer text-sm">
               <input
