@@ -31,6 +31,7 @@ from models.entities.article import (
     VintedSyncUpdate,
 )
 from utils.category_alerts import notify_new_article
+from utils import cardtrader_sync as cts
 from utils.storage import (
     UploadValidationError,
     delete_article_dir,
@@ -303,12 +304,16 @@ def update_article(
     was_published = article.status == ArticleStatus.PUBLISHED
     article_helper.update(article_data, article)
 
-    # Avvisi "nuovo arrivo" solo sulla transizione a PUBLISHED (best-effort)
+    # Alla transizione a PUBLISHED: avvisi iscritti + auto-push CardTrader
+    # (solo carte abbinate); entrambi best-effort. Se torna SOLD, togli da CT.
     if not was_published and article.status == ArticleStatus.PUBLISHED:
         try:
             notify_new_article(article_helper.db, article)
         except Exception:  # noqa: BLE001
             pass
+        cts.auto_publish_if_card(article_helper.db, article)
+    elif article.status == ArticleStatus.SOLD:
+        cts.auto_unpublish_on_sold(article_helper.db, article)
 
     return _to_response(article)
 
@@ -351,6 +356,8 @@ def publish_article(
             notify_new_article(article_helper.db, article)
         except Exception:  # noqa: BLE001
             pass
+        # Auto-push su CardTrader (solo carte abbinate, best-effort)
+        cts.auto_publish_if_card(article_helper.db, article)
     return _to_response(article)
 
 
@@ -368,6 +375,8 @@ def sell_article(
             detail=f"Articolo con ID {article_id} non trovato",
         )
     article_helper.set_status(article, ArticleStatus.SOLD)
+    # Venduto sul sito → togli da CardTrader per non venderlo due volte
+    cts.auto_unpublish_on_sold(article_helper.db, article)
     return _to_response(article)
 
 
