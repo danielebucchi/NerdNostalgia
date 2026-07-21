@@ -7,10 +7,10 @@
  * Solo per carte: CardTrader accetta solo prodotti agganciati a un blueprint.
  */
 import { useEffect, useState } from "react";
+import { ExpansionCombobox } from "@/components/admin/ExpansionCombobox";
 import { adminApi } from "@/lib/admin-api";
 import type { Article } from "@/lib/types";
 
-interface Expansion { id: number; game_id: number; code: string; name: string }
 interface Blueprint {
   id: number;
   name: string;
@@ -27,13 +27,10 @@ export function CardTraderBox({
   onUpdated: (a: Article) => void;
 }) {
   const [status, setStatus] = useState<null | { ok: boolean; detail?: string }>(null);
-  // Espansioni del gioco predefinito (Pokémon), precaricate → dropdown
-  // ricercabile con filtro client-side.
-  const [allExpansions, setAllExpansions] = useState<Expansion[]>([]);
+  // Espansione scelta per la ricerca blueprint: id CardTrader + testo mostrato.
+  const [defaultGameId, setDefaultGameId] = useState<number | null>(null);
   const [expansionId, setExpansionId] = useState<number | null>(null);
-  const [expQuery, setExpQuery] = useState("");
-  const [expChosen, setExpChosen] = useState<string | null>(null);
-  const [expOpen, setExpOpen] = useState(false);
+  const [expText, setExpText] = useState("");
   const [query, setQuery] = useState(article.title);
   const [results, setResults] = useState<Blueprint[]>([]);
   const [searching, setSearching] = useState(false);
@@ -46,8 +43,7 @@ export function CardTraderBox({
   const bpId = article.cardtrader_blueprint_id;
   const productId = article.cardtrader_product_id;
 
-  // Prova connessione → precarica TUTTE le espansioni del gioco predefinito
-  // (Pokémon) per la dropdown ricercabile
+  // Prova connessione + gioco predefinito per la dropdown espansioni
   useEffect(() => {
     adminApi
       .get<{ ok: boolean; detail?: string; default_game_id?: number | null }>(
@@ -55,13 +51,7 @@ export function CardTraderBox({
       )
       .then((s) => {
         setStatus(s);
-        if (s.ok) {
-          const gid = s.default_game_id ?? 5;
-          adminApi
-            .get<Expansion[]>(`/api/cardtrader/expansions?game_id=${gid}&limit=5000`)
-            .then(setAllExpansions)
-            .catch(() => {});
-        }
+        if (s.ok) setDefaultGameId(s.default_game_id ?? 5);
       })
       .catch(() => setStatus({ ok: false, detail: "non raggiungibile" }));
   }, []);
@@ -74,22 +64,6 @@ export function CardTraderBox({
       .then(setPrice)
       .catch(() => setPrice(null));
   }, [bpId]);
-
-  // Filtro client-side sulla lista precaricata (istantaneo, no round-trip)
-  const expMatches = (() => {
-    const q = expQuery.trim().toLowerCase();
-    if (!q) return allExpansions.slice(0, 50);
-    return allExpansions
-      .filter((e) => e.name.toLowerCase().includes(q) || (e.code ?? "").toLowerCase().includes(q))
-      .slice(0, 50);
-  })();
-
-  function chooseExpansion(e: Expansion) {
-    setExpansionId(e.id);
-    setExpChosen(e.name);
-    setExpQuery("");
-    setExpOpen(false);
-  }
 
   async function autoResolve() {
     setSearching(true);
@@ -306,45 +280,27 @@ export function CardTraderBox({
             </button>
           )}
 
-          {/* Dropdown ricercabile con TUTTE le espansioni Pokémon (valore =
-              id CardTrader). Digita per filtrare, clicca per selezionare. */}
-          <div className="relative">
+          {/* Dropdown ricercabile con TUTTE le espansioni Pokémon. Scegliere
+              un suggerimento imposta il nome esatto e l'id CardTrader. */}
+          <div>
             <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
               Espansione (Pokémon)
             </span>
-            <input
-              value={expChosen ?? expQuery}
-              onChange={(e) => {
-                setExpChosen(null);
+            <ExpansionCombobox
+              gameId={defaultGameId ?? 5}
+              value={expText}
+              onChange={(t) => {
+                setExpText(t);
                 setExpansionId(null);
-                setExpQuery(e.target.value);
-                setExpOpen(true);
               }}
-              onFocus={() => setExpOpen(true)}
-              onBlur={() => setTimeout(() => setExpOpen(false), 150)}
-              placeholder={
-                allExpansions.length
-                  ? `Cerca fra ${allExpansions.length} espansioni…`
-                  : "Carico espansioni…"
-              }
+              onSelect={(e) => {
+                setExpText(e.name);
+                setExpansionId(e.id);
+              }}
+              placeholder="Cerca espansione/collezione CardTrader…"
               className="ct-input mt-1"
+              ariaLabel="Espansione"
             />
-            {expOpen && !expChosen && expMatches.length > 0 && (
-              <div className="absolute z-10 left-0 right-0 mt-1 max-h-52 overflow-y-auto bg-white rounded-xl ring-1 ring-ink/15 shadow-hover">
-                {expMatches.map((e) => (
-                  <button
-                    key={e.id}
-                    type="button"
-                    onMouseDown={(ev) => ev.preventDefault()}
-                    onClick={() => chooseExpansion(e)}
-                    className="w-full text-left px-3 py-2 hover:bg-pink-soft/40 text-sm"
-                  >
-                    <span className="text-ink font-semibold">{e.name}</span>
-                    {e.code && <span className="text-ink-soft/60 text-[10px]"> ({e.code})</span>}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
           <div className="flex gap-2">
             <input

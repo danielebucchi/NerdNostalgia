@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CameraCapture, supportsInAppCamera } from "@/components/admin/CameraCapture";
+import { ExpansionCombobox } from "@/components/admin/ExpansionCombobox";
 import { useSoldPriceHint } from "@/components/admin/useSoldPriceHint";
 import { adminApi } from "@/lib/admin-api";
 import { compressImage } from "@/lib/image-compress";
@@ -488,14 +489,12 @@ export function QuickAddDialog({ open, onClose }: Props) {
 
             {isCard && (
               <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
+                <ExpansionCombobox
                   value={cardCollection}
-                  onChange={(e) => setCardCollection(e.target.value)}
+                  onChange={setCardCollection}
                   placeholder="Espansione/collezione"
                   className="qa-input"
-                  maxLength={100}
-                  aria-label="Collezione carta"
+                  ariaLabel="Collezione carta"
                 />
                 <input
                   type="text"
