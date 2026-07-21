@@ -6,6 +6,7 @@ comuni (data, piattaforma, chi ha comprato, costo totale) vivono sul Lot.
 """
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
     Date,
@@ -81,6 +82,11 @@ class InventoryItem(BaseModel):
     card_collection = Column(String(100))
     card_number = Column(String(50))
     card_finish = Column(String(50))
+    # Attributi CardTrader (condizione/lingua/reverse/prima edizione)
+    card_condition = Column(String(30))
+    card_language = Column(String(5))
+    card_reverse = Column(Boolean, nullable=False, default=False)
+    card_first_edition = Column(Boolean, nullable=False, default=False)
 
     article_id = Column(
         Integer,
