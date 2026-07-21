@@ -71,6 +71,8 @@ def resolve_blueprints(
         score = 0
         if coll_l and code == coll_l:
             score += 6
+        if coll_l and ename == coll_l:
+            score += 8  # nome espansione identico → forte preferenza
         if coll_l and (coll_l in ename or ename in coll_l):
             score += 4
         overlap = len(ctoks & _tokens(e.get("name")))
@@ -116,6 +118,35 @@ def resolve_single(
         return exact[0]["blueprint"]["id"]
     if len(exact) >= 2 and exact[0]["score"] >= exact[1]["score"] + 6:
         return exact[0]["blueprint"]["id"]
+    return None
+
+
+def resolve_in_expansion(
+    expansion_id: Optional[int],
+    number: Optional[str],
+    name: Optional[str] = None,
+) -> Optional[int]:
+    """Blueprint univoco DENTRO un'espansione nota (id CardTrader), dato il
+    numero carta. Deterministico: niente euristica sul nome dell'espansione
+    (è già stata scelta a mano). Se più blueprint hanno lo stesso numero,
+    disambigua col nome carta; altrimenti None (→ abbinamento manuale)."""
+    target = _norm_number(number)
+    if not expansion_id or not target:
+        return None
+    bps = ct.blueprints_cached(expansion_id)
+    matches = [
+        bp for bp in bps
+        if _norm_number((bp.get("fixed_properties") or {}).get("collector_number")) == target
+    ]
+    if len(matches) == 1:
+        return matches[0]["id"]
+    if len(matches) > 1 and name:
+        ntoks = _tokens(name)
+        scored = sorted(matches, key=lambda b: -len(ntoks & _tokens(b.get("name"))))
+        best = len(ntoks & _tokens(scored[0].get("name")))
+        second = len(ntoks & _tokens(scored[1].get("name")))
+        if best > 0 and best > second:
+            return scored[0]["id"]
     return None
 
 
@@ -206,31 +237,46 @@ def unpublish_article(db, article: Article) -> bool:
     return True
 
 
-def auto_publish_if_card(db, article: Article) -> Optional[int]:
-    """Hook alla pubblicazione sul sito: se e' una carta abbinata, la
-    pubblica anche su CardTrader col prezzo 4°. Best-effort: non solleva
-    mai (la pubblicazione sul sito non deve fallire per CardTrader)."""
+def auto_publish_if_card(
+    db, article: Article, *, expansion_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Hook alla pubblicazione sul sito: se e' una carta abbinabile, la
+    pubblica anche su CardTrader col prezzo 4°. Best-effort: non solleva mai
+    (la pubblicazione sul sito non deve fallire per CardTrader).
+
+    Se `expansion_id` e' dato (l'utente ha scelto l'espansione esatta), il
+    blueprint si trova in modo DETERMINISTICO (id espansione + numero); solo
+    in mancanza si ricade sull'euristica dal testo della collezione.
+
+    Ritorna un esito {status, ...} per dare feedback visibile a chi pubblica:
+    published / unmatched / skipped / error."""
     try:
         if not ct.is_configured():
-            return None
+            return {"status": "skipped", "reason": "CardTrader non configurato"}
         if not is_card_article(article):
-            return None
+            return {"status": "skipped", "reason": "non è una carta"}
         if not article.cardtrader_blueprint_id:
-            # Prova a risolvere il blueprint da collezione+numero, ma solo
-            # se il match e' inequivocabile (altrimenti niente auto-push:
-            # meglio abbinare a mano che pubblicare la carta sbagliata).
-            bp = resolve_single(
-                article.card_collection,
-                article.card_number,
-                article.title,
-                _default_game_id(db),
-            )
+            bp = None
+            if expansion_id:
+                bp = resolve_in_expansion(expansion_id, article.card_number, article.title)
+            if not bp:
+                # Fallback euristico da collezione+numero (spesso ambiguo per
+                # Pokémon): solo se inequivocabile, altrimenti niente push.
+                bp = resolve_single(
+                    article.card_collection,
+                    article.card_number,
+                    article.title,
+                    _default_game_id(db),
+                )
             if not bp:
                 LOGGER.info(
                     "Auto-push CardTrader saltato: articolo %s carta ma blueprint "
-                    "non abbinato ne' risolvibile univocamente", article.id,
+                    "non individuato univocamente", article.id,
                 )
-                return None
+                return {
+                    "status": "unmatched",
+                    "reason": "blueprint non individuato: controlla espansione e numero",
+                }
             article.cardtrader_blueprint_id = bp
             db.commit()
             LOGGER.info("Auto-match blueprint %s per articolo %s", bp, article.id)
@@ -239,10 +285,15 @@ def auto_publish_if_card(db, article: Article) -> Optional[int]:
             "Auto-push CardTrader: articolo %s → prodotto %s a %.2f€",
             article.id, res["product_id"], res["price_eur"],
         )
-        return res["product_id"]
+        return {
+            "status": "published",
+            "product_id": res["product_id"],
+            "price_eur": res["price_eur"],
+            "blueprint_id": article.cardtrader_blueprint_id,
+        }
     except Exception as exc:  # noqa: BLE001
         LOGGER.warning("Auto-push CardTrader fallito per articolo %s: %s", article.id, exc)
-        return None
+        return {"status": "error", "reason": str(exc)}
 
 
 def auto_unpublish_on_sold(db, article: Article) -> None:

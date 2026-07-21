@@ -39,6 +39,15 @@ interface Draft {
   draftItemId: number | null;
   cardCollection: string;
   cardNumber: string;
+  cardExpansionId: number | null;
+}
+
+interface CardTraderResult {
+  status: "published" | "unmatched" | "skipped" | "error";
+  reason?: string;
+  product_id?: number;
+  price_eur?: number;
+  blueprint_id?: number;
 }
 
 type PhotoStatus = "pending" | "done" | "error";
@@ -59,6 +68,8 @@ export function QuickAddDialog({ open, onClose }: Props) {
   const [categoryId, setCategoryId] = useState("");
   const [cardCollection, setCardCollection] = useState("");
   const [cardNumber, setCardNumber] = useState("");
+  // id espansione CardTrader scelta a mano → match blueprint deterministico
+  const [cardExpansionId, setCardExpansionId] = useState<number | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoStatus, setPhotoStatus] = useState<PhotoStatus[]>([]);
   const [publishNow, setPublishNow] = useState(false);
@@ -68,7 +79,9 @@ export function QuickAddDialog({ open, onClose }: Props) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ itemId: number; lotId: number } | null>(null);
+  const [done, setDone] = useState<
+    { itemId: number; lotId: number; cardtrader?: CardTraderResult | null } | null
+  >(null);
 
   const priceHint = useSoldPriceHint(title);
 
@@ -103,6 +116,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
         if (d.draftItemId) setDraftItemId(d.draftItemId);
         if (d.cardCollection) setCardCollection(d.cardCollection);
         if (d.cardNumber) setCardNumber(d.cardNumber);
+        if (d.cardExpansionId) setCardExpansionId(d.cardExpansionId);
       }
     } catch {
       // bozza corrotta: ignora
@@ -116,7 +130,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
     if (!open) return;
     const draft: Draft = {
       title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId,
-      cardCollection, cardNumber,
+      cardCollection, cardNumber, cardExpansionId,
     };
     try {
       if (title.trim() || draftItemId) {
@@ -125,7 +139,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
     } catch {
       // storage pieno/negato: pazienza
     }
-  }, [open, title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId, cardCollection, cardNumber]);
+  }, [open, title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId, cardCollection, cardNumber, cardExpansionId]);
 
   function clearDraft() {
     try {
@@ -241,12 +255,20 @@ export function QuickAddDialog({ open, onClose }: Props) {
       }
 
       // 3) Pubblicazione opzionale
+      let cardtrader: CardTraderResult | null = null;
       if (publishNow && listPrice.trim()) {
         setProgress("Pubblico sul catalogo…");
-        await adminApi.post(`/api/inventory/${itemId}/publish`, { publish_now: true });
+        const pub = await adminApi.post<{ cardtrader?: CardTraderResult | null }>(
+          `/api/inventory/${itemId}/publish`,
+          {
+            publish_now: true,
+            cardtrader_expansion_id: isCard ? cardExpansionId : null,
+          },
+        );
+        cardtrader = pub.cardtrader ?? null;
       }
 
-      setDone({ itemId, lotId: Number(lotId) });
+      setDone({ itemId, lotId: Number(lotId), cardtrader });
       clearDraft();
       // reset per il prossimo giro (tenendo il lotto selezionato)
       setTitle("");
@@ -255,6 +277,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
       setCost("");
       setCardCollection("");
       setCardNumber("");
+      setCardExpansionId(null);
       setPhotos([]);
       setPhotoStatus([]);
     } catch (err) {
@@ -297,9 +320,30 @@ export function QuickAddDialog({ open, onClose }: Props) {
           <div className="text-center py-4">
             <div className="text-4xl mb-2">✨</div>
             <p className="display text-lg text-ink mb-1">Catalogato!</p>
-            <p className="text-sm text-ink-soft mb-4">
+            <p className="text-sm text-ink-soft mb-3">
               Item #{done.itemId} salvato nel lotto.
             </p>
+            {done.cardtrader && (
+              <p
+                className={`text-xs rounded-lg px-3 py-2 mb-4 mx-auto max-w-xs ${
+                  done.cardtrader.status === "published"
+                    ? "bg-mint/30 text-mint-deep"
+                    : done.cardtrader.status === "unmatched" || done.cardtrader.status === "error"
+                      ? "bg-pink-soft/60 text-pink-deep"
+                      : "bg-lilac-soft/50 text-lilac-deep"
+                }`}
+              >
+                {done.cardtrader.status === "published"
+                  ? `🃏 Pubblicata su CardTrader${
+                      done.cardtrader.price_eur != null ? ` a €${done.cardtrader.price_eur}` : ""
+                    }`
+                  : done.cardtrader.status === "unmatched"
+                    ? "🃏 Non pubblicata su CardTrader: carta non abbinata (scegli l'espansione dalla lista e verifica il numero)."
+                    : done.cardtrader.status === "error"
+                      ? `🃏 CardTrader: ${done.cardtrader.reason ?? "errore"}`
+                      : null}
+              </p>
+            )}
             <div className="flex flex-wrap gap-2 justify-center">
               <button
                 type="button"
@@ -491,7 +535,14 @@ export function QuickAddDialog({ open, onClose }: Props) {
               <div className="grid grid-cols-2 gap-3">
                 <ExpansionCombobox
                   value={cardCollection}
-                  onChange={setCardCollection}
+                  onChange={(t) => {
+                    setCardCollection(t);
+                    setCardExpansionId(null); // testo libero → niente id esatto
+                  }}
+                  onSelect={(e) => {
+                    setCardCollection(e.name);
+                    setCardExpansionId(e.id);
+                  }}
                   placeholder="Espansione/collezione"
                   className="qa-input"
                   ariaLabel="Collezione carta"

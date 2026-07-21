@@ -297,6 +297,7 @@ def publish_to_site(
     # e, se e' una carta abbinabile, auto-push su CardTrader (best-effort):
     # stesso hook della pubblicazione da pagina articolo, cosi' anche lo
     # "Scatta e cataloga" da telefono sincronizza le carte.
+    cardtrader_result = None
     if publish_now:
         try:
             from utils.category_alerts import notify_new_article
@@ -305,11 +306,15 @@ def publish_to_site(
             pass
         try:
             from utils import cardtrader_sync as cts
-            cts.auto_publish_if_card(db, article)
-        except Exception:  # noqa: BLE001
-            pass
+            cardtrader_result = cts.auto_publish_if_card(
+                db, article, expansion_id=payload.cardtrader_expansion_id,
+            )
+        except Exception as exc:  # noqa: BLE001
+            cardtrader_result = {"status": "error", "reason": str(exc)}
 
-    return _to_response(item)
+    resp = _to_response(item)
+    resp.cardtrader = cardtrader_result
+    return resp
 
 
 @router.post("/{item_id}/unpublish", response_model=InventoryItemResponse)
