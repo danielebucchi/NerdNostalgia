@@ -121,6 +121,9 @@ class InventoryItemResponse(BaseModel):
     immobilizzato: Optional[Decimal] = None
     ancora_disponibile: bool = True
 
+    # Esito auto-push CardTrader: valorizzato solo dalla /publish (non persistito)
+    cardtrader: Optional[dict] = None
+
     created_at: str
     updated_at: str
 
@@ -139,6 +142,9 @@ class PublishToSiteRequest(BaseModel):
     # False = crea DRAFT (rifinisci in /admin/articles prima di andare live);
     # True  = pubblica direttamente sul catalogo (status PUBLISHED).
     publish_now: bool = False
+    # Espansione CardTrader scelta a mano (dropdown): abilita il match
+    # DETERMINISTICO del blueprint (id espansione + numero) all'auto-push.
+    cardtrader_expansion_id: Optional[int] = None
 
 
 class StatusUpdateRequest(BaseModel):
