@@ -96,6 +96,9 @@ class ArticleUpdate(ArticleInventoryFields):
     dimensions_cm: Optional[str] = Field(None, max_length=50)
     images: Optional[List[str]] = None
     article_metadata: Optional[dict] = None
+    cardtrader_blueprint_id: Optional[int] = Field(
+        None, description="Blueprint CardTrader abbinato (None = scollega)"
+    )
 
 
 class ArticleImageAdd(BaseModel):
@@ -152,6 +155,9 @@ class ArticleResponse(BaseModel):
     ebay_url: Optional[str] = None
     ebay_synced_at: Optional[str] = None
     ebay_price: Optional[Decimal] = None
+    cardtrader_blueprint_id: Optional[int] = None
+    cardtrader_product_id: Optional[int] = None
+    cardtrader_synced_at: Optional[str] = None
     created_at: str
     updated_at: str
     published_at: Optional[str]

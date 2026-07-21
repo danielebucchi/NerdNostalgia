@@ -97,7 +97,10 @@ CREATE TABLE IF NOT EXISTS articles (
     card_collection VARCHAR(100),
     card_number VARCHAR(50),
     card_finish VARCHAR(50),
-    vinted_item_id BIGINT
+    vinted_item_id BIGINT,
+    cardtrader_blueprint_id BIGINT,
+    cardtrader_product_id BIGINT,
+    cardtrader_synced_at TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_articles_user_id ON articles(user_id);
 CREATE INDEX IF NOT EXISTS idx_articles_category_id ON articles(category_id);

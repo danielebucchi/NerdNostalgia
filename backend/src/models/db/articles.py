@@ -146,6 +146,11 @@ class Article(BaseModel):
     ebay_synced_at = Column(DateTime)
     ebay_price = Column(Numeric(10, 2))
 
+    # CardTrader sync (solo carte abbinate a un blueprint)
+    cardtrader_blueprint_id = Column(BigInteger)
+    cardtrader_product_id = Column(BigInteger)
+    cardtrader_synced_at = Column(DateTime)
+
     # Timestamp aggiuntivi
     published_at = Column(DateTime)
     sold_at = Column(DateTime)
