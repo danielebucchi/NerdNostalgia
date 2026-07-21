@@ -15,6 +15,7 @@ from helpers.article import ArticleHelper, get_article_helper
 from helpers.auth import require_admin
 from models.db import User
 from utils import cardtrader_client as ct
+from utils import cardtrader_sync as cts
 from utils.session import get_db
 
 router = APIRouter(prefix="/api/cardtrader", tags=["cardtrader"])
@@ -138,67 +139,21 @@ def publish_article(
     article = helper.get("id", article_id)
     if not article:
         raise HTTPException(404, f"Articolo {article_id} non trovato")
-    if not article.cardtrader_blueprint_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Articolo non abbinato a un blueprint CardTrader.",
-        )
-
-    # Prezzo
-    price_eur = payload.price_eur
-    price_meta = None
-    if price_eur is None:
-        sug = ct.suggested_price_cents(
-            article.cardtrader_blueprint_id, payload.price_position
-        )
-        if not sug:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Nessuna inserzione di riferimento: imposta un prezzo manuale.",
-            )
-        price_eur = round(sug["cents"] / 100, 2)
-        price_meta = sug
-
-    qty = payload.quantity or article.quantity or 1
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-
     try:
-        if article.cardtrader_product_id:
-            # gia' pubblicato → aggiorno prezzo e quantita'
-            ct.update_product(
-                article.cardtrader_product_id,
-                price=price_eur,
-                quantity=qty,
-            )
-            product_id = article.cardtrader_product_id
-            action = "updated"
-        else:
-            resp = ct.create_product(
-                blueprint_id=article.cardtrader_blueprint_id,
-                price_eur=price_eur,
-                quantity=qty,
-                condition=payload.condition,
-            )
-            product_id = _extract_product_id(resp)
-            action = "created"
+        return cts.publish_article(
+            db, article,
+            price_eur=payload.price_eur,
+            price_position=payload.price_position,
+            quantity=payload.quantity,
+            condition=payload.condition,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except ct.CardTraderError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"{exc} (body={exc.body})" if exc.body else str(exc),
         ) from exc
-
-    article.cardtrader_product_id = product_id
-    article.cardtrader_synced_at = now
-    db.commit()
-    db.refresh(article)
-
-    return {
-        "action": action,
-        "product_id": product_id,
-        "price_eur": price_eur,
-        "quantity": qty,
-        "price_meta": price_meta,
-    }
 
 
 @router.post("/unpublish/{article_id}")
@@ -216,13 +171,7 @@ def unpublish_article(
     if not article.cardtrader_product_id:
         raise HTTPException(400, "Articolo non pubblicato su CardTrader")
     try:
-        ct.delete_product(article.cardtrader_product_id)
+        cts.unpublish_article(db, article)
     except ct.CardTraderError as exc:
-        # 404 CardTrader = gia' rimosso: procedo comunque a pulire da noi
-        if exc.status != 404:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
-            ) from exc
-    article.cardtrader_product_id = None
-    db.commit()
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return {"ok": True}
