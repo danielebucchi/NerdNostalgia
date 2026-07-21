@@ -294,10 +294,18 @@ def publish_to_site(
     db.refresh(item)
 
     # Live sul catalogo → avvisa gli iscritti "nuovi arrivi" (best-effort)
+    # e, se e' una carta abbinabile, auto-push su CardTrader (best-effort):
+    # stesso hook della pubblicazione da pagina articolo, cosi' anche lo
+    # "Scatta e cataloga" da telefono sincronizza le carte.
     if publish_now:
         try:
             from utils.category_alerts import notify_new_article
             notify_new_article(db, article)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            from utils import cardtrader_sync as cts
+            cts.auto_publish_if_card(db, article)
         except Exception:  # noqa: BLE001
             pass
 
