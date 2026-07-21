@@ -98,6 +98,36 @@ def list_blueprints(
     return items[:200]
 
 
+@router.get("/resolve")
+def resolve_blueprint(
+    collection: Optional[str] = Query(None, description="Collezione/espansione (testo libero)"),
+    number: Optional[str] = Query(None, description="Numero carta"),
+    name: Optional[str] = Query(None, description="Nome carta (bonus match)"),
+    game_id: Optional[int] = Query(None),
+    article_id: Optional[int] = Query(None, description="Se passato, usa i campi carta dell'articolo"),
+    helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Candidati blueprint da collezione+numero (+nome). Match espansione
+    euristico → si confermano i candidati, non si assegna in automatico."""
+    _guard()
+    if article_id is not None:
+        art = helper.get("id", article_id)
+        if art:
+            collection = collection or art.card_collection
+            number = number or art.card_number
+            name = name or art.title
+    if game_id is None:
+        game_id = cts._default_game_id(helper.db)
+    if not (collection or number or name):
+        raise HTTPException(400, "Fornisci almeno collezione, numero o nome")
+    try:
+        cands = cts.resolve_blueprints(collection, number, name, game_id)
+    except ct.CardTraderError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return {"game_id": game_id, "candidates": cands}
+
+
 @router.get("/suggested-price")
 def suggested_price(
     blueprint_id: int = Query(...),

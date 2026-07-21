@@ -69,6 +69,14 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "label": "Footer descrizione Vinted",
         "help": "Aggiunto in fondo alla descrizione copiata per Vinted.",
     },
+    "cardtrader_default_game_id": {
+        "default": "",
+        "public": False,
+        "label": "CardTrader — gioco predefinito (game_id)",
+        "help": "ID gioco CardTrader usato per l'auto-match dei blueprint "
+                "(es. 5 = Pokémon, 1 = Magic). Vuoto = cerca in tutti i giochi "
+                "(più lento e ambiguo). Imposta se vendi soprattutto un gioco.",
+    },
     "marketplace_footer_ebay": {
         "default": "Spedizione Veloce\nAltri pezzi su www.nerdnostalgia.store",
         "public": False,
