@@ -84,6 +84,9 @@ export interface Article {
   ebay_url: string | null;
   ebay_synced_at: string | null;
   ebay_price: string | null;
+  cardtrader_blueprint_id: number | null;
+  cardtrader_product_id: number | null;
+  cardtrader_synced_at: string | null;
   created_at: string;
   updated_at: string;
   published_at: string | null;
