@@ -51,6 +51,10 @@ class ArticleInventoryFields(BaseModel):
     card_collection: Optional[str] = Field(None, max_length=100)
     card_number: Optional[str] = Field(None, max_length=50)
     card_finish: Optional[str] = Field(None, max_length=50)
+    card_condition: Optional[str] = Field(None, max_length=30)
+    card_language: Optional[str] = Field(None, max_length=5)
+    card_reverse: Optional[bool] = None
+    card_first_edition: Optional[bool] = None
 
 
 class ArticleCreate(ArticleInventoryFields):
@@ -128,6 +132,10 @@ class ArticleResponse(BaseModel):
     card_collection: Optional[str] = None
     card_number: Optional[str] = None
     card_finish: Optional[str] = None
+    card_condition: Optional[str] = None
+    card_language: Optional[str] = None
+    card_reverse: bool = False
+    card_first_edition: bool = False
     # Derived (calcolati in _to_response)
     net_revenue: Optional[Decimal] = None
     profit: Optional[Decimal] = None

@@ -159,6 +159,15 @@ def _default_game_id(db) -> Optional[int]:
         return None
 
 
+def _default_language(db) -> Optional[str]:
+    try:
+        from helpers.setting import SettingHelper
+        v = SettingHelper(db=db).get_value("cardtrader_default_language")
+        return v.strip().lower() if v and v.strip() else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _extract_product_id(resp: Any) -> Optional[int]:
     if isinstance(resp, dict):
         if isinstance(resp.get("resource"), dict) and "id" in resp["resource"]:
@@ -177,19 +186,37 @@ def publish_article(
     price_eur: Optional[float] = None,
     price_position: int = 4,
     quantity: Optional[int] = None,
-    condition: str = "Near Mint",
+    condition: Optional[str] = None,
+    language: Optional[str] = None,
+    reverse: Optional[bool] = None,
+    first_edition: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Crea (o aggiorna) il prodotto CardTrader per l'articolo.
-    Solleva ValueError (dati) o ct.CardTraderError (API). Il chiamante
-    decide se propagare (endpoint) o inghiottire (auto-push)."""
+    Condizione/lingua/reverse/prima-edizione: se non passati, si leggono
+    dall'articolo (col default lingua dalle impostazioni). Il prezzo, se non
+    forzato, e' il N-esimo piu' basso fra le inserzioni CON LE STESSE
+    caratteristiche. Solleva ValueError (dati) o ct.CardTraderError (API)."""
     if not article.cardtrader_blueprint_id:
         raise ValueError("Articolo non abbinato a un blueprint CardTrader")
 
+    # Attributi effettivi: argomento esplicito → campo articolo → default
+    condition = condition or article.card_condition or "Near Mint"
+    language = language or article.card_language or _default_language(db)
+    reverse = article.card_reverse if reverse is None else reverse
+    first_edition = article.card_first_edition if first_edition is None else first_edition
+
     meta = None
     if price_eur is None:
-        sug = ct.suggested_price_cents(article.cardtrader_blueprint_id, price_position)
+        sug = ct.suggested_price_cents(
+            article.cardtrader_blueprint_id, price_position,
+            condition=condition, language=language,
+            reverse=bool(reverse), first_edition=bool(first_edition),
+        )
         if not sug:
-            raise ValueError("Nessuna inserzione di riferimento per il prezzo")
+            raise ValueError(
+                "Nessuna inserzione di riferimento per il prezzo "
+                "(con questa condizione/lingua)"
+            )
         price_eur = round(sug["cents"] / 100, 2)
         meta = sug
 
@@ -205,6 +232,9 @@ def publish_article(
             price_eur=price_eur,
             quantity=qty,
             condition=condition,
+            language=language,
+            reverse=bool(reverse),
+            first_edition=bool(first_edition),
         )
         product_id = _extract_product_id(resp)
         action = "created"

@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { ExpansionCombobox } from "@/components/admin/ExpansionCombobox";
 import { adminApi } from "@/lib/admin-api";
+import { CT_CONDITIONS, CT_LANGUAGES } from "@/lib/cardtrader-options";
 import type { Article } from "@/lib/types";
 
 interface Blueprint {
@@ -36,7 +37,10 @@ export function CardTraderBox({
   const [searching, setSearching] = useState(false);
   const [price, setPrice] = useState<SuggestedPrice | null>(null);
   const [priceOverride, setPriceOverride] = useState("");
-  const [condition, setCondition] = useState("Near Mint");
+  const [condition, setCondition] = useState(article.card_condition || "Near Mint");
+  const [language, setLanguage] = useState(article.card_language || "it");
+  const [reverse, setReverse] = useState(!!article.card_reverse);
+  const [firstEdition, setFirstEdition] = useState(!!article.card_first_edition);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,14 +60,22 @@ export function CardTraderBox({
       .catch(() => setStatus({ ok: false, detail: "non raggiungibile" }));
   }, []);
 
-  // Prezzo consigliato quando c'è un blueprint abbinato
+  // Prezzo consigliato quando c'è un blueprint abbinato — filtrato per
+  // condizione/lingua/reverse/prima edizione (si aggiorna al cambio)
   useEffect(() => {
     if (!bpId) return;
+    const qs = new URLSearchParams({
+      blueprint_id: String(bpId),
+      condition,
+      language,
+      reverse: String(reverse),
+      first_edition: String(firstEdition),
+    });
     adminApi
-      .get<SuggestedPrice>(`/api/cardtrader/suggested-price?blueprint_id=${bpId}`)
+      .get<SuggestedPrice>(`/api/cardtrader/suggested-price?${qs}`)
       .then(setPrice)
       .catch(() => setPrice(null));
-  }, [bpId]);
+  }, [bpId, condition, language, reverse, firstEdition]);
 
   async function autoResolve() {
     setSearching(true);
@@ -126,7 +138,13 @@ export function CardTraderBox({
     setBusy(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = { condition, price_position: 4 };
+      const body: Record<string, unknown> = {
+        condition,
+        language,
+        reverse,
+        first_edition: firstEdition,
+        price_position: 4,
+      };
       if (priceOverride.trim()) body.price_eur = Number(priceOverride);
       const res = await adminApi.post<{ product_id: number; price_eur: number }>(
         `/api/cardtrader/publish/${article.id}`,
@@ -222,20 +240,47 @@ export function CardTraderBox({
             </label>
           </div>
 
-          <label className="block">
-            <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
-              Condizione
-            </span>
-            <select
-              value={condition}
-              onChange={(e) => setCondition(e.target.value)}
-              className="ct-input mt-1"
-            >
-              {["Mint", "Near Mint", "Slightly Played", "Moderately Played", "Played", "Poor"].map(
-                (c) => <option key={c} value={c}>{c}</option>,
-              )}
-            </select>
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+                Condizione
+              </span>
+              <select
+                value={condition}
+                onChange={(e) => setCondition(e.target.value)}
+                className="ct-input mt-1"
+              >
+                {CT_CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+                Lingua
+              </span>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="ct-input mt-1"
+              >
+                {CT_LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="flex flex-wrap gap-4 pt-1">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={reverse} onChange={(e) => setReverse(e.target.checked)} />
+              Reverse holo
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={firstEdition}
+                onChange={(e) => setFirstEdition(e.target.checked)}
+              />
+              1ª edizione
+            </label>
+          </div>
 
           <div className="flex flex-wrap gap-2 pt-1">
             <button

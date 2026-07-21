@@ -17,6 +17,7 @@ import Link from "next/link";
 import { CameraCapture, supportsInAppCamera } from "@/components/admin/CameraCapture";
 import { ExpansionCombobox } from "@/components/admin/ExpansionCombobox";
 import { useSoldPriceHint } from "@/components/admin/useSoldPriceHint";
+import { CT_CONDITIONS, CT_LANGUAGES } from "@/lib/cardtrader-options";
 import { adminApi } from "@/lib/admin-api";
 import { compressImage } from "@/lib/image-compress";
 import { uploadWithRetry } from "@/lib/upload-retry";
@@ -40,6 +41,10 @@ interface Draft {
   cardCollection: string;
   cardNumber: string;
   cardExpansionId: number | null;
+  cardCondition: string;
+  cardLanguage: string;
+  cardReverse: boolean;
+  cardFirstEdition: boolean;
 }
 
 interface CardTraderResult {
@@ -70,6 +75,10 @@ export function QuickAddDialog({ open, onClose }: Props) {
   const [cardNumber, setCardNumber] = useState("");
   // id espansione CardTrader scelta a mano → match blueprint deterministico
   const [cardExpansionId, setCardExpansionId] = useState<number | null>(null);
+  const [cardCondition, setCardCondition] = useState("Near Mint");
+  const [cardLanguage, setCardLanguage] = useState("it");
+  const [cardReverse, setCardReverse] = useState(false);
+  const [cardFirstEdition, setCardFirstEdition] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoStatus, setPhotoStatus] = useState<PhotoStatus[]>([]);
   const [publishNow, setPublishNow] = useState(false);
@@ -117,6 +126,10 @@ export function QuickAddDialog({ open, onClose }: Props) {
         if (d.cardCollection) setCardCollection(d.cardCollection);
         if (d.cardNumber) setCardNumber(d.cardNumber);
         if (d.cardExpansionId) setCardExpansionId(d.cardExpansionId);
+        if (d.cardCondition) setCardCondition(d.cardCondition);
+        if (d.cardLanguage) setCardLanguage(d.cardLanguage);
+        if (typeof d.cardReverse === "boolean") setCardReverse(d.cardReverse);
+        if (typeof d.cardFirstEdition === "boolean") setCardFirstEdition(d.cardFirstEdition);
       }
     } catch {
       // bozza corrotta: ignora
@@ -131,6 +144,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
     const draft: Draft = {
       title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId,
       cardCollection, cardNumber, cardExpansionId,
+      cardCondition, cardLanguage, cardReverse, cardFirstEdition,
     };
     try {
       if (title.trim() || draftItemId) {
@@ -139,7 +153,7 @@ export function QuickAddDialog({ open, onClose }: Props) {
     } catch {
       // storage pieno/negato: pazienza
     }
-  }, [open, title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId, cardCollection, cardNumber, cardExpansionId]);
+  }, [open, title, description, listPrice, cost, categoryId, lotId, publishNow, draftItemId, cardCollection, cardNumber, cardExpansionId, cardCondition, cardLanguage, cardReverse, cardFirstEdition]);
 
   function clearDraft() {
     try {
@@ -230,6 +244,10 @@ export function QuickAddDialog({ open, onClose }: Props) {
           // Solo per le carte: alimentano l'auto-match del blueprint CardTrader
           card_collection: isCard && cardCollection.trim() ? cardCollection.trim() : null,
           card_number: isCard && cardNumber.trim() ? cardNumber.trim() : null,
+          card_condition: isCard ? cardCondition : null,
+          card_language: isCard ? cardLanguage : null,
+          card_reverse: isCard ? cardReverse : false,
+          card_first_edition: isCard ? cardFirstEdition : false,
         });
         itemId = item.id;
         setDraftItemId(itemId);
@@ -278,6 +296,9 @@ export function QuickAddDialog({ open, onClose }: Props) {
       setCardCollection("");
       setCardNumber("");
       setCardExpansionId(null);
+      setCardReverse(false);
+      setCardFirstEdition(false);
+      // condizione/lingua le tengo: nel giro di carte sono spesso le stesse
       setPhotos([]);
       setPhotoStatus([]);
     } catch (err) {
@@ -556,9 +577,46 @@ export function QuickAddDialog({ open, onClose }: Props) {
                   maxLength={50}
                   aria-label="Numero carta"
                 />
+                <select
+                  value={cardCondition}
+                  onChange={(e) => setCardCondition(e.target.value)}
+                  className="qa-input"
+                  aria-label="Condizione"
+                >
+                  {CT_CONDITIONS.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <select
+                  value={cardLanguage}
+                  onChange={(e) => setCardLanguage(e.target.value)}
+                  className="qa-input"
+                  aria-label="Lingua"
+                >
+                  {CT_LANGUAGES.map((l) => (
+                    <option key={l.code} value={l.code}>{l.label}</option>
+                  ))}
+                </select>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={cardReverse}
+                    onChange={(e) => setCardReverse(e.target.checked)}
+                  />
+                  Reverse holo
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={cardFirstEdition}
+                    onChange={(e) => setCardFirstEdition(e.target.checked)}
+                  />
+                  1ª edizione
+                </label>
                 <p className="col-span-2 text-[11px] text-ink-soft -mt-1">
-                  🃏 Collezione + numero servono per pubblicarla in automatico su
-                  CardTrader (prezzo = 4° più basso). Facoltativi.
+                  🃏 Collezione + numero pubblicano la carta in automatico su
+                  CardTrader; il prezzo (4° più basso) è calcolato su condizione e
+                  lingua scelte. Facoltativi.
                 </p>
               </div>
             )}

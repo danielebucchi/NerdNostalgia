@@ -166,13 +166,23 @@ def resolve_blueprint(
 def suggested_price(
     blueprint_id: int = Query(...),
     position: int = Query(4, ge=1, le=50, description="N-esimo piu' basso (default 4°)"),
+    condition: Optional[str] = Query(None),
+    language: Optional[str] = Query(None),
+    reverse: Optional[bool] = Query(None),
+    first_edition: Optional[bool] = Query(None),
     _admin: User = Depends(require_admin),
 ):
-    res = _wrap(ct.suggested_price_cents, blueprint_id, position)
+    """4° prezzo piu' basso, filtrato per condizione/lingua/reverse/prima
+    edizione se passati (comparabili con la carta che vendi)."""
+    res = _wrap(
+        ct.suggested_price_cents, blueprint_id, position,
+        condition=condition, language=language,
+        reverse=reverse, first_edition=first_edition,
+    )
     if res is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Nessuna inserzione con prezzo per questo blueprint",
+            detail="Nessuna inserzione con prezzo per questi filtri",
         )
     res["eur"] = round(res["cents"] / 100, 2)
     return res
@@ -182,10 +192,14 @@ def suggested_price(
 
 class PublishRequest(BaseModel):
     # Prezzo: se assente, calcolato come N-esimo piu' basso dal marketplace
+    # (filtrato per condizione/lingua/reverse/prima edizione)
     price_eur: Optional[float] = Field(None, ge=0)
     price_position: int = Field(4, ge=1, le=50, description="N-esimo piu' basso (default 4°)")
     quantity: Optional[int] = Field(None, ge=1)
     condition: str = Field("Near Mint")
+    language: Optional[str] = Field(None, description="Codice lingua CardTrader (it/en/...)")
+    reverse: Optional[bool] = None
+    first_edition: Optional[bool] = None
 
 
 @router.post("/publish/{article_id}")
@@ -203,6 +217,16 @@ def publish_article(
     article = helper.get("id", article_id)
     if not article:
         raise HTTPException(404, f"Articolo {article_id} non trovato")
+    # Persisti gli attributi scelti sull'articolo (così restano coerenti col
+    # prezzo mostrato e con eventuali repubblicazioni / la scheda sul sito).
+    article.card_condition = payload.condition
+    if payload.language is not None:
+        article.card_language = payload.language
+    if payload.reverse is not None:
+        article.card_reverse = payload.reverse
+    if payload.first_edition is not None:
+        article.card_first_edition = payload.first_edition
+    db.commit()
     try:
         return cts.publish_article(
             db, article,
@@ -210,6 +234,9 @@ def publish_article(
             price_position=payload.price_position,
             quantity=payload.quantity,
             condition=payload.condition,
+            language=payload.language,
+            reverse=payload.reverse,
+            first_edition=payload.first_edition,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

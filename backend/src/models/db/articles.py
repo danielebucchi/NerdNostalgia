@@ -1,7 +1,7 @@
 """
 Modello Article per SQLAlchemy.
 """
-from sqlalchemy import BigInteger, Column, String, Integer, Numeric, Text, Enum, Date, DateTime, ForeignKey, JSON
+from sqlalchemy import BigInteger, Boolean, Column, String, Integer, Numeric, Text, Enum, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 import enum
 from datetime import datetime, timezone
@@ -95,6 +95,11 @@ class Article(BaseModel):
     card_collection = Column(String(100))
     card_number = Column(String(50))
     card_finish = Column(String(50))
+    # Attributi CardTrader (condizione/lingua/reverse/prima edizione)
+    card_condition = Column(String(30))
+    card_language = Column(String(5))
+    card_reverse = Column(Boolean, nullable=False, default=False)
+    card_first_edition = Column(Boolean, nullable=False, default=False)
 
     # Classificazione
     category_id = Column(

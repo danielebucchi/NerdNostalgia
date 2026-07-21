@@ -58,6 +58,10 @@ export interface Article {
   card_collection: string | null;
   card_number: string | null;
   card_finish: string | null;
+  card_condition: string | null;
+  card_language: string | null;
+  card_reverse: boolean;
+  card_first_edition: boolean;
   // Derived
   net_revenue: string | null;
   profit: string | null;

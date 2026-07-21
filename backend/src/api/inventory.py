@@ -281,6 +281,10 @@ def publish_to_site(
         card_collection=item.card_collection,
         card_number=item.card_number,
         card_finish=item.card_finish,
+        card_condition=item.card_condition,
+        card_language=item.card_language,
+        card_reverse=item.card_reverse,
+        card_first_edition=item.card_first_edition,
     )
     db.add(article)
     db.commit()

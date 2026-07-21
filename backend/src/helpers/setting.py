@@ -69,6 +69,13 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "label": "Footer descrizione Vinted",
         "help": "Aggiunto in fondo alla descrizione copiata per Vinted.",
     },
+    "cardtrader_default_language": {
+        "default": "it",  # vendi soprattutto carte in italiano
+        "public": False,
+        "label": "CardTrader — lingua predefinita carte",
+        "help": "Codice lingua CardTrader usato quando non specifichi la "
+                "lingua sulla singola carta (en, fr, de, it, pt, es).",
+    },
     "cardtrader_default_game_id": {
         "default": "5",  # 5 = Pokémon (default: vendi soprattutto carte Pokémon)
         "public": False,

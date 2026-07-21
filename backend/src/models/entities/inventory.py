@@ -42,6 +42,10 @@ class InventoryItemBase(BaseModel):
     card_collection: Optional[str] = Field(None, max_length=100)
     card_number: Optional[str] = Field(None, max_length=50)
     card_finish: Optional[str] = Field(None, max_length=50)
+    card_condition: Optional[str] = Field(None, max_length=30)
+    card_language: Optional[str] = Field(None, max_length=5)
+    card_reverse: bool = False
+    card_first_edition: bool = False
 
     article_id: Optional[int] = None
     vinted_item_id: Optional[int] = None
@@ -73,6 +77,10 @@ class InventoryItemUpdate(BaseModel):
     card_collection: Optional[str] = Field(None, max_length=100)
     card_number: Optional[str] = Field(None, max_length=50)
     card_finish: Optional[str] = Field(None, max_length=50)
+    card_condition: Optional[str] = Field(None, max_length=30)
+    card_language: Optional[str] = Field(None, max_length=5)
+    card_reverse: Optional[bool] = None
+    card_first_edition: Optional[bool] = None
     article_id: Optional[int] = None
     vinted_item_id: Optional[int] = None
     images: Optional[List[str]] = None
@@ -110,6 +118,10 @@ class InventoryItemResponse(BaseModel):
     card_collection: Optional[str]
     card_number: Optional[str]
     card_finish: Optional[str]
+    card_condition: Optional[str] = None
+    card_language: Optional[str] = None
+    card_reverse: bool = False
+    card_first_edition: bool = False
 
     article_id: Optional[int]
     vinted_item_id: Optional[int]
