@@ -54,13 +54,20 @@ def _wrap(fn, *args, **kwargs) -> Any:
 
 
 @router.get("/status")
-def status_check(_admin: User = Depends(require_admin)):
-    """Prova connessione: token valido + server raggiunge l'API."""
+def status_check(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Prova connessione: token valido + server raggiunge l'API.
+    Include il gioco predefinito (per la dropdown espansioni del box)."""
+    default_game = cts._default_game_id(db)
     if not ct.is_configured():
-        return {"configured": False, "ok": False, "detail": "CARDTRADER_JWT mancante"}
+        return {"configured": False, "ok": False, "detail": "CARDTRADER_JWT mancante",
+                "default_game_id": default_game}
     try:
         info = ct.info()
-        return {"configured": True, "ok": True, "info": info}
+        return {"configured": True, "ok": True, "info": info,
+                "default_game_id": default_game}
     except ct.CardTraderError as exc:
         return {
             "configured": True,
@@ -68,6 +75,7 @@ def status_check(_admin: User = Depends(require_admin)):
             "status": exc.status,
             "detail": str(exc),
             "body": exc.body,
+            "default_game_id": default_game,
         }
 
 
@@ -77,8 +85,34 @@ def list_games(_admin: User = Depends(require_admin)):
 
 
 @router.get("/expansions")
-def list_expansions(_admin: User = Depends(require_admin)):
-    return _wrap(ct.expansions)
+def list_expansions(
+    game_id: Optional[int] = Query(None, description="Filtra per gioco"),
+    search: Optional[str] = Query(None, description="Cerca per nome o codice"),
+    limit: int = Query(300, ge=1, le=5000),
+    _admin: User = Depends(require_admin),
+):
+    """Elenco espansioni CardTrader (la lista ufficiale delle 'collezioni').
+    Con game_id/search per scegliere quella esatta senza digitarla a mano.
+    Arricchito col nome del gioco per contesto."""
+    _guard()
+    try:
+        exps = ct.expansions_cached()
+        game_names = {g["id"]: g.get("display_name") or g.get("name") for g in ct.games()}
+    except ct.CardTraderError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    if game_id is not None:
+        exps = [e for e in exps if e.get("game_id") == game_id]
+    if search:
+        q = search.lower()
+        exps = [
+            e for e in exps
+            if q in str(e.get("name", "")).lower() or q in str(e.get("code", "")).lower()
+        ]
+    exps = sorted(exps, key=lambda e: str(e.get("name", "")))[:limit]
+    return [
+        {**e, "game_name": game_names.get(e.get("game_id"))}
+        for e in exps
+    ]
 
 
 @router.get("/blueprints")

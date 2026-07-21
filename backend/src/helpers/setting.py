@@ -70,7 +70,7 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "help": "Aggiunto in fondo alla descrizione copiata per Vinted.",
     },
     "cardtrader_default_game_id": {
-        "default": "",
+        "default": "5",  # 5 = Pokémon (default: vendi soprattutto carte Pokémon)
         "public": False,
         "label": "CardTrader — gioco predefinito (game_id)",
         "help": "ID gioco CardTrader usato per l'auto-match dei blueprint "
