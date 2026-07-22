@@ -59,6 +59,25 @@ def test_suggested_price_excludes_graded(monkeypatch):
     assert res["total"] == 4
 
 
+def test_create_product_includes_description(monkeypatch):
+    monkeypatch.setattr(ct, "blueprint_editable_properties", lambda bid: [{"name": "condition"}])
+    captured = {}
+
+    def fake_request(method, path, *, params=None, json=None):
+        captured["method"] = method
+        captured["path"] = path
+        captured["json"] = json
+        return {"id": 1}
+
+    monkeypatch.setattr(ct, "_request", fake_request)
+    ct.create_product(1, 1.0, description="Reverse holo\n\nAsk For Photos")
+    assert captured["json"]["description"] == "Reverse holo\n\nAsk For Photos"
+
+    # description vuota → chiave assente nel body
+    ct.create_product(1, 1.0, description="   ")
+    assert "description" not in captured["json"]
+
+
 def test_build_product_properties(monkeypatch):
     editable = [
         {"name": "condition"},
