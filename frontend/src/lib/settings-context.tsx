@@ -27,6 +27,7 @@ interface PublicSettings {
   contact_email: string;
   hand_exchange_cap_prefixes: string;
   hand_exchange_cities: string;
+  cardtrader_shop_url: string;
 }
 
 const ENV_DEFAULTS: PublicSettings = {
@@ -36,6 +37,7 @@ const ENV_DEFAULTS: PublicSettings = {
   contact_email: "nerdnostalgiaita@gmail.com",
   hand_exchange_cap_prefixes: "56,57",
   hand_exchange_cities: "Livorno/Pisa",
+  cardtrader_shop_url: "",
 };
 
 export interface SettingsValue {
@@ -47,6 +49,7 @@ export interface SettingsValue {
   contactEmail: string;
   handExchangeCapPrefixes: string[];
   handExchangeCities: string;
+  cardtraderShopUrl: string;
 }
 
 function toValue(raw: PublicSettings, loaded: boolean): SettingsValue {
@@ -61,6 +64,7 @@ function toValue(raw: PublicSettings, loaded: boolean): SettingsValue {
       .map((p) => p.trim())
       .filter((p) => /^\d+$/.test(p)),
     handExchangeCities: raw.hand_exchange_cities.trim(),
+    cardtraderShopUrl: raw.cardtrader_shop_url.trim(),
   };
 }
 
