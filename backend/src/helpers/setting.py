@@ -69,6 +69,13 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "label": "Footer descrizione Vinted",
         "help": "Aggiunto in fondo alla descrizione copiata per Vinted.",
     },
+    "cardtrader_footer": {
+        "default": "Ask For Photos\nMore product on www.nerdnostalgia.store",
+        "public": False,
+        "label": "Footer descrizione CardTrader",
+        "help": "Aggiunto in fondo alla descrizione dell'inserzione CardTrader "
+                "(dopo la descrizione dell'articolo). Vuoto = nessun footer.",
+    },
     "cardtrader_default_language": {
         "default": "it",  # vendi soprattutto carte in italiano
         "public": False,

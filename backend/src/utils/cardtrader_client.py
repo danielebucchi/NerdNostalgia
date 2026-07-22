@@ -278,6 +278,7 @@ def create_product(
     language: Optional[str] = None,
     reverse: bool = False,
     first_edition: bool = False,
+    description: Optional[str] = None,
     properties: Optional[Dict[str, Any]] = None,
 ) -> Any:
     """Mette in vendita: POST /products. price in EURO (decimale, come da
@@ -298,6 +299,8 @@ def create_product(
         "error_mode": "strict",
         "properties": props,
     }
+    if description and description.strip():
+        body["description"] = description.strip()
     return _request("POST", "/products", json=body)
 
 

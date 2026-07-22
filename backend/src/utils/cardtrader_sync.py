@@ -168,6 +168,21 @@ def _default_language(db) -> Optional[str]:
         return None
 
 
+def _cardtrader_description(db, article: Article) -> Optional[str]:
+    """Descrizione per l'inserzione CardTrader: descrizione dell'articolo +
+    footer configurabile (es. "Ask For Photos / More product on ..."). Le foto
+    non si possono caricare via API, quindi il footer invita a chiederle."""
+    desc = (article.description or "").strip()
+    footer = ""
+    try:
+        from helpers.setting import SettingHelper
+        footer = (SettingHelper(db=db).get_value("cardtrader_footer") or "").strip()
+    except Exception:  # noqa: BLE001
+        footer = ""
+    parts = [p for p in (desc, footer) if p]
+    return "\n\n".join(parts) if parts else None
+
+
 def _extract_product_id(resp: Any) -> Optional[int]:
     if isinstance(resp, dict):
         if isinstance(resp.get("resource"), dict) and "id" in resp["resource"]:
@@ -235,6 +250,7 @@ def publish_article(
             language=language,
             reverse=bool(reverse),
             first_edition=bool(first_edition),
+            description=_cardtrader_description(db, article),
         )
         product_id = _extract_product_id(resp)
         action = "created"
