@@ -209,6 +209,14 @@ export function CardTraderBox({
                 Scollega
               </button>
             </div>
+            <a
+              href={`https://www.cardtrader.com/cards/${bpId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-1 text-xs text-mint-deep font-semibold hover:underline"
+            >
+              Vedi la carta su CardTrader ↗
+            </a>
           </div>
 
           <div className="grid grid-cols-2 gap-3 items-end">
