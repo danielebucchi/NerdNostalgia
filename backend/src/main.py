@@ -22,6 +22,7 @@ from api.consignment_sales import router as consignment_sales_router
 from api.expenses import router as expenses_router
 from api.categories import router as categories_router
 from api.dashboard import router as dashboard_router
+from api.ebay import router as ebay_router
 from api.inquiries import router as inquiries_router
 from api.inventory import router as inventory_router
 from api.lots import router as lots_router
@@ -90,6 +91,7 @@ app.include_router(vinted_router)
 app.include_router(settings_router)
 app.include_router(alerts_router)
 app.include_router(cardtrader_router)
+app.include_router(ebay_router)
 
 
 # Static files (uploaded images)

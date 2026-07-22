@@ -156,6 +156,11 @@ class Article(BaseModel):
     cardtrader_product_id = Column(BigInteger)
     cardtrader_synced_at = Column(DateTime)
 
+    # eBay sync (Inventory API). ebay_synced_at riusato da sopra.
+    ebay_sku = Column(String(50))
+    ebay_offer_id = Column(String(30))
+    ebay_listing_id = Column(String(30))
+
     # Timestamp aggiuntivi
     published_at = Column(DateTime)
     sold_at = Column(DateTime)

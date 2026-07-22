@@ -43,6 +43,13 @@ services:
       - EMAIL_TO_ADMIN=${EMAIL_TO_ADMIN:-nerdnostalgiaita@gmail.com}
       # CardTrader API (JWT). In prod dal vault garganacl.
       - CARDTRADER_JWT=${CARDTRADER_JWT:-}
+      # eBay Sell API (OAuth). In prod dal vault garganacl. Default sandbox.
+      - EBAY_ENV=${EBAY_ENV:-sandbox}
+      - EBAY_MARKETPLACE_ID=${EBAY_MARKETPLACE_ID:-EBAY_IT}
+      - EBAY_CLIENT_ID=${EBAY_CLIENT_ID:-}
+      - EBAY_CLIENT_SECRET=${EBAY_CLIENT_SECRET:-}
+      - EBAY_REDIRECT_RUNAME=${EBAY_REDIRECT_RUNAME:-}
+      - EBAY_REFRESH_TOKEN=${EBAY_REFRESH_TOKEN:-}
       # Backup S3/R2 (opzionali)
       - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
       - BACKUP_S3_ENDPOINT=${BACKUP_S3_ENDPOINT:-}

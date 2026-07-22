@@ -69,6 +69,38 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "label": "Footer descrizione Vinted",
         "help": "Aggiunto in fondo alla descrizione copiata per Vinted.",
     },
+    "ebay_fulfillment_policy_id": {
+        "default": "",
+        "public": False,
+        "label": "eBay — Policy di spedizione (ID)",
+        "help": "ID della business policy di spedizione (da GET /api/ebay/policies). "
+                "Obbligatoria per pubblicare.",
+    },
+    "ebay_payment_policy_id": {
+        "default": "",
+        "public": False,
+        "label": "eBay — Policy di pagamento (ID)",
+        "help": "ID della business policy di pagamento. Obbligatoria per pubblicare.",
+    },
+    "ebay_return_policy_id": {
+        "default": "",
+        "public": False,
+        "label": "eBay — Policy di reso (ID)",
+        "help": "ID della business policy di reso. Obbligatoria per pubblicare.",
+    },
+    "ebay_merchant_location_key": {
+        "default": "",
+        "public": False,
+        "label": "eBay — Chiave location magazzino",
+        "help": "merchantLocationKey della sede di spedizione (da GET /api/ebay/policies).",
+    },
+    "ebay_default_category_id": {
+        "default": "",
+        "public": False,
+        "label": "eBay — Categoria predefinita (ID)",
+        "help": "Categoria eBay di fallback quando non ne troviamo una migliore "
+                "(es. carte collezionabili). Da /api/ebay/category-suggestions.",
+    },
     "cardtrader_footer": {
         "default": "Ask For Photos\nMore product on www.nerdnostalgia.store",
         "public": False,
