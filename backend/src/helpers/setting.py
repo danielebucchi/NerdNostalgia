@@ -69,6 +69,14 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "label": "Footer descrizione Vinted",
         "help": "Aggiunto in fondo alla descrizione copiata per Vinted.",
     },
+    "cardtrader_shop_url": {
+        "default": "",
+        "public": True,
+        "label": "URL shop CardTrader (pubblico)",
+        "help": "Link al tuo negozio CardTrader (es. https://www.cardtrader.com/it/"
+                "users/tuonome). Se valorizzato, compare nel footer del sito "
+                "come 'Trovaci anche su CardTrader'. Vuoto = nascosto.",
+    },
     "ebay_fulfillment_policy_id": {
         "default": "",
         "public": False,

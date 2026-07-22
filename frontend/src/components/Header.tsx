@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getPublicSettings } from "@/lib/api";
 import { AlertBell } from "@/components/AlertBell";
 import { CartNavLink } from "@/components/CartNavLink";
 import { LogoImage } from "@/components/LogoImage";
@@ -91,7 +92,9 @@ export function Header() {
   );
 }
 
-export function Footer() {
+export async function Footer() {
+  const settings = await getPublicSettings();
+  const cardtraderShopUrl = (settings.cardtrader_shop_url || "").trim();
   return (
     <footer className="mt-16 sm:mt-20 border-t border-ink/15 bg-white/40 backdrop-blur">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10 grid gap-6 sm:gap-8 sm:grid-cols-3">
@@ -122,6 +125,16 @@ export function Footer() {
           >
             nerdnostalgiaita@gmail.com
           </a>
+          {cardtraderShopUrl && (
+            <a
+              href={cardtraderShopUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-lilac-deep font-semibold mt-3 block hover:underline"
+            >
+              🃏 Trovaci anche su CardTrader ↗
+            </a>
+          )}
         </div>
       </div>
       <div className="text-center text-xs text-ink-soft pb-6 px-4 space-y-2">
