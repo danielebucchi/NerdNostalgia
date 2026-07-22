@@ -240,6 +240,9 @@ def suggested_price_cents(
     Se ce ne sono meno di N, prende l'ultimo disponibile. Ritorna
     {cents, position, total, all_cents, filtered} o None se nessuna inserzione."""
     products = marketplace_products(blueprint_id)
+    # Le carte gradate (slab PSA/BGS) hanno prezzi non comparabili con la carta
+    # sciolta → mai usate come riferimento per il "4° piu' basso".
+    products = [p for p in products if not p.get("graded")]
     filtered = any(x is not None for x in (condition, language, reverse, first_edition))
     if filtered:
         products = [
