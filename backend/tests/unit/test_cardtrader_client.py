@@ -47,6 +47,18 @@ def test_suggested_price_unfiltered(monkeypatch):
     assert res["filtered"] is False
 
 
+def test_suggested_price_excludes_graded(monkeypatch):
+    listings = [
+        {"price": {"cents": 500}, "graded": True, "properties_hash": {"condition": "Near Mint"}},
+        _p(10), _p(12), _p(15), _p(18),
+    ]
+    monkeypatch.setattr(ct, "marketplace_products", lambda bid: listings)
+    res = ct.suggested_price_cents(1, 4)
+    # lo slab da 500 e' escluso → 4° = 18, non 15
+    assert res["cents"] == 18
+    assert res["total"] == 4
+
+
 def test_build_product_properties(monkeypatch):
     editable = [
         {"name": "condition"},
