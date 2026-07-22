@@ -50,6 +50,11 @@ services:
       - EBAY_CLIENT_SECRET=${EBAY_CLIENT_SECRET:-}
       - EBAY_REDIRECT_RUNAME=${EBAY_REDIRECT_RUNAME:-}
       - EBAY_REFRESH_TOKEN=${EBAY_REFRESH_TOKEN:-}
+      # Vinted Pro Integrations API (HMAC). REST → funziona dal datacenter,
+      # a differenza dello scraping legacy. Default sandbox.
+      - VINTED_PRO_ENV=${VINTED_PRO_ENV:-sandbox}
+      - VINTED_PRO_ACCESS_KEY=${VINTED_PRO_ACCESS_KEY:-}
+      - VINTED_PRO_SIGNING_KEY=${VINTED_PRO_SIGNING_KEY:-}
       # Backup S3/R2 (opzionali)
       - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
       - BACKUP_S3_ENDPOINT=${BACKUP_S3_ENDPOINT:-}

@@ -34,6 +34,7 @@ from api.personal_cards import router as personal_cards_router
 from api.settings import router as settings_router
 from api.users import router as users_router
 from api.vinted import router as vinted_router
+from api.vinted_pro import router as vinted_pro_router
 from api.wanted import router as wanted_router
 from utils.scheduler import start_scheduler, stop_scheduler
 from utils.session import get_db
@@ -92,6 +93,7 @@ app.include_router(settings_router)
 app.include_router(alerts_router)
 app.include_router(cardtrader_router)
 app.include_router(ebay_router)
+app.include_router(vinted_pro_router)
 
 
 # Static files (uploaded images)
