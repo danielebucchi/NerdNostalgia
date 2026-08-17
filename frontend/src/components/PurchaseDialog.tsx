@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createOrder, isHandExchangeEligible } from "@/lib/api";
+import { createOrder, createStripeCheckout, isHandExchangeEligible } from "@/lib/api";
 import { buildPaypalUrl } from "@/lib/paypal";
 import { useSettings } from "@/lib/settings-context";
 import type { Article } from "@/lib/types";
@@ -56,7 +56,9 @@ export function PurchaseDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const { paypalMe, handExchangeCapPrefixes, handExchangeCities } = useSettings();
+  // Metodo scelto al click (ref = lettura sincrona in handleSubmit)
+  const methodRef = useRef<"paypal" | "stripe">("paypal");
+  const { paypalMe, stripeEnabled, handExchangeCapPrefixes, handExchangeCities } = useSettings();
 
   const subtotal = articles.reduce(
     (acc, a) => acc + Number(a.price || 0),
@@ -117,7 +119,7 @@ export function PurchaseDialog({
     setSubmitting(true);
     setError(null);
     try {
-      await createOrder({
+      const order = await createOrder({
         buyer_name: state.buyer_name.trim(),
         buyer_email: state.buyer_email.trim(),
         buyer_phone: state.buyer_phone.trim() || undefined,
@@ -132,12 +134,19 @@ export function PurchaseDialog({
         items: articles.map((a) => ({ article_id: a.id, quantity: 1 })),
       });
 
-      // Apri paypal.me col totale in una nuova tab
+      if (methodRef.current === "stripe") {
+        // Checkout Stripe: redirect alla pagina di pagamento ospitata
+        const url = await createStripeCheckout(order.id);
+        if (onSuccess) onSuccess();
+        window.location.href = url;
+        return;
+      }
+
+      // PayPal.me: apre il pagamento in una nuova tab
       const url = buildPaypalUrl(paypalMe, grandTotal, currency);
       if (url) {
         window.open(url, "_blank", "noopener,noreferrer");
       }
-
       if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
@@ -381,7 +390,32 @@ export function PurchaseDialog({
             </span>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-1">
+          <div className="flex flex-col gap-2 pt-1">
+            {stripeEnabled && (
+              <button
+                type="submit"
+                onClick={() => { methodRef.current = "stripe"; }}
+                disabled={submitting}
+                className="btn btn-primary text-base font-bold w-full px-6 py-3.5 inline-flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <span className="inline-block h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                    Invio…
+                  </>
+                ) : (
+                  <>💳 Paga con carta € {grandTotal.toFixed(2)}</>
+                )}
+              </button>
+            )}
+            <button
+              type="submit"
+              onClick={() => { methodRef.current = "paypal"; }}
+              disabled={submitting}
+              className="btn btn-paypal text-base font-bold w-full px-6 py-3.5 inline-flex items-center justify-center gap-2"
+            >
+              {submitting ? "Invio…" : <>Paga con PayPal € {grandTotal.toFixed(2)}</>}
+            </button>
             <button
               type="button"
               onClick={onClose}
@@ -390,24 +424,10 @@ export function PurchaseDialog({
             >
               Annulla
             </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn btn-paypal text-base font-bold flex-1 px-6 py-3.5 inline-flex items-center justify-center gap-2"
-            >
-              {submitting ? (
-                <>
-                  <span className="inline-block h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                  Invio…
-                </>
-              ) : (
-                <>Conferma e paga € {grandTotal.toFixed(2)} →</>
-              )}
-            </button>
           </div>
           <p className="text-xs text-ink-soft text-center">
-            Ti arriverà una conferma via email. Il pagamento PayPal apre in una
-            nuova scheda.
+            Ti arriverà una conferma via email. Con carta il pagamento è immediato;
+            con PayPal si apre in una nuova scheda.
           </p>
         </form>
 

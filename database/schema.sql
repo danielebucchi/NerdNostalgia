@@ -184,6 +184,9 @@ CREATE TABLE IF NOT EXISTS orders (
     admin_notes TEXT,
     -- Tracking IP per rate-limit / antifrode
     ip_address VARCHAR(45),
+    -- Stripe Checkout
+    stripe_session_id VARCHAR(120),
+    stripe_payment_intent VARCHAR(120),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

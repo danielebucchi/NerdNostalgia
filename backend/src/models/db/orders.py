@@ -66,6 +66,10 @@ class Order(BaseModel):
 
     ip_address = Column(String(45))
 
+    # Stripe Checkout
+    stripe_session_id = Column(String(120))
+    stripe_payment_intent = Column(String(120))
+
     items = relationship(
         "OrderItem",
         back_populates="order",

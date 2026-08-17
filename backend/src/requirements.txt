@@ -12,3 +12,4 @@ requests>=2.31
 APScheduler>=3.11.2
 playwright>=1.45
 slowapi>=0.1.9
+stripe>=11.0
