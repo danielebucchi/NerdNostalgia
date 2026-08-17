@@ -218,6 +218,26 @@ export async function createOrder(payload: OrderCreateInput): Promise<OrderConfi
   return res.json();
 }
 
+/** Crea una Checkout Session Stripe per un ordine e ritorna l'URL a cui redirigere. */
+export async function createStripeCheckout(orderId: number): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/orders/${orderId}/checkout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    let detail = `${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  const data = await res.json();
+  return data.url as string;
+}
+
 export function formatPrice(article: Pick<Article, "price" | "currency">): string {
   const value = Number(article.price);
   if (Number.isNaN(value)) return article.price;

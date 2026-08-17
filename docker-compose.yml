@@ -55,6 +55,9 @@ services:
       - VINTED_PRO_ENV=${VINTED_PRO_ENV:-sandbox}
       - VINTED_PRO_ACCESS_KEY=${VINTED_PRO_ACCESS_KEY:-}
       - VINTED_PRO_SIGNING_KEY=${VINTED_PRO_SIGNING_KEY:-}
+      # Stripe Checkout (pagamento carta). In prod dal vault. Test mode = sk_test_.
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
       # Backup S3/R2 (opzionali)
       - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
       - BACKUP_S3_ENDPOINT=${BACKUP_S3_ENDPOINT:-}

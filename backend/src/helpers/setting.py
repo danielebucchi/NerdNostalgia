@@ -69,6 +69,14 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "label": "Footer descrizione Vinted",
         "help": "Aggiunto in fondo alla descrizione copiata per Vinted.",
     },
+    "stripe_enabled": {
+        "default": "",
+        "public": True,
+        "label": "Pagamento con carta (Stripe) attivo",
+        "help": "true/false. Se true mostra il bottone 'Paga con carta' al "
+                "checkout (accanto a PayPal). Richiede STRIPE_SECRET_KEY lato "
+                "server. Vuoto/false = nascosto.",
+    },
     "cardtrader_shop_url": {
         "default": "",
         "public": True,

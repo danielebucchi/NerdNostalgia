@@ -32,6 +32,7 @@ from api.misc_sales import router as misc_sales_router
 from api.orders import router as orders_router
 from api.personal_cards import router as personal_cards_router
 from api.settings import router as settings_router
+from api.stripe import router as stripe_router
 from api.users import router as users_router
 from api.vinted import router as vinted_router
 from api.vinted_pro import router as vinted_pro_router
@@ -94,6 +95,7 @@ app.include_router(alerts_router)
 app.include_router(cardtrader_router)
 app.include_router(ebay_router)
 app.include_router(vinted_pro_router)
+app.include_router(stripe_router)
 
 
 # Static files (uploaded images)

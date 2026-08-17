@@ -266,6 +266,34 @@ def create_order(
     return order
 
 
+@router.post("/{order_id}/checkout")
+@limiter.limit("10/minute;60/hour")
+def create_checkout(
+    order_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Crea una Checkout Session Stripe per un ordine PENDING e restituisce
+    l'URL a cui redirigere il compratore. Pubblico: l'ordine e' appena stato
+    creato dal compratore."""
+    from utils import stripe_client as sc
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+    if order.status != OrderStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Ordine non pagabile (gia' processato)")
+    if not sc.is_configured():
+        raise HTTPException(status_code=503, detail="Pagamento con carta non disponibile")
+    try:
+        session = sc.create_checkout_session(order)
+    except sc.StripeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    order.stripe_session_id = session.id
+    db.commit()
+    return {"url": session.url}
+
+
 # ─────────────────── Admin endpoints ───────────────────
 @router.get("/", response_model=List[OrderResponse])
 def list_orders(
