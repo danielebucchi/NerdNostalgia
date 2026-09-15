@@ -21,6 +21,7 @@ interface VintedSyncLog {
   items_imported: number;
   items_updated: number;
   items_skipped: number;
+  items_archived: number;
   error_message: string | null;
 }
 
@@ -226,6 +227,7 @@ export default function AdminImportVintedPage() {
                   <th className="text-right py-2 px-2">Nuovi</th>
                   <th className="text-right py-2 px-2">Aggiornati</th>
                   <th className="text-right py-2 px-2">Saltati</th>
+                  <th className="text-right py-2 px-2">Archiviati</th>
                   <th className="text-left py-2 px-2">Note / errori</th>
                 </tr>
               </thead>
@@ -254,6 +256,9 @@ export default function AdminImportVintedPage() {
                     <td className="py-2 px-2 text-right tabular-nums">{l.items_updated || "—"}</td>
                     <td className="py-2 px-2 text-right tabular-nums text-ink-soft">
                       {l.items_skipped || "—"}
+                    </td>
+                    <td className="py-2 px-2 text-right tabular-nums text-pink-deep">
+                      {l.items_archived || "—"}
                     </td>
                     <td className="py-2 px-2 text-xs">
                       {l.error_message ? (

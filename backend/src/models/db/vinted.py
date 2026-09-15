@@ -33,6 +33,7 @@ class VintedSyncLog(BaseModel):
     items_imported = Column(Integer, nullable=False, default=0)
     items_updated = Column(Integer, nullable=False, default=0)
     items_skipped = Column(Integer, nullable=False, default=0)
+    items_archived = Column(Integer, nullable=False, default=0)
     error_message = Column(Text)
 
     # BaseModel has its own created_at/updated_at: started_at è il momento del run
