@@ -14,6 +14,13 @@ Usage:
     # esegui
     python sync_from_local.py
 
+Dopo l'import fa un secondo giro di "riconciliazione": il server risponde
+con gli item_id che ha a catalogo ma che non sono comparsi nel fetch, questo
+script verifica uno a uno se sono davvero spariti da Vinted (404 su
+/items/{id} — va fatto da qui, non dal server, per lo stesso motivo del
+fetch) e rimanda i confermati a POST /api/vinted/reconcile, che li archivia.
+Si disattiva con RECONCILE=0.
+
 Exit code:
     0  ok (sync completata, anche con 0 nuovi items)
     1  errore di rete/login
@@ -37,7 +44,11 @@ if SRC.is_dir():
 
 try:
     import requests
-    from utils.vinted_client import VintedClientError, fetch_user_items
+    from utils.vinted_client import (
+        VintedClientError,
+        fetch_user_items,
+        verify_items_missing,
+    )
 except ImportError as exc:
     sys.stderr.write(
         f"Import error: {exc}\n"
@@ -101,7 +112,12 @@ def serialize_items(items) -> list[dict]:
     return out
 
 
-def push(api_url: str, token: str, items: list[dict]) -> dict | None:
+def push(
+    api_url: str,
+    token: str,
+    items: list[dict],
+    seen_item_ids: list[int] | None = None,
+) -> dict | None:
     """Pusha gli items al server. Timeout volutamente alto: l'import lato
     server scarica le foto da Vinted CDN per ogni item, e per 100+ items
     può durare 10-20 minuti. Se il client va in timeout comunque, il
@@ -113,7 +129,11 @@ def push(api_url: str, token: str, items: list[dict]) -> dict | None:
         # (connect, read) — read alto perché l'import è sincrono server-side
         r = requests.post(
             f"{api_url}/api/vinted/import",
-            json={"items": items, "triggered_by": "remote"},
+            json={
+                "items": items,
+                "triggered_by": "remote",
+                "seen_item_ids": seen_item_ids or [],
+            },
             headers={"Authorization": f"Bearer {token}"},
             timeout=(30, 1800),
         )
@@ -129,6 +149,56 @@ def push(api_url: str, token: str, items: list[dict]) -> dict | None:
         LOGGER.error("Import fallito: HTTP %s — %s", r.status_code, r.text[:300])
         sys.exit(3)
     return r.json()
+
+
+def reconcile(api_url: str, token: str, candidate_ids: list[int]) -> None:
+    """Verifica i candidati e archivia quelli davvero spariti da Vinted.
+
+    Best-effort: qualunque intoppo qui non deve far fallire la sync, che a
+    quel punto e' gia' andata a buon fine. `verify_items_missing` e' gia'
+    conservativo di suo — su errore di rete NON marca l'item come mancante.
+    """
+    LOGGER.info("Riconciliazione: verifico %d candidati su Vinted…", len(candidate_ids))
+    try:
+        missing = sorted(verify_items_missing(candidate_ids))
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("Verifica candidati fallita, non archivio nulla: %s", exc)
+        return
+
+    alive = len(candidate_ids) - len(missing)
+    LOGGER.info(
+        "Riconciliazione: %d confermati spariti, %d ancora vivi su Vinted",
+        len(missing), alive,
+    )
+    if not missing:
+        return
+
+    if os.getenv("DRY_RUN") == "1":
+        LOGGER.info("DRY_RUN=1, non archivio: %s", missing)
+        return
+
+    try:
+        r = requests.post(
+            f"{api_url}/api/vinted/reconcile",
+            json={"missing_item_ids": missing, "triggered_by": "reconcile"},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=(30, 300),
+        )
+    except requests.RequestException as exc:
+        LOGGER.warning("POST /reconcile fallita: %s", exc)
+        return
+
+    if r.status_code >= 300:
+        LOGGER.warning("Reconcile HTTP %s — %s", r.status_code, r.text[:300])
+        return
+
+    log = r.json()
+    LOGGER.info(
+        "Reconcile: archiviati=%s rifiutati=%s error=%s",
+        log.get("items_archived"),
+        log.get("items_skipped"),
+        log.get("error_message"),
+    )
 
 
 def main() -> int:
@@ -148,12 +218,16 @@ def main() -> int:
     LOGGER.info("Fetchati %d items", len(items))
 
     payload = serialize_items(items)
+    # Tutti gli ID visti sul profilo, filtro NerdNostalgia escluso: servono
+    # al server per capire quali articoli a catalogo non sono piu' comparsi.
+    seen_ids = [it.item_id for it in items]
+
     if os.getenv("DRY_RUN") == "1":
         print(json.dumps(payload, indent=2, ensure_ascii=False)[:4000])
         LOGGER.info("DRY_RUN=1, non pusho.")
         return 0
 
-    log = push(api_url, token, payload)
+    log = push(api_url, token, payload, seen_item_ids=seen_ids)
     if log is None:
         # Timeout: il server molto probabilmente ha finito comunque (vedi
         # `GET /api/vinted/logs` per confermare). Exit 0 perché la sync
@@ -167,6 +241,31 @@ def main() -> int:
         log.get("items_skipped"),
         log.get("error_message"),
     )
+
+    if os.getenv("RECONCILE", "1") != "1":
+        LOGGER.info("RECONCILE=0, salto la riconciliazione.")
+        return 0
+
+    reason = log.get("reconcile_skipped_reason")
+    if reason:
+        LOGGER.warning("Riconciliazione saltata dal server: %s", reason)
+        return 0
+
+    if "reconcile_candidates" not in log:
+        # Server non ancora aggiornato: ignora `seen_item_ids` e non risponde
+        # coi candidati. L'import e' andato a buon fine comunque.
+        LOGGER.warning(
+            "Il server non supporta la riconciliazione (nessun "
+            "reconcile_candidates in risposta): serve il deploy del backend."
+        )
+        return 0
+
+    candidates = log["reconcile_candidates"]
+    if not candidates:
+        LOGGER.info("Riconciliazione: nessun candidato, catalogo allineato.")
+        return 0
+
+    reconcile(api_url, token, candidates)
     return 0
 
 
