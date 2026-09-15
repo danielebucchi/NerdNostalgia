@@ -4,7 +4,10 @@ API endpoint sync Vinted (admin only):
   PATCH /api/vinted/settings    → modifica config (user_id, sync_hour, enabled)
   GET   /api/vinted/logs        → ultime sync
   POST  /api/vinted/sync        → trigger manuale (sincrono)
+  POST  /api/vinted/import      → import di items fetchati altrove
+  POST  /api/vinted/reconcile   → archivia gli item spariti da Vinted
 """
+import logging
 from datetime import datetime
 from typing import List, Optional
 
@@ -16,9 +19,16 @@ from helpers.auth import require_admin
 from models.db import User, VintedSettings, VintedSyncLog
 from utils.session import get_db
 from utils.vinted_client import VintedItem
-from utils.vinted_sync import persist_items, run_sync
+from utils.vinted_sync import (
+    archive_missing_items,
+    persist_items,
+    reconcile_candidates,
+    run_sync,
+)
 
 router = APIRouter(prefix="/api/vinted", tags=["vinted"])
+
+LOGGER = logging.getLogger("vinted_api")
 
 
 # ----------------------------- Schemas Pydantic -----------------------------
@@ -47,6 +57,7 @@ class VintedSyncLogResponse(BaseModel):
     items_imported: int
     items_updated: int
     items_skipped: int
+    items_archived: int = 0
     error_message: Optional[str]
 
 
@@ -68,6 +79,31 @@ class VintedItemPayload(BaseModel):
 class VintedImportRequest(BaseModel):
     items: List[VintedItemPayload]
     triggered_by: str = Field(default="remote", max_length=20)
+    seen_item_ids: Optional[List[int]] = Field(
+        default=None,
+        description=(
+            "Tutti gli item_id visti sul profilo in questa run, PRIMA di "
+            "qualunque filtro lato client. Se presente, la risposta include "
+            "i candidati alla riconciliazione. Ometterlo disattiva il giro."
+        ),
+    )
+
+
+class VintedImportResponse(VintedSyncLogResponse):
+    """Log dell'import + esito del calcolo dei candidati alla rimozione."""
+    reconcile_candidates: List[int] = Field(default_factory=list)
+    reconcile_skipped_reason: Optional[str] = None
+
+
+class VintedReconcileRequest(BaseModel):
+    missing_item_ids: List[int] = Field(
+        ...,
+        description=(
+            "item_id verificati come spariti (404/410 su /items/{id}) dal "
+            "client, che deve girare su IP residenziale."
+        ),
+    )
+    triggered_by: str = Field(default="reconcile", max_length=20)
 
 
 # ----------------------------- Settings -----------------------------
@@ -134,7 +170,7 @@ def trigger_sync(
     return log
 
 
-@router.post("/import", response_model=VintedSyncLogResponse)
+@router.post("/import", response_model=VintedImportResponse)
 def import_items(
     payload: VintedImportRequest,
     db: Session = Depends(get_db),
@@ -168,4 +204,40 @@ def import_items(
         for p in payload.items
     ]
     log = persist_items(db, items, triggered_by=payload.triggered_by)
-    return log
+
+    candidates: List[int] = []
+    skipped_reason: Optional[str] = None
+    if payload.seen_item_ids is not None:
+        candidates, skipped_reason = reconcile_candidates(
+            db, payload.seen_item_ids, exclude_log_id=log.id,
+        )
+        if skipped_reason:
+            LOGGER.info("Riconciliazione saltata: %s", skipped_reason)
+
+    return VintedImportResponse(
+        **VintedSyncLogResponse.model_validate(log).model_dump(),
+        reconcile_candidates=candidates,
+        reconcile_skipped_reason=skipped_reason,
+    )
+
+
+@router.post("/reconcile", response_model=VintedSyncLogResponse)
+def reconcile(
+    payload: VintedReconcileRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Archivia gli articoli i cui item sono spariti da Vinted.
+
+    Secondo tempo del giro avviato da `POST /api/vinted/import`: il client
+    riceve `reconcile_candidates`, li verifica uno a uno con
+    `verify_items_missing()` (404/410 su /items/{id}) e rimanda qui solo
+    quelli confermati.
+
+    Gli articoli passano a `ARCHIVED`: spariscono dal catalogo pubblico e
+    dagli ordinabili, ma foto e storico restano. Il server rivalida ogni ID
+    contro l'ultimo import e rifiuta quelli toccati di recente.
+    """
+    return archive_missing_items(
+        db, payload.missing_item_ids, triggered_by=payload.triggered_by,
+    )

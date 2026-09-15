@@ -308,6 +308,7 @@ CREATE TABLE IF NOT EXISTS vinted_sync_logs (
     items_imported INTEGER NOT NULL DEFAULT 0,
     items_updated INTEGER NOT NULL DEFAULT 0,
     items_skipped INTEGER NOT NULL DEFAULT 0,
+    items_archived INTEGER NOT NULL DEFAULT 0,
     error_message TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

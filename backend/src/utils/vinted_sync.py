@@ -8,8 +8,12 @@ Pipeline:
   4) Auto-detect categoria via CATEGORY_RULES (titolo + descrizione)
   5) Crea Article PUBLISHED (o aggiorna esistente)
   6) Scarica foto in WebP + thumbnail locale
-  7) Cancella articoli non piu' visti su Vinted (safety: min 10 fetched)
-  8) Scrive vinted_sync_logs con counters
+  7) Scrive vinted_sync_logs con counters
+
+La rimozione degli articoli spariti da Vinted NON fa parte di questo giro:
+e' un secondo passaggio esplicito (reconcile_candidates + archive_missing_items,
+in fondo al modulo) guidato dal client, che deve poter confermare il 404 da un
+IP residenziale.
 """
 from __future__ import annotations
 
@@ -492,9 +496,10 @@ def run_sync(db: Session, triggered_by: str = "cron") -> VintedSyncLog:
     Playwright, vedi `scripts/sync_from_local.py` e l'endpoint
     POST /api/vinted/import per la pipeline "fetch da Mac → push al server".
 
-    La sync fa SOLO insert/update. NON cancella articoli che spariscono
-    da Vinted (scroll parziale → cancellazioni accidentali). Per rimuovere
-    un articolo venduto: /admin/articles → status SOLD.
+    La sync fa SOLO insert/update: gli articoli spariti da Vinted vengono
+    archiviati a parte, vedi `reconcile_candidates()` / `archive_missing_items()`
+    e `POST /api/vinted/reconcile`. Il motivo e' che la conferma del 404 va
+    fatta da un IP residenziale, quindi non puo' partire dal server.
     """
     settings = db.query(VintedSettings).order_by(VintedSettings.id.asc()).first()
     if settings is None or not settings.enabled:
@@ -525,3 +530,194 @@ def run_sync(db: Session, triggered_by: str = "cron") -> VintedSyncLog:
         return log
 
     return persist_items(db, items_iter, triggered_by=triggered_by)
+
+
+# ----------------------------- Riconciliazione -----------------------------
+# Un item che sparisce da Vinted (venduto e rimosso, o delistato) resta
+# altrimenti PUBLISHED sul sito per sempre: persist_items() fa solo upsert.
+# La rimozione e' volutamente a DUE gate indipendenti, perche' uno scroll
+# parziale del profilo (CF, rate-limit, rete) non deve svuotare il catalogo:
+#
+#   gate 1 (client) — l'item non compare nel fetch E `verify_items_missing`
+#                     conferma 404/410 navigando su /items/{id}
+#   gate 2 (server) — l'articolo non e' stato toccato dall'ultimo import
+#                     (vinted_synced_at piu' vecchio del suo started_at)
+#
+# In piu' `reconcile_candidates()` si rifiuta di produrre candidati se il
+# fetch corrente e' anomalmente piccolo rispetto alle run recenti.
+
+# Sotto questo numero di item visti non si riconcilia mai: un fetch cosi'
+# piccolo e' quasi certamente una run degenere, non un profilo svuotato.
+RECONCILE_MIN_SEEN = 10
+
+# Il fetch corrente deve valere almeno questa frazione della miglior run
+# recente, altrimenti e' parziale e i "mancanti" sono falsi positivi.
+RECONCILE_MIN_RATIO = 0.7
+
+# Quante run guardare indietro per stabilire il riferimento.
+RECONCILE_REFERENCE_RUNS = 5
+
+# Tetto ai candidati per run: ogni verifica e' una navigazione Playwright
+# (~1s + restart browser ogni 8), il resto slitta alla run successiva.
+RECONCILE_MAX_CANDIDATES = 150
+
+
+def _as_naive_utc(value: Optional[datetime]) -> Optional[datetime]:
+    """SQLite restituisce datetime naive, il codice ne crea di aware:
+    normalizza a naive-UTC cosi' i confronti non esplodono."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(_dt.UTC).replace(tzinfo=None)
+
+
+def _reference_fetch_size(db: Session, exclude_log_id: Optional[int] = None) -> int:
+    """Miglior `items_fetched` fra le ultime run andate a buon fine.
+
+    Usato come metro per capire se il fetch corrente e' parziale. NON si
+    confronta col numero di articoli a DB: un arretrato di articoli orfani
+    abbasserebbe la copertura in modo permanente, bloccando per sempre la
+    riconciliazione che serve proprio a smaltirlo.
+    """
+    q = (
+        db.query(VintedSyncLog)
+        .filter(VintedSyncLog.error_message.is_(None))
+        .filter(VintedSyncLog.items_fetched > 0)
+    )
+    if exclude_log_id is not None:
+        q = q.filter(VintedSyncLog.id != exclude_log_id)
+    recent = q.order_by(VintedSyncLog.started_at.desc()).limit(RECONCILE_REFERENCE_RUNS).all()
+    return max((r.items_fetched or 0) for r in recent) if recent else 0
+
+
+def reconcile_candidates(
+    db: Session,
+    seen_item_ids: Iterable[int],
+    exclude_log_id: Optional[int] = None,
+) -> tuple[List[int], Optional[str]]:
+    """Articoli PUBLISHED/LISTED il cui item non compare nel fetch corrente.
+
+    Ritorna (candidati, motivo_skip). Se motivo_skip non e' None la lista e'
+    vuota e il chiamante NON deve rimuovere nulla.
+
+    Sono solo *candidati*: vanno confermati con `verify_items_missing()`
+    lato client (dal Mac: da un IP datacenter Cloudflare risponde challenge
+    e ogni item sembrerebbe sparito).
+    """
+    seen = {int(i) for i in seen_item_ids}
+
+    if len(seen) < RECONCILE_MIN_SEEN:
+        return [], (
+            f"fetch troppo piccolo ({len(seen)} item < {RECONCILE_MIN_SEEN})"
+        )
+
+    reference = _reference_fetch_size(db, exclude_log_id=exclude_log_id)
+    if reference and len(seen) < RECONCILE_MIN_RATIO * reference:
+        return [], (
+            f"fetch parziale: {len(seen)} item contro un riferimento di "
+            f"{reference} (soglia {RECONCILE_MIN_RATIO:.0%})"
+        )
+
+    rows = (
+        db.query(Article.vinted_item_id)
+        .filter(Article.vinted_item_id.isnot(None))
+        .filter(Article.status == ArticleStatus.PUBLISHED)
+        .filter(Article.vinted_status == VintedStatus.LISTED)
+        .all()
+    )
+    candidates = sorted({int(r[0]) for r in rows} - seen)
+
+    if len(candidates) > RECONCILE_MAX_CANDIDATES:
+        LOGGER.info(
+            "Riconciliazione: %d candidati, ne verifico %d (il resto alla "
+            "prossima run)", len(candidates), RECONCILE_MAX_CANDIDATES,
+        )
+        candidates = candidates[:RECONCILE_MAX_CANDIDATES]
+
+    return candidates, None
+
+
+def archive_missing_items(
+    db: Session,
+    missing_item_ids: Iterable[int],
+    triggered_by: str = "reconcile",
+) -> VintedSyncLog:
+    """Archivia gli articoli i cui item sono stati confermati spariti.
+
+    Non cancella: `status = ARCHIVED` li toglie dal catalogo pubblico (la
+    vetrina interroga status=PUBLISHED) e dagli ordinabili, ma preserva
+    foto, storico e i riferimenti da order_items.
+
+    Gate server-side: si archivia solo se `vinted_synced_at` e' anteriore
+    all'inizio dell'ultimo import. Se l'import appena concluso ha toccato
+    l'articolo, l'item e' vivo su Vinted e la richiesta viene rifiutata,
+    qualunque cosa dica il client.
+    """
+    log = VintedSyncLog(
+        started_at=datetime.now(_dt.UTC),
+        triggered_by=triggered_by,
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+
+    archived: List[int] = []
+    rejected: List[int] = []
+
+    try:
+        ids = sorted({int(i) for i in missing_item_ids})
+        last_import = (
+            db.query(VintedSyncLog)
+            .filter(VintedSyncLog.id != log.id)
+            .filter(VintedSyncLog.items_fetched > 0)
+            .order_by(VintedSyncLog.started_at.desc())
+            .first()
+        )
+        cutoff = _as_naive_utc(last_import.started_at) if last_import else None
+
+        for item_id in ids:
+            article = (
+                db.query(Article)
+                .filter(Article.vinted_item_id == item_id)
+                .first()
+            )
+            if article is None or article.status != ArticleStatus.PUBLISHED:
+                rejected.append(item_id)
+                continue
+
+            synced = _as_naive_utc(article.vinted_synced_at)
+            if cutoff is not None and synced is not None and synced >= cutoff:
+                # Visto nell'ultimo import: vivo su Vinted, non si tocca.
+                LOGGER.warning(
+                    "Riconciliazione: rifiuto item %s, sincronizzato a %s "
+                    "(>= inizio ultimo import %s)", item_id, synced, cutoff,
+                )
+                rejected.append(item_id)
+                continue
+
+            article.status = ArticleStatus.ARCHIVED
+            article.vinted_status = VintedStatus.NOT_LISTED
+            db.commit()
+            archived.append(item_id)
+            LOGGER.info(
+                "Archiviato articolo %s (Vinted item %s): non piu' su Vinted",
+                article.id, item_id,
+            )
+
+        if rejected:
+            log.error_message = (
+                f"{len(rejected)} item rifiutati dal gate server-side: "
+                f"{rejected[:20]}"
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.error_message = f"Errore inatteso: {exc}"
+        LOGGER.exception("archive_missing_items inattesa")
+    finally:
+        log.finished_at = datetime.now(_dt.UTC)
+        log.items_archived = len(archived)
+        log.items_skipped = len(rejected)
+        db.commit()
+        db.refresh(log)
+
+    return log
