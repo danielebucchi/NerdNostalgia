@@ -286,6 +286,11 @@ def fetch_user_items(
     collected_raw: List[dict] = []
     seen_ids: set[int] = set()
     error: Optional[str] = None
+    # Distingue "guardaroba davvero vuoto" da "non abbiamo intercettato
+    # niente": senza questo i due casi producevano lo stesso errore, che
+    # dava la colpa al captcha anche quando il profilo era semplicemente
+    # senza annunci.
+    api_stats: dict = {"seen": False, "total_entries": None}
 
     def on_response(response: PWResponse) -> None:
         if not ITEMS_URL_PATTERN.search(response.url):
@@ -297,6 +302,10 @@ def fetch_user_items(
         except Exception as exc:  # noqa: BLE001
             LOGGER.warning("Risposta intercettata non JSON: %s", exc)
             return
+        api_stats["seen"] = True
+        pagination = payload.get("pagination") or {}
+        if isinstance(pagination, dict) and "total_entries" in pagination:
+            api_stats["total_entries"] = pagination.get("total_entries")
         new_items = payload.get("items") or []
         for raw in new_items:
             try:
@@ -480,6 +489,16 @@ def fetch_user_items(
         raise VintedClientError(f"Playwright fallito: {exc}") from exc
 
     if not collected_raw and error is None:
+        if api_stats["seen"] and not api_stats["total_entries"]:
+            # L'API ha risposto e dichiara zero annunci: il profilo e'
+            # vuoto davvero (venduto tutto, modalita' vacanza, account
+            # svuotato). Non e' un errore, e' un risultato.
+            LOGGER.warning(
+                "Profilo %d: nessun annuncio online (l'API dichiara "
+                "total_entries=%s). Non e' un blocco: il guardaroba e' vuoto.",
+                vinted_user_id, api_stats["total_entries"],
+            )
+            return
         raise VintedClientError(
             "Nessuna risposta API intercettata. Vinted potrebbe mostrare "
             "captcha o aver cambiato la struttura della pagina."
@@ -502,10 +521,13 @@ def verify_items_missing(item_ids: list[int]) -> set[int]:
     piu'. Usato per evitare cancellazioni accidentali quando lo scroll
     del profilo non carica tutti gli items.
 
-    Detection criteri:
-      - Pagina restituisce 404 o 410
-      - Redirect verso pagina di errore (URL contiene 'not-found' o '404')
-      - Titolo pagina contiene "Pagina non trovata" / "Page not found"
+    Detection criteri (tutti necessari, non alternativi):
+      - HTTP 404/410, oppure redirect a una URL di not-found
+      - E il body e' riconoscibile come la pagina d'errore di Vinted
+
+    Nel dubbio NON marca missing: 403/429/5xx, errori di rete o una pagina
+    che non riconosce lasciano l'item fuori dal set. Un rate-limit scambiato
+    per "annuncio sparito" si tradurrebbe in una rimozione di massa.
     """
     if not item_ids:
         return set()
@@ -558,22 +580,44 @@ def verify_items_missing(item_ids: list[int]) -> set[int]:
                 final_url = page.url
                 status = resp.status if resp else None
 
+                # Anti-bot: 403/429/5xx non dicono niente sull'esistenza
+                # dell'item. Trattarli come "sparito" trasformerebbe un
+                # rate-limit in una cancellazione di massa.
+                if status in (403, 429) or (status or 0) >= 500:
+                    LOGGER.warning(
+                        "verify_items_missing #%d: HTTP %s (blocco o errore "
+                        "server), non decido", item_id, status,
+                    )
+                    continue
+
                 is_missing = False
                 if status in (404, 410):
                     is_missing = True
                 elif final_url and ("not-found" in final_url or "/404" in final_url):
                     is_missing = True
-                else:
-                    # Check titolo pagina per messaggi di errore
-                    title = page.title() or ""
-                    title_lower = title.lower()
-                    if any(s in title_lower for s in (
-                        "pagina non trovata",
+
+                if is_missing:
+                    # Conferma in positivo di essere sulla pagina d'errore di
+                    # Vinted e non su una interstitial anti-bot che risponde
+                    # 404 a tutto: se non riconosco il testo, non decido.
+                    body = ""
+                    try:
+                        body = (page.inner_text("body") or "").lower()
+                    except Exception:  # noqa: BLE001
+                        pass
+                    markers = (
                         "page not found",
-                        "404",
-                        "non disponibile",
-                    )):
-                        is_missing = True
+                        "pagina non trovata",
+                        "controlla che il link",
+                        "check the link",
+                    )
+                    if body and not any(m in body for m in markers):
+                        LOGGER.warning(
+                            "verify_items_missing #%d: HTTP %s ma la pagina "
+                            "non e' l'errore noto di Vinted, non decido",
+                            item_id, status,
+                        )
+                        continue
 
                 if is_missing:
                     missing.add(item_id)
@@ -607,3 +651,126 @@ def download_photo(url: str, max_bytes: int = 10 * 1024 * 1024) -> bytes:
                 f"Foto troppo grande (>{max_bytes // 1024 // 1024}MB): {url}"
             )
     return bytes(chunks)
+
+
+def classify_items(
+    item_ids: list[int],
+    *,
+    delay: float = 1.2,
+    pause_every: int = 25,
+    pause_seconds: float = 45.0,
+) -> dict[int, str]:
+    """Per ogni item_id dice in che stato si trova su Vinted.
+
+    Ritorna {item_id: stato} con stato in:
+      "missing" — 404/410 sulla pagina d'errore riconosciuta di Vinted
+      "sold"    — la pagina esiste e l'annuncio risulta venduto
+      "live"    — la pagina esiste e l'annuncio e' ancora in vendita
+      "unknown" — blocco anti-bot, timeout, pagina non riconosciuta
+
+    Piu' informativo di `verify_items_missing`, che collassa sold/live/
+    unknown in "non sparito": un annuncio venduto va tolto dalla vetrina
+    quanto uno rimosso, ma va marcato SOLD e non archiviato.
+
+    Come il fratello minore, nel dubbio non si sbilancia: qualunque
+    incertezza finisce in "unknown", mai in uno stato che porta a
+    modificare l'articolo.
+
+    Ritmo: su volumi alti Vinted inizia a rispondere a vuoto dopo qualche
+    decina di richieste ravvicinate, e il risultato degenera in "unknown"
+    a catena. `pause_every`/`pause_seconds` inseriscono una pausa lunga
+    ogni N item; con i default, 130 item richiedono circa 7 minuti.
+    """
+    out: dict[int, str] = {}
+    if not item_ids:
+        return out
+
+    sold_markers = ("venduto", "sold")
+    err_markers = (
+        "page not found", "pagina non trovata",
+        "controlla che il link", "check the link",
+    )
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage",
+                  "--disable-blink-features=AutomationControlled"],
+        )
+
+        def fresh_page():
+            ctx = browser.new_context(
+                user_agent=USER_AGENT, locale="it-IT",
+                viewport={"width": 1366, "height": 900},
+            )
+            return ctx.new_page()
+
+        page = fresh_page()
+        for i, item_id in enumerate(item_ids):
+            if i > 0 and pause_every and i % pause_every == 0:
+                LOGGER.info(
+                    "Pausa di %.0fs dopo %d item (anti rate-limit)",
+                    pause_seconds, i,
+                )
+                time.sleep(pause_seconds)
+            if i > 0 and i % 8 == 0:
+                # Stesso accorgimento anti rate-limit del resto del modulo.
+                try:
+                    page.context.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                page = fresh_page()
+
+            try:
+                resp = page.goto(
+                    f"{BASE_HOST}/items/{item_id}",
+                    wait_until="domcontentloaded", timeout=15_000,
+                )
+                status = resp.status if resp else None
+
+                if status in (403, 429) or (status or 0) >= 500:
+                    out[item_id] = "unknown"
+                    LOGGER.warning(
+                        "classify_items #%d: HTTP %s (blocco/errore server)",
+                        item_id, status,
+                    )
+                    continue
+
+                if status == 200:
+                    # Il badge "venduto" arriva con l'idratazione lato
+                    # client: leggere il body subito dopo domcontentloaded
+                    # fa passare per ancora-in-vendita un annuncio venduto.
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=8_000)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    time.sleep(1.0)
+
+                body = (page.inner_text("body") or "").lower()
+
+                if status in (404, 410):
+                    out[item_id] = (
+                        "missing" if any(m in body for m in err_markers)
+                        else "unknown"
+                    )
+                elif status == 200:
+                    title = (page.title() or "").lower()
+                    if not title or "vinted" not in title:
+                        out[item_id] = "unknown"
+                    elif any(m in body for m in sold_markers):
+                        out[item_id] = "sold"
+                    else:
+                        out[item_id] = "live"
+                else:
+                    out[item_id] = "unknown"
+
+                LOGGER.info("Item %d: %s", item_id, out[item_id])
+                time.sleep(delay + random.uniform(0, 0.5))
+            except Exception as exc:  # noqa: BLE001
+                out[item_id] = "unknown"
+                LOGGER.warning("classify_items #%d fail: %s", item_id, exc)
+                continue
+
+        browser.close()
+
+    return out
