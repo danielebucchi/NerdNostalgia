@@ -62,10 +62,6 @@ class ArticleCreate(ArticleInventoryFields):
     title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     price: Decimal = Field(..., ge=0, max_digits=10, decimal_places=2)
-    shipping_price: Optional[Decimal] = Field(
-        Decimal("5.00"), ge=0, max_digits=10, decimal_places=2,
-        description="Costo spedizione richiesto al cliente. Default 5€.",
-    )
     currency: str = Field("EUR", min_length=3, max_length=3)
     category_id: Optional[int] = Field(None, description="FK categoria/sottocategoria")
     condition: ArticleCondition = ArticleCondition.USED
@@ -84,10 +80,6 @@ class ArticleUpdate(ArticleInventoryFields):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
-    shipping_price: Optional[Decimal] = Field(
-        None, ge=0, max_digits=10, decimal_places=2,
-        description="Costo spedizione richiesto al cliente",
-    )
     currency: Optional[str] = Field(None, min_length=3, max_length=3)
     category_id: Optional[int] = None
     condition: Optional[ArticleCondition] = None
@@ -117,7 +109,6 @@ class ArticleResponse(BaseModel):
     title: str
     description: Optional[str]
     price: Decimal
-    shipping_price: Optional[Decimal] = None
     currency: str
     # Inventory fields
     lotto: Optional[str] = None
@@ -147,6 +138,9 @@ class ArticleResponse(BaseModel):
     condition: ArticleCondition
     status: ArticleStatus
     quantity: int
+    # True se un ordine in attesa tiene impegnato il pezzo: non e' venduto,
+    # ma non deve comparire sul sito finche' l'ordine non si chiude.
+    reserved: bool = False
     sku: Optional[str]
     brand: Optional[str]
     model: Optional[str]

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCart } from "@/lib/cart";
+import { useCart, usePaidOrderCleanup } from "@/lib/cart";
 import { useSettings } from "@/lib/settings-context";
 
 interface Props {
@@ -11,6 +11,9 @@ interface Props {
 export function CartNavLink({ variant = "desktop" }: Props) {
   const { count, hydrated } = useCart();
   const { paymentsEnabled } = useSettings();
+  // Sta nell'header, quindi gira su ogni pagina: se il compratore ha pagato
+  // (anche tornando da PayPal giorni dopo) il carrello si svuota da solo.
+  usePaidOrderCleanup();
   if (!paymentsEnabled) return null;
   const showBadge = hydrated && count > 0;
   const label = `Carrello${showBadge ? ` (${count})` : ""}`;

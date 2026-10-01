@@ -73,10 +73,12 @@ class Article(BaseModel):
 
     # Pricing
     price = Column(Numeric(10, 2), nullable=False)
-    # Costo spedizione mostrato/richiesto al cliente. Diverso da
-    # shipping_cost piu' sotto (che e' la spesa sostenuta, lato inventario).
-    # Default 5€ (piego di libri raccomandato), override manuale per articoli
-    # voluminosi o piu' fragili.
+    # DEPRECATO. Era la spedizione richiesta al cliente per questo articolo;
+    # ora la calcola helpers/shipping.py sul totale dell'ordine, quindi il
+    # campo e' sparito da form e API. La colonna resta solo per non buttare i
+    # valori storici: nessun codice la legge piu'.
+    # Da non confondere con shipping_cost piu' sotto, che e' la spesa
+    # sostenuta da noi (lato inventario) ed e' tuttora in uso.
     shipping_price = Column(Numeric(10, 2), default=5)
     currency = Column(String(3), default="EUR")
 
@@ -113,6 +115,13 @@ class Article(BaseModel):
 
     # Inventario
     quantity = Column(Integer, default=1, nullable=False)
+
+    # Prenotazione: ordine che tiene impegnato il pezzo. Finche' e' valorizzato
+    # l'articolo sparisce dal catalogo pubblico e non e' ordinabile.
+    reserved_order_id = Column(
+        Integer, ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
+    )
+    reserved_at = Column(DateTime)
     sku = Column(String(100), unique=True, index=True)
 
     # Dettagli prodotto
@@ -188,7 +197,6 @@ class Article(BaseModel):
             "title": self.title,
             "description": self.description,
             "price": float(self.price) if self.price else None,
-            "shipping_price": float(self.shipping_price) if self.shipping_price is not None else None,
             "currency": self.currency,
             "category_id": self.category_id,
             "condition": self.condition.value if self.condition else None,

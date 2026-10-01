@@ -80,6 +80,13 @@ export default async function ArticleDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  // Prenotato da un ordine in attesa: non e' venduto, ma per chi arriva dal
+  // link diretto non deve esistere, altrimenti ordinerebbe un pezzo che
+  // stiamo gia' tenendo da parte per qualcun altro.
+  if (article.reserved) {
+    notFound();
+  }
+
   // Correlati: stessa famiglia di categoria (parent se esiste, cosi' pesca
   // anche dalle sottocategorie sorelle), escluso l'articolo corrente. Se il
   // paniere e' magro si riempie con gli ultimi arrivi. Best-effort: la

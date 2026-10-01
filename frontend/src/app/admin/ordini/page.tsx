@@ -22,6 +22,10 @@ interface Order {
   buyer_phone: string | null;
   ship_street: string;
   ship_city: string;
+  inpost_point_id?: string | null;
+  inpost_point_name?: string | null;
+  insured?: boolean;
+  insurance_fee?: string;
   ship_postal_code: string;
   ship_province: string | null;
   ship_country: string;
@@ -353,6 +357,21 @@ export default function AdminOrdersPage() {
                           </dt>
                           <dd>€ {Number(o.shipping_total).toFixed(2)}</dd>
                         </div>
+                        {o.insured && (
+                          <div className="flex justify-between">
+                            <dt className="text-ink-soft">
+                              🛡 Assicurata
+                              <span className="ml-1 text-[10px] text-ink-mute">
+                                (compresa sopra)
+                              </span>
+                            </dt>
+                            <dd className="text-mint-deep font-semibold">
+                              {Number(o.insurance_fee ?? 0) > 0
+                                ? `€ ${Number(o.insurance_fee).toFixed(2)}`
+                                : "inclusa"}
+                            </dd>
+                          </div>
+                        )}
                         <div className="flex justify-between font-bold text-pink-deep pt-1 border-t border-ink/10">
                           <dt>Totale</dt>
                           <dd>
@@ -364,10 +383,20 @@ export default function AdminOrdersPage() {
 
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-ink-soft mb-2">
-                        Spedizione
+                        {o.inpost_point_id ? "Ritiro al locker InPost" : "Spedizione"}
                       </h3>
                       <address className="text-sm not-italic bg-pink-soft/20 rounded-lg p-3 mb-3">
                         {o.buyer_name}<br />
+                        {o.inpost_point_id && (
+                          <>
+                            <strong>📦 {o.inpost_point_name || "Locker InPost"}</strong>
+                            <br />
+                            <code className="text-xs bg-ink/10 rounded px-1.5 py-0.5">
+                              {o.inpost_point_id}
+                            </code>
+                            <br />
+                          </>
+                        )}
                         {o.ship_street}<br />
                         {o.ship_postal_code} {o.ship_city}
                         {o.ship_province && ` (${o.ship_province})`}<br />

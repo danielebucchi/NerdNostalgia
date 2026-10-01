@@ -1,0 +1,12 @@
+-- Token pubblico dell'ordine: permette al compratore (non autenticato) di
+-- leggere SOLO lo stato del proprio ordine, senza esporre /api/orders/{id}
+-- (admin-only) ne' rendere enumerabili gli ordini altrui.
+--
+-- Serve al carrello: resta pieno finche' l'ordine non risulta PAID, cosi' un
+-- pagamento PayPal mai completato non fa perdere la selezione al compratore.
+--
+-- Niente indice: l'ordine si cerca sempre per chiave primaria e il token si
+-- confronta in Python. Un indice qui non verrebbe mai usato — e in schema.sql
+-- romperebbe il boot, perche' schema.sql gira PRIMA delle migration e su un DB
+-- gia' esistente la colonna non c'e' ancora.
+ALTER TABLE orders ADD COLUMN public_token VARCHAR(64);

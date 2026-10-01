@@ -62,6 +62,10 @@ CREATE TABLE IF NOT EXISTS articles (
     status VARCHAR(20) NOT NULL DEFAULT 'DRAFT'
         CHECK (status IN ('DRAFT','PUBLISHED','SOLD','ARCHIVED')),
     quantity INTEGER NOT NULL DEFAULT 1,
+    -- Prenotato da un ordine in attesa (vedi 0018): fuori dal catalogo
+    -- pubblico finche' l'ordine non viene confermato o annullato.
+    reserved_order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+    reserved_at TIMESTAMP,
     sku VARCHAR(100) UNIQUE,
     brand VARCHAR(100),
     model VARCHAR(100),
@@ -173,8 +177,8 @@ CREATE TABLE IF NOT EXISTS orders (
     grand_total NUMERIC(10,2) NOT NULL,
     currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
     notes TEXT,
-    -- Scambio a mano: compratore residente in LI/PI, niente spedizione.
-    -- Validato lato API che il CAP cominci con 56 (Pisa) o 57 (Livorno).
+    -- Scambio a mano: offerta RITIRATA dal sito. La colonna resta per non
+    -- perdere il dato degli ordini storici; i nuovi ordini sono sempre 0.
     hand_exchange BOOLEAN NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
         CHECK (status IN ('PENDING','PAID','SHIPPED','CANCELLED')),
@@ -187,6 +191,17 @@ CREATE TABLE IF NOT EXISTS orders (
     -- Stripe Checkout
     stripe_session_id VARCHAR(120),
     stripe_payment_intent VARCHAR(120),
+    -- Token per la lettura pubblica dello stato ordine (vedi 0015)
+    public_token VARCHAR(64),
+    -- PayPal Orders v2 (vedi 0017)
+    paypal_order_id VARCHAR(64),
+    paypal_capture_id VARCHAR(64),
+    -- Locker InPost scelto dal compratore (vedi 0019)
+    inpost_point_id VARCHAR(64),
+    inpost_point_name VARCHAR(255),
+    -- Assicurazione spedizione scelta dal compratore (vedi 0020)
+    insured BOOLEAN NOT NULL DEFAULT 0,
+    insurance_fee NUMERIC(10,2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -279,6 +294,8 @@ CREATE TABLE IF NOT EXISTS marketplace_fees (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     marketplace VARCHAR(50) NOT NULL,
     markup_percent NUMERIC(5,2) NOT NULL,
+    -- Quota fissa per transazione (gateway di pagamento). 0 per i marketplace.
+    fixed_fee NUMERIC(10,2) NOT NULL DEFAULT 0,
     note VARCHAR(255),
     category_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

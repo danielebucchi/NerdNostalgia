@@ -45,7 +45,10 @@ function ArticlesListContent() {
       setLoading(true);
       setError(null);
       try {
-        const qs = new URLSearchParams({ limit: "100" });
+        // include_reserved: in admin devono comparire anche i pezzi
+        // impegnati da un ordine in attesa, altrimenti spariscono proprio
+        // quando serve guardarli per confermare o annullare.
+        const qs = new URLSearchParams({ limit: "100", include_reserved: "true" });
         if (status) qs.set("status", status);
         if (debouncedQuery) qs.set("search", debouncedQuery);
         const data = await adminApi.get<ArticleListResponse>(`/api/articles/?${qs}`);
@@ -336,6 +339,14 @@ function ArticleRow({
             {a.sku ? ` · ${a.sku}` : ""}
           </p>
         </div>
+        {a.reserved && (
+          <span
+            className="chip chip-lilac hidden sm:inline-flex whitespace-nowrap"
+            title="Ordine in attesa su questo pezzo: non è in vendita sul sito finché non confermi o annulli l'ordine"
+          >
+            ⏳ RISERVATO
+          </span>
+        )}
         <span
           className={`chip ${STATUS_CHIP[a.status] ?? ""} hidden sm:inline-flex`}
         >

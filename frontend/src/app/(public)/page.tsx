@@ -48,6 +48,13 @@ export default async function HomePage() {
               Videogiochi vintage, carte Pokémon, Funko e gadget retro selezionati
               con cura. Spedizione veloce in tutta Italia.
             </p>
+            <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-mint-deep/15 ring-1 ring-mint-deep/40 px-4 py-2 text-sm font-semibold text-ink">
+              <span aria-hidden="true" className="text-base">🚚</span>
+              <span>
+                Spedizione <span className="text-mint-deep">gratuita</span> per
+                ordini da 250 €
+              </span>
+            </p>
             <div className="mt-5 flex flex-wrap gap-3 justify-center md:justify-start">
               <Link href="#catalogo" className="btn btn-primary">
                 Sfoglia il catalogo →
