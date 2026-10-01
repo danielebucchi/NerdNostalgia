@@ -90,11 +90,11 @@ def _to_response(article: Article) -> ArticleResponse:
     metrics = _calc_inventory_metrics(article)
     return ArticleResponse(
         id=article.id,
+        reserved=article.reserved_order_id is not None,
         user_id=article.user_id,
         title=article.title,
         description=article.description,
         price=article.price,
-        shipping_price=article.shipping_price,
         currency=article.currency,
         lotto=article.lotto,
         purchase_date=article.purchase_date,
@@ -175,7 +175,6 @@ def create_article(
         title=article_data.title,
         description=article_data.description,
         price=article_data.price,
-        shipping_price=article_data.shipping_price,
         currency=article_data.currency,
         lotto=article_data.lotto,
         purchase_date=article_data.purchase_date,
@@ -224,6 +223,11 @@ def list_articles(
     min_price: Optional[Decimal] = Query(None, ge=0),
     max_price: Optional[Decimal] = Query(None, ge=0),
     search: Optional[str] = Query(None, description="Ricerca full-text su titolo e descrizione"),
+    include_reserved: bool = Query(
+        False,
+        description="Includi gli articoli prenotati da un ordine in attesa "
+                    "(serve all'admin; il catalogo pubblico li nasconde).",
+    ),
     article_helper: ArticleHelper = Depends(get_article_helper),
     category_helper: CategoryHelper = Depends(get_category_helper),
 ):
@@ -246,6 +250,7 @@ def list_articles(
         min_price=min_price,
         max_price=max_price,
         search=search,
+        include_reserved=include_reserved,
     )
 
     return ArticleListResponse(

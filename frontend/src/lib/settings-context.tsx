@@ -25,8 +25,6 @@ interface PublicSettings {
   payments_enabled: string;        // "true"/"false"/"" (vuoto = fallback env)
   contact_whatsapp: string;
   contact_email: string;
-  hand_exchange_cap_prefixes: string;
-  hand_exchange_cities: string;
   cardtrader_shop_url: string;
   stripe_enabled: string;
 }
@@ -36,8 +34,6 @@ const ENV_DEFAULTS: PublicSettings = {
   payments_enabled: (process.env.NEXT_PUBLIC_PAYMENTS_ENABLED ?? "").trim(),
   contact_whatsapp: "",
   contact_email: "nerdnostalgiaita@gmail.com",
-  hand_exchange_cap_prefixes: "56,57",
-  hand_exchange_cities: "Livorno/Pisa",
   cardtrader_shop_url: "",
   stripe_enabled: "",
 };
@@ -49,8 +45,6 @@ export interface SettingsValue {
   paymentsEnabled: boolean;
   contactWhatsapp: string;
   contactEmail: string;
-  handExchangeCapPrefixes: string[];
-  handExchangeCities: string;
   cardtraderShopUrl: string;
   stripeEnabled: boolean;
 }
@@ -62,11 +56,6 @@ function toValue(raw: PublicSettings, loaded: boolean): SettingsValue {
     paymentsEnabled: raw.payments_enabled.trim().toLowerCase() === "true",
     contactWhatsapp: raw.contact_whatsapp.trim(),
     contactEmail: raw.contact_email.trim(),
-    handExchangeCapPrefixes: raw.hand_exchange_cap_prefixes
-      .split(",")
-      .map((p) => p.trim())
-      .filter((p) => /^\d+$/.test(p)),
-    handExchangeCities: raw.hand_exchange_cities.trim(),
     cardtraderShopUrl: raw.cardtrader_shop_url.trim(),
     stripeEnabled: raw.stripe_enabled.trim().toLowerCase() === "true",
   };

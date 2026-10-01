@@ -185,12 +185,14 @@ Apri nell'admin: /admin/inquiries/{inquiry.id}
     )
 
 
-def send_order_notification(order, paypal_url: Optional[str] = None) -> bool:
-    """Notifica all'admin di un nuovo ordine con dati compratore + articoli.
+def send_order_notification(order) -> bool:
+    """Notifica all'admin di un nuovo ordine: dati compratore, articoli e
+    tutto il necessario per comprare l'etichetta di spedizione.
 
-    L'email arriva nel momento in cui il compratore submit-ta il form,
-    NON quando il pagamento PayPal e' confermato (paypal.me non ha
-    webhook). Sara' l'admin a confermare il pagato da /admin/ordini.
+    Viene mandata due volte nel ciclo di vita dell'ordine: quando il
+    compratore conferma (stato PENDING) e quando il pagamento risulta
+    incassato (PayPal/Stripe). Il riquadro con i dati del destinatario serve
+    a creare la spedizione su Packlink senza dover aprire l'admin.
     """
     cfg = _config()
     to_admin = cfg["to_admin"]
@@ -221,8 +223,10 @@ Email: {order.buyer_email}
 {f"Tel:   {order.buyer_phone}" if order.buyer_phone else ""}
 {f"WhatsApp: {wa_url}" if wa_url else ""}
 
-Spedizione
-----------
+Ritiro al locker InPost
+-----------------------
+{order.inpost_point_name or "(nome non disponibile)"}
+Codice punto: {order.inpost_point_id or "—"}
 {order.ship_street}
 {order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}
 {order.ship_country}
@@ -234,15 +238,24 @@ Articoli
 Totali
 ------
 Subtotale:  € {float(order.subtotal):.2f}
-Spedizione: € {float(order.shipping_total):.2f}{" (CONSEGNA A MANO)" if order.hand_exchange else ""}
+Spedizione: € {float(order.shipping_total):.2f}{f" (di cui assicurazione € {float(order.insurance_fee):.2f})" if order.insured and order.insurance_fee else " — ASSICURATA" if order.insured else ""}
 TOTALE:     € {float(order.grand_total):.2f} {order.currency}
 
 {f"Note: {order.notes}" if order.notes else ""}
 
-Pagamento PayPal: {paypal_url or "vedi paypal.me/DanieleBucchi"}
-(Il compratore e' stato istruito di scegliere "A un amico o familiare"
-su PayPal per evitare le commissioni — controlla che lo abbia fatto
-prima di marcare l'ordine come PAID.)
+Crea la spedizione su Packlink: https://pro.packlink.it/private/shipments/new
+
+Dati destinatario da incollare
+------------------------------
+Nome:      {order.buyer_name}
+Indirizzo: {order.ship_street}
+CAP:       {order.ship_postal_code}
+Citta':    {order.ship_city}
+Provincia: {order.ship_province or "-"}
+Paese:     {order.ship_country}
+Telefono:  {order.buyer_phone or "NON FORNITO"}
+Email:     {order.buyer_email}
+Assicurazione: {"SI - valore " + f"{float(order.subtotal):.2f} EUR" if order.insured else "no"}
 
 Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
 """
@@ -272,8 +285,10 @@ Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
     </a>''' if wa_url else ''}
   </div>
 
-  <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">Spedizione</h3>
+  <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">Ritiro al locker InPost</h3>
   <address style="background:#fbf7f4; padding:10px 14px; border-radius:8px; font-style:normal;">
+    <strong>{order.inpost_point_name or "(nome non disponibile)"}</strong><br>
+    <code style="background:#eee; padding:1px 5px; border-radius:4px;">{order.inpost_point_id or "—"}</code><br>
     {order.ship_street}<br>
     {order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}<br>
     {order.ship_country}
@@ -287,7 +302,7 @@ Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
   <table style="margin-top:12px;">
     <tr><td>Subtotale</td><td style="text-align:right; padding-left:24px;">€ {float(order.subtotal):.2f}</td></tr>
     <tr>
-      <td>Spedizione{' <strong style="color:#7a4ca8;">(consegna a mano)</strong>' if order.hand_exchange else ''}</td>
+      <td>Spedizione{' <strong style="color:#7dd1b8;">🛡 assicurata</strong>' if order.insured else ''}</td>
       <td style="text-align:right; padding-left:24px;">€ {float(order.shipping_total):.2f}</td>
     </tr>
     <tr style="font-weight:bold; font-size:1.1em; color:#e879a8;">
@@ -295,22 +310,30 @@ Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
       <td style="text-align:right; padding-left:24px;">€ {float(order.grand_total):.2f} {order.currency}</td>
     </tr>
   </table>
-  {f'<p style="background:#a890d8/20; border-left:3px solid #a890d8; padding:8px 12px; margin-top:10px;">🤝 <strong>Consegna a mano</strong> richiesta dal compratore (zona Livorno/Pisa). Niente spedizione, mettiti d&apos;accordo via email/WhatsApp.</p>' if order.hand_exchange else ''}
 
   {f'<h3 style="color:#3d2a5c;">Note compratore</h3><pre style="white-space:pre-wrap; background:#fbf7f4; padding:12px; border-radius:8px;">{order.notes}</pre>' if order.notes else ""}
 
   <hr>
+  <h3 style="color:#3d2a5c;">Spedizione</h3>
   <p>
-    <a href="{paypal_url}" style="display:inline-block; background:#ffc439; color:#003087; padding:10px 18px; border-radius:999px; text-decoration:none; font-weight:bold;">
-      Apri il link PayPal del compratore
+    <a href="https://pro.packlink.it/private/shipments/new"
+       style="display:inline-block; background:#7dd1b8; color:#15322a; padding:10px 18px; border-radius:999px; text-decoration:none; font-weight:bold;">
+      📦 Crea la spedizione su Packlink
     </a>
   </p>
-  <p style="font-size:0.85em; background:#ffc439/20; border-left:3px solid #ffc439; padding:8px 12px; color:#3d2a5c;">
-    💡 Il compratore è stato istruito di scegliere
-    <strong>&quot;A un amico o familiare&quot;</strong> su PayPal per evitare le
-    commissioni. Verifica che il pagamento ricevuto sia di questo tipo prima
-    di marcare l&apos;ordine come PAID.
+  <p style="font-size:0.85em; color:#888; margin-top:-4px;">
+    Packlink non accetta i dati dal link: il riquadro qui sotto è fatto per
+    essere selezionato e incollato campo per campo.
   </p>
+  <pre style="background:#fbf7f4; border:1px solid #e7e0f0; border-radius:8px; padding:12px; font-size:0.85em; line-height:1.6; white-space:pre-wrap; color:#3d2a5c;">Nome:      {order.buyer_name}
+Indirizzo: {order.ship_street}
+CAP:       {order.ship_postal_code}
+Città:     {order.ship_city}
+Provincia: {order.ship_province or "-"}
+Paese:     {order.ship_country}
+Telefono:  {order.buyer_phone or "NON FORNITO"}
+Email:     {order.buyer_email}</pre>
+  {f'<p style="background:#e0f5ec; border-left:3px solid #7dd1b8; padding:8px 12px; font-size:0.9em;">🛡 <strong>Spedizione assicurata</strong> — il compratore ha pagato il premio ({float(order.insurance_fee):.2f} €). Dichiara un valore di <strong>{float(order.subtotal):.2f} €</strong> quando compri l&apos;etichetta.</p>' if order.insured else '<p style="font-size:0.85em; color:#888;">Spedizione non assicurata: il compratore non l&apos;ha richiesta.</p>'}
   <p style="font-size: 0.85em; color: #888;">
     Stato: <strong>PENDING</strong> — conferma il pagamento ricevuto da
     <code>/admin/ordini/{order.id}</code>

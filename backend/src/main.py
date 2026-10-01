@@ -13,6 +13,7 @@ import os
 
 from utils.limiter import limiter
 
+from api.address import router as address_router
 from api.alerts import router as alerts_router
 from api.articles import router as articles_router
 from api.auth import router as auth_router
@@ -23,6 +24,7 @@ from api.expenses import router as expenses_router
 from api.categories import router as categories_router
 from api.dashboard import router as dashboard_router
 from api.ebay import router as ebay_router
+from api.inpost import router as inpost_router
 from api.inquiries import router as inquiries_router
 from api.inventory import router as inventory_router
 from api.lots import router as lots_router
@@ -30,6 +32,7 @@ from api.marketplace_fees import router as marketplace_fees_router
 from api.platforms import router as platforms_router
 from api.misc_sales import router as misc_sales_router
 from api.orders import router as orders_router
+from api.paypal import router as paypal_router
 from api.personal_cards import router as personal_cards_router
 from api.settings import router as settings_router
 from api.stripe import router as stripe_router
@@ -92,10 +95,13 @@ app.include_router(dashboard_router)
 app.include_router(vinted_router)
 app.include_router(settings_router)
 app.include_router(alerts_router)
+app.include_router(address_router)
 app.include_router(cardtrader_router)
 app.include_router(ebay_router)
 app.include_router(vinted_pro_router)
 app.include_router(stripe_router)
+app.include_router(paypal_router)
+app.include_router(inpost_router)
 
 
 # Static files (uploaded images)

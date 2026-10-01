@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { MarketplaceLogo } from "@/components/MarketplaceLogo";
 import { PurchaseDialog } from "@/components/PurchaseDialog";
-import { useCart } from "@/lib/cart";
+import { FREE_SHIPPING_FROM, shippingFor, useCart } from "@/lib/cart";
 import { useSettings, whatsappUrl } from "@/lib/settings-context";
 import type { Article } from "@/lib/types";
 
@@ -22,15 +22,12 @@ interface Props {
 export function BuyControls({ article }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { has, toggle } = useCart();
-  const {
-    paymentsEnabled,
-    paypalMe,
-    contactWhatsapp,
-    handExchangeCities,
-  } = useSettings();
-  const paypalEnabled = paypalMe.length > 0;
-  const ship = article.shipping_price ? Number(article.shipping_price) : 5;
-  const grandTotal = Number(article.price || 0) + ship;
+  const { paymentsEnabled, contactWhatsapp } = useSettings();
+  // Spedizione a scaglioni sul prezzo: comprando questo pezzo da solo e'
+  // questa, ma nel carrello cambia col totale (e sopra i 200 € sparisce).
+  const price = Number(article.price || 0);
+  const ship = shippingFor(price);
+  const grandTotal = price + ship;
   const inCart = has(article.id);
 
   const waText = `Ciao! Sono interessato a "${article.title}" — ${
@@ -83,14 +80,14 @@ export function BuyControls({ article }: Props) {
           </a>
         )}
 
-        {paymentsEnabled && paypalEnabled && article.status === "PUBLISHED" && (
+        {paymentsEnabled && article.status === "PUBLISHED" && (
           <button
             type="button"
             onClick={() => setDialogOpen(true)}
-            aria-label={`Acquista questo articolo via PayPal a ${grandTotal.toFixed(2)} euro`}
-            className="btn btn-paypal text-sm font-bold px-4 py-2.5 inline-flex items-center gap-2"
+            aria-label={`Acquista questo articolo a ${grandTotal.toFixed(2)} euro`}
+            className="btn btn-primary text-sm font-bold px-4 py-2.5 inline-flex items-center gap-2"
           >
-            <span>Paga € {grandTotal.toFixed(2)} su PayPal</span>
+            <span>Acquista € {grandTotal.toFixed(2)}</span>
             <span aria-hidden="true">→</span>
           </button>
         )}
@@ -111,37 +108,23 @@ export function BuyControls({ article }: Props) {
       </div>
 
       <p className="text-xs text-ink-soft mt-2">
-        Prezzo: € {Number(article.price).toFixed(2)}
+        Prezzo: € {price.toFixed(2)}
         {paymentsEnabled && (
           <>
             {" "}·{" "}
-            <strong className="text-ink">Spedizione: € {ship.toFixed(2)}</strong>{" "}
+            <strong className="text-ink">
+              Spedizione:{" "}
+              {ship === 0 ? "gratis" : `€ ${ship.toFixed(2)}`}
+            </strong>{" "}
             · totale € {grandTotal.toFixed(2)}
           </>
         )}
       </p>
-      {paymentsEnabled && paypalEnabled && article.status === "PUBLISHED" && (
-        <>
-          <div className="mt-3 inline-flex items-center gap-2 text-xs rounded-full bg-white text-ink px-3 py-1.5 font-semibold ring-2 ring-mint-deep shadow-soft">
-            <span aria-hidden="true" className="text-base">🤝</span>
-            <span>
-              Consegna a mano <strong className="text-mint-deep">gratuita</strong>{" "}
-              a {handExchangeCities}
-              <span className="font-normal text-ink-soft ml-1">
-                (no spedizione)
-              </span>
-            </span>
-          </div>
-          <p className="text-[11px] text-ink-soft mt-2 leading-snug">
-            💡 Su PayPal scegli{" "}
-            <strong className="text-[#003087]">
-              &quot;Amico o familiare&quot;
-            </strong>{" "}
-            per evitare le commissioni.
-          </p>
-        </>
+      {paymentsEnabled && article.status === "PUBLISHED" && ship > 0 && (
+        <p className="text-[11px] text-mint-deep font-semibold mt-1.5 leading-snug">
+          🚚 Spedizione gratuita per ordini da € {FREE_SHIPPING_FROM.toFixed(2)}
+        </p>
       )}
-
       {paymentsEnabled && (
         <PurchaseDialog
           open={dialogOpen}

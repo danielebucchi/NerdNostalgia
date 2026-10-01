@@ -30,6 +30,8 @@ export interface MarketplaceFee {
   marketplace: string;
   category_id: number | null;
   markup_percent: string;
+  /** Quota fissa a transazione (gateway di pagamento). "0" sui marketplace. */
+  fixed_fee: string;
   note: string | null;
   created_at: string;
   updated_at: string;
@@ -37,13 +39,12 @@ export interface MarketplaceFee {
 
 export interface Article {
   id: number;
+  /** Ordine in attesa su questo pezzo: non venduto, ma fuori dal catalogo. */
+  reserved?: boolean;
   user_id: number;
   title: string;
   description: string | null;
   price: string;
-  // Costo spedizione mostrato al cliente (somma a price nel link PayPal).
-  // Diverso da shipping_cost (= spesa sostenuta lato inventario per profit calc).
-  shipping_price: string | null;
   currency: string;
   // Inventory tracking
   lotto: string | null;

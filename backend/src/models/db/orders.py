@@ -51,7 +51,8 @@ class Order(BaseModel):
     currency = Column(String(3), nullable=False, default="EUR")
 
     notes = Column(Text)
-    # Scambio a mano (LI/PI): se True, shipping_total e' 0.
+    # Scambio a mano: offerta ritirata dal sito. Resta per gli ordini storici
+    # (l'admin mostra ancora il badge); i nuovi ordini sono sempre False.
     hand_exchange = Column(Boolean, nullable=False, default=False)
     status = Column(
         PgEnum(OrderStatus, name="order_status", create_type=False),
@@ -69,6 +70,27 @@ class Order(BaseModel):
     # Stripe Checkout
     stripe_session_id = Column(String(120))
     stripe_payment_intent = Column(String(120))
+
+    # Token opaco generato alla creazione: con (id + token) il compratore puo'
+    # leggere lo stato del proprio ordine senza autenticarsi, e il carrello
+    # sa quando svuotarsi. Non va mai mostrato nelle liste pubbliche.
+    public_token = Column(String(64))
+
+    # PayPal Orders v2 (bottoni ufficiali)
+    paypal_order_id = Column(String(64))
+    paypal_capture_id = Column(String(64))
+
+    # Locker InPost: id del punto (es. "IT12345") e descrizione leggibile.
+    # I campi ship_* contengono l'indirizzo del locker, che e' la vera
+    # destinazione della spedizione.
+    inpost_point_id = Column(String(64))
+    inpost_point_name = Column(String(255))
+
+    # Assicurazione: scelta del compratore + quanto gli e' costata. La cifra
+    # la salviamo perche' le tariffe cambiano e l'ordine deve restare
+    # leggibile fra un anno.
+    insured = Column(Boolean, nullable=False, default=False)
+    insurance_fee = Column(Numeric(10, 2), nullable=False, default=0)
 
     items = relationship(
         "OrderItem",

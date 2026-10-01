@@ -18,6 +18,8 @@ class MarketplaceFee(BaseModel):
         index=True,
     )
     markup_percent = Column(Numeric(5, 2), nullable=False)
+    # Quota fissa a transazione (es. 0.35 per PayPal). Zero sui marketplace.
+    fixed_fee = Column(Numeric(10, 2), nullable=False, default=0)
     note = Column(String(255))
 
     category = relationship("Category", foreign_keys=[category_id])
