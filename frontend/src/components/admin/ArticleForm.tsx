@@ -7,7 +7,14 @@ import { CategoryPicker } from "@/components/admin/CategoryPicker";
 import { Sortable } from "@/components/admin/Sortable";
 import { calcMarkup } from "@/components/admin/MarketplaceSyncBox";
 import { useCategories } from "@/lib/useCategories";
-import { getMarkupsFromFees, useMarketplaceFees } from "@/lib/useMarketplaceFees";
+import {
+  getMarkupsFromFees,
+  grossUpPrice,
+  netAfterFee,
+  resolveFee,
+  SITE_MARKETPLACE,
+  useMarketplaceFees,
+} from "@/lib/useMarketplaceFees";
 import type {
   Article,
   ArticleCondition,
@@ -67,7 +74,6 @@ interface FormState {
   title: string;
   description: string;
   price: string;
-  shipping_price: string;
   currency: string;
   category_id: number | null;
   condition: ArticleCondition;
@@ -97,7 +103,6 @@ const empty: FormState = {
   title: "",
   description: "",
   price: "",
-  shipping_price: "5.00",
   currency: "EUR",
   category_id: null,
   condition: "USED",
@@ -127,7 +132,6 @@ function toForm(article: Article): FormState {
     title: article.title,
     description: article.description ?? "",
     price: String(article.price ?? ""),
-    shipping_price: article.shipping_price ?? "",
     currency: article.currency ?? "EUR",
     category_id: article.category_id ?? null,
     condition: article.condition,
@@ -220,8 +224,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
         title: state.title.trim(),
         description: state.description.trim() || null,
         price: Number(state.price),
-        shipping_price: state.shipping_price.trim() ? Number(state.shipping_price) : null,
-        currency: state.currency.trim().toUpperCase(),
+            currency: state.currency.trim().toUpperCase(),
         category_id: state.category_id,
         condition: state.condition,
         quantity: Number(state.quantity),
@@ -364,23 +367,11 @@ export function ArticleForm({ initial, onSaved }: Props) {
         </Field>
       </Row>
 
-      <Row>
-        <Field
-          label="Spedizione richiesta al cliente"
-          full
-          hint="Sommata al prezzo nel link PayPal. Lascia vuoto per 'da concordare'."
-        >
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="es. 5.00"
-            value={state.shipping_price}
-            onChange={(e) => set("shipping_price", e.target.value)}
-            className="input"
-          />
-        </Field>
-      </Row>
+      <SiteFeeHint
+        price={state.price}
+        categoryId={state.category_id}
+        onApply={(v) => set("price", v)}
+      />
 
       <Row>
         <div className="col-span-full">
@@ -987,6 +978,69 @@ function MarketplacePicker({
             />
           </label>
         </div>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * Quanto resta in tasca vendendo dal sito, e a quanto bisogna vendere per
+ * incassare la cifra scritta nel campo prezzo.
+ *
+ * Compare solo se in /admin/markups esiste una commissione per il canale
+ * "sito": senza configurazione non inventiamo percentuali, perche' le aliquote
+ * vere stanno sul contratto del gateway e variano per account.
+ */
+function SiteFeeHint({
+  price,
+  categoryId,
+  onApply,
+}: {
+  price: string;
+  categoryId: number | null;
+  onApply: (value: string) => void;
+}) {
+  const { fees } = useMarketplaceFees();
+  const { byId } = useCategories();
+  const parentId = categoryId != null ? byId[categoryId]?.parent_id ?? null : null;
+  const fee = resolveFee(fees, SITE_MARKETPLACE, categoryId, parentId);
+
+  const value = Number(price);
+  if (!fee || !Number.isFinite(value) || value <= 0) return null;
+
+  const net = netAfterFee(value, fee);
+  const gross = grossUpPrice(value, fee);
+  if (net == null || gross == null) return null;
+
+  const feeLabel =
+    `${fee.percent}%` + (fee.fixed > 0 ? ` + € ${fee.fixed.toFixed(2)}` : "");
+
+  return (
+    <div className="rounded-xl bg-mint-soft/50 ring-1 ring-mint-deep/30 px-3 py-2.5 text-sm leading-snug -mt-2 mb-1">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span>
+          Commissione sito <strong>{feeLabel}</strong>
+        </span>
+        <span>
+          A € {value.toFixed(2)} incassi <strong>€ {net.toFixed(2)}</strong>
+        </span>
+        <span>
+          Per incassarne € {value.toFixed(2)} vendi a{" "}
+          <strong className="text-mint-deep">€ {gross.toFixed(2)}</strong>
+        </span>
+        <button
+          type="button"
+          onClick={() => onApply(gross.toFixed(2))}
+          className="btn btn-ghost text-xs px-3 py-1"
+        >
+          Applica € {gross.toFixed(2)}
+        </button>
+      </div>
+      {net <= 0 && (
+        <p className="text-pink-deep mt-1">
+          ⚠ A questo prezzo la commissione si mangia tutto: alza il prezzo.
+        </p>
       )}
     </div>
   );

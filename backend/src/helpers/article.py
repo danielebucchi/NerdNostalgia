@@ -44,9 +44,14 @@ class ArticleHelper(BaseHelper):
         min_price: Optional[Decimal] = None,
         max_price: Optional[Decimal] = None,
         search: Optional[str] = None,
+        include_reserved: bool = False,
     ) -> Tuple[List[Article], int]:
         query = self.db.query(Article)
 
+        # Gli articoli prenotati da un ordine in attesa non si vedono sul
+        # sito: l'admin invece deve poterli vedere, per confermare o annullare.
+        if not include_reserved:
+            query = query.filter(Article.reserved_order_id.is_(None))
         if status is not None:
             query = query.filter(Article.status == status)
         if category_ids:

@@ -42,19 +42,6 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "label": "Email di contatto",
         "help": "Mostrata nelle pagine pubbliche (privacy, contatti).",
     },
-    "hand_exchange_cap_prefixes": {
-        "default": "56,57",
-        "public": True,
-        "label": "Prefissi CAP consegna a mano",
-        "help": "Prime 2 cifre dei CAP abilitati, separate da virgola "
-                "(56=Pisa, 57=Livorno).",
-    },
-    "hand_exchange_cities": {
-        "default": "Livorno/Pisa",
-        "public": True,
-        "label": "Zone consegna a mano (testo)",
-        "help": "Testo mostrato nel badge sull'articolo e nel carrello.",
-    },
     "article_description_footer": {
         "default": "Spedizione veloce",
         "public": True,

@@ -9,6 +9,8 @@ import { WishlistNavLink } from "@/components/WishlistNavLink";
 const TOPBAR_MESSAGES = [
   "Compro · Vendo · Scambio",
   "Videogiochi, carte Pokémon, Funko & nerderie",
+  // Soglia allineata a FREE_SHIPPING_FROM in lib/cart.ts
+  "🚚 Spedizione GRATUITA per ordini da 250 €",
   "Spedizioni in tutta Italia",
 ];
 

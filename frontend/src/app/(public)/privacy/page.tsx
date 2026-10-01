@@ -141,6 +141,15 @@ export default function PrivacyPage() {
           <li>
             il provider del servizio email usato per ricevere i messaggi.
           </li>
+          <li>
+            <strong>Geoapify</strong> (server nell&apos;Unione Europea), che
+            riceve solo quello che scrivi nel campo indirizzo del checkout, per
+            proporti i suggerimenti di completamento. Non riceve il tuo nome,
+            la tua email né l&apos;ordine: solo il testo parziale
+            dell&apos;indirizzo mentre lo digiti. Se preferisci evitarlo, puoi
+            scrivere l&apos;indirizzo per intero senza scegliere nessun
+            suggerimento.
+          </li>
         </ul>
         <p>
           Entrambi agiscono come <em>responsabili del trattamento</em> ai sensi

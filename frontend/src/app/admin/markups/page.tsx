@@ -11,7 +11,9 @@ interface FeeListResp {
   total: number;
 }
 
-const MARKETPLACES = ["vinted", "ebay"] as const;
+// "sito" = vendita diretta dal nostro sito: la commissione e' quella del
+// gateway di pagamento (PayPal/Stripe), che ha anche una quota fissa.
+const MARKETPLACES = ["vinted", "ebay", "sito"] as const;
 
 export default function AdminMarkupsPage() {
   const { flat: categories, byId: catById } = useCategories();
@@ -24,6 +26,7 @@ export default function AdminMarkupsPage() {
   const [marketplace, setMarketplace] = useState<string>("ebay");
   const [categoryId, setCategoryId] = useState<string>(""); // "" = default (NULL)
   const [percent, setPercent] = useState("");
+  const [fixedFee, setFixedFee] = useState("");
   const [note, setNote] = useState("");
 
   async function reload() {
@@ -52,10 +55,12 @@ export default function AdminMarkupsPage() {
         marketplace,
         category_id: categoryId === "" ? null : Number(categoryId),
         markup_percent: Number(percent),
+        fixed_fee: fixedFee.trim() === "" ? 0 : Number(fixedFee),
         note: note.trim() || null,
       });
       setCategoryId("");
       setPercent("");
+      setFixedFee("");
       setNote("");
       await reload();
     } catch (err) {
@@ -103,6 +108,15 @@ export default function AdminMarkupsPage() {
         Preset di maggiorazione che appaiono come bottoncini sotto al campo prezzo
         di Vinted ed eBay. Categoria <code>vuota</code> = default per quel marketplace.
       </p>
+      <div className="card p-4 mb-6 text-sm leading-snug bg-sky-soft/40 ring-1 ring-sky-deep/30">
+        <strong>&laquo;sito&raquo;</strong> è la vendita diretta da
+        nerdnostalgia.store: lì la commissione è quella del gateway di pagamento,
+        che oltre alla percentuale ha una <strong>quota fissa per
+        transazione</strong>. Mettile entrambe, altrimenti sugli articoli da
+        pochi euro il conto esce sotto (su 8&nbsp;€ una fissa da 0,35&nbsp;€ pesa
+        più della percentuale). Le percentuali esatte sono sul contratto del tuo
+        account PayPal/Stripe: copiale da lì, non fidarti dei valori di listino.
+      </div>
 
       {error && (
         <div className="card p-4 mb-4 text-pink-deep font-semibold">⚠ {error}</div>
@@ -110,7 +124,7 @@ export default function AdminMarkupsPage() {
 
       <form onSubmit={handleCreate} className="card p-5 mb-8">
         <h2 className="display text-lg text-ink mb-3">+ Nuovo markup</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <label className="block">
             <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
               Marketplace
@@ -151,6 +165,20 @@ export default function AdminMarkupsPage() {
               value={percent}
               onChange={(e) => setPercent(e.target.value)}
               placeholder="11.00"
+              className="input mt-1"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+              Quota fissa €
+            </span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={fixedFee}
+              onChange={(e) => setFixedFee(e.target.value)}
+              placeholder="0.35"
               className="input mt-1"
             />
           </label>
@@ -262,13 +290,15 @@ function FeeRow({
     fee.category_id != null ? String(fee.category_id) : "",
   );
   const [percent, setPercent] = useState(fee.markup_percent);
+  const [fixedFee, setFixedFee] = useState(fee.fixed_fee ?? "0");
   const [note, setNote] = useState(fee.note ?? "");
 
   const currentCatId = categoryId === "" ? null : Number(categoryId);
   const dirtyCat = currentCatId !== fee.category_id;
   const dirtyPercent = percent !== fee.markup_percent;
+  const dirtyFixed = Number(fixedFee || 0) !== Number(fee.fixed_fee ?? 0);
   const dirtyNote = (note.trim() || null) !== fee.note;
-  const anyDirty = dirtyCat || dirtyPercent || dirtyNote;
+  const anyDirty = dirtyCat || dirtyPercent || dirtyFixed || dirtyNote;
 
   const labelPreview = useMemo(
     () => categoryLabel(catById, currentCatId),
@@ -279,12 +309,13 @@ function FeeRow({
     const payload: Record<string, unknown> = {};
     if (dirtyCat) payload.category_id = currentCatId;
     if (dirtyPercent) payload.markup_percent = Number(percent);
+    if (dirtyFixed) payload.fixed_fee = Number(fixedFee || 0);
     if (dirtyNote) payload.note = note.trim() || null;
     onSave(payload);
   }
 
   return (
-    <div className="card p-3 grid sm:grid-cols-[1.5fr_1fr_2fr_auto] items-center gap-2">
+    <div className="card p-3 grid sm:grid-cols-[1.5fr_1fr_1fr_2fr_auto] items-center gap-2">
       <div>
         <select
           value={categoryId}
@@ -307,6 +338,18 @@ function FeeRow({
           className="input"
         />
         <span className="text-ink-soft">%</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-ink-soft">+€</span>
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={fixedFee}
+          onChange={(e) => setFixedFee(e.target.value)}
+          className="input"
+          title="Quota fissa per transazione"
+        />
       </div>
       <input
         type="text"

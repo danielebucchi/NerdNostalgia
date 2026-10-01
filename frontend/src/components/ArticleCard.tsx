@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Article } from "@/lib/types";
 import { formatPrice } from "@/lib/api";
 import { CardImageCarousel } from "@/components/CardImageCarousel";
+import { CartButton } from "@/components/CartButton";
 import { MarketplaceLogo } from "@/components/MarketplaceLogo";
 import { WishlistButton } from "@/components/WishlistButton";
 import { thumbUrlsFor } from "@/lib/images";
@@ -42,9 +43,14 @@ export function ArticleCard({ article }: { article: Article }) {
           {CONDITION_LABEL[article.condition]}
         </span>
 
-        {/* Wishlist: in alto a destra */}
-        <div className="absolute top-2 right-2">
+        {/* Wishlist + carrello: colonna in alto a destra. Il carrello si
+            nasconde da solo se i pagamenti sono spenti o l'articolo e' venduto. */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1.5">
           <WishlistButton articleId={article.id} variant="icon" />
+          <CartButton
+            articleId={article.id}
+            purchasable={article.status === "PUBLISHED"}
+          />
         </div>
 
         {/* Marketplace: pillole compatte uniformi in basso a sinistra. */}

@@ -63,6 +63,9 @@ def _mark_paid(db: Session, order_id: int, payment_intent) -> None:
     if payment_intent:
         order.stripe_payment_intent = payment_intent
     db.commit()
+    # I pezzi passano da "prenotati" a VENDUTI
+    from helpers.reservation import mark_sold
+    mark_sold(db, order)
     LOGGER.info("Ordine %s marcato PAID via Stripe", order_id)
     try:
         from utils.email import send_order_notification

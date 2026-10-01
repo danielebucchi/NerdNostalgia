@@ -117,38 +117,3 @@ def test_publish_triggers_notification(client, admin_headers, admin_user, catego
     sent.clear()
     client.post(f"/api/articles/{art['id']}/publish", headers=admin_headers)
     assert sent == []
-
-
-def test_orders_cap_prefixes_from_settings(client, admin_headers, admin_user):
-    """Cambiare hand_exchange_cap_prefixes dalle settings cambia la validazione."""
-    art = client.post(
-        "/api/articles/",
-        headers=admin_headers,
-        json={
-            "user_id": admin_user.id,
-            "title": "Gioco", "price": 10, "currency": "EUR",
-            "condition": "USED", "status": "PUBLISHED", "quantity": 1,
-        },
-    ).json()
-
-    def order_payload(cap):
-        return {
-            "buyer_name": "Mario", "buyer_email": "mario@test.it",
-            "ship_street": "Via Roma 1", "ship_city": "Lucca",
-            "ship_postal_code": cap, "hand_exchange": True,
-            "items": [{"article_id": art["id"], "quantity": 1}],
-        }
-
-    # CAP 55xxx (Lucca) non abilitato di default
-    r = client.post("/api/orders/", json=order_payload("55100"))
-    assert r.status_code == 400
-
-    # Abilito il prefisso 55 dalle settings
-    client.put(
-        "/api/settings/",
-        headers=admin_headers,
-        json={"values": {"hand_exchange_cap_prefixes": "55,56,57"}},
-    )
-    r = client.post("/api/orders/", json=order_payload("55100"))
-    assert r.status_code == 201, r.text
-    assert float(r.json()["shipping_total"]) == 0.0
