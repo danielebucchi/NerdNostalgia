@@ -58,6 +58,21 @@ services:
       # Stripe Checkout (pagamento carta). In prod dal vault. Test mode = sk_test_.
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      # Suggerimenti indirizzo al checkout (Geoapify). Chiave solo server-side:
+      # il browser passa da /api/address/autocomplete. Vuota = campo a mano.
+      - GEOAPIFY_API_KEY=${GEOAPIFY_API_KEY:-}
+      - ADDRESS_COUNTRY_CODES=${ADDRESS_COUNTRY_CODES:-it}
+      # PayPal Orders v2 (bottoni ufficiali). Default sandbox: in produzione
+      # va messo esplicitamente PAYPAL_ENV=live.
+      - PAYPAL_ENV=${PAYPAL_ENV:-sandbox}
+      - PAYPAL_CLIENT_ID=${PAYPAL_CLIENT_ID:-}
+      - PAYPAL_CLIENT_SECRET=${PAYPAL_CLIENT_SECRET:-}
+      - PAYPAL_WEBHOOK_ID=${PAYPAL_WEBHOOK_ID:-}
+      # Mappa locker InPost (Geowidget). Token PUBBLICO ma legato al dominio:
+      # uno per localhost, uno per il dominio di produzione.
+      - INPOST_GEOWIDGET_TOKEN=${INPOST_GEOWIDGET_TOKEN:-}
+      - INPOST_WIDGET_BASE=${INPOST_WIDGET_BASE:-}
+      - INPOST_WIDGET_LANGUAGE=${INPOST_WIDGET_LANGUAGE:-en}
       # Backup S3/R2 (opzionali)
       - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
       - BACKUP_S3_ENDPOINT=${BACKUP_S3_ENDPOINT:-}

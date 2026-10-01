@@ -12,7 +12,7 @@ def test_public_settings_returns_defaults(client):
     # Le admin-only NON devono uscire
     assert "marketplace_footer_vinted" not in body
     # Default effettivi
-    assert body["hand_exchange_cap_prefixes"] == "56,57"
+    assert body["article_description_footer"] == "Spedizione veloce"
     assert body["contact_email"] == "nerdnostalgiaita@gmail.com"
 
 
@@ -56,14 +56,14 @@ def test_empty_value_falls_back_to_default(client, admin_headers):
     client.put(
         "/api/settings/",
         headers=admin_headers,
-        json={"values": {"hand_exchange_cap_prefixes": "50,51"}},
+        json={"values": {"article_description_footer": "Spedizione lenta"}},
     )
-    assert client.get("/api/settings/public").json()["hand_exchange_cap_prefixes"] == "50,51"
+    assert client.get("/api/settings/public").json()["article_description_footer"] == "Spedizione lenta"
 
     # Svuotare = tornare al default
     client.put(
         "/api/settings/",
         headers=admin_headers,
-        json={"values": {"hand_exchange_cap_prefixes": ""}},
+        json={"values": {"article_description_footer": ""}},
     )
-    assert client.get("/api/settings/public").json()["hand_exchange_cap_prefixes"] == "56,57"
+    assert client.get("/api/settings/public").json()["article_description_footer"] == "Spedizione veloce"

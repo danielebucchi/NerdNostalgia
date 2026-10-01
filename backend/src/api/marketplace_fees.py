@@ -24,6 +24,7 @@ def _to_response(fee: MarketplaceFee) -> MarketplaceFeeResponse:
         marketplace=fee.marketplace,
         category_id=fee.category_id,
         markup_percent=fee.markup_percent,
+        fixed_fee=fee.fixed_fee or 0,
         note=fee.note,
         created_at=fee.created_at.isoformat() if fee.created_at else None,
         updated_at=fee.updated_at.isoformat() if fee.updated_at else None,
@@ -54,6 +55,7 @@ def create_fee(
         marketplace=payload.marketplace.strip().lower(),
         category_id=payload.category_id,
         markup_percent=payload.markup_percent,
+        fixed_fee=payload.fixed_fee,
         note=payload.note.strip() if payload.note else None,
     )
     helper.save(fee)

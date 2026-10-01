@@ -4,7 +4,18 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PurchaseDialog } from "@/components/PurchaseDialog";
 import { formatPrice, getArticle } from "@/lib/api";
-import { aggregateShipping, cartSubtotal, useCart } from "@/lib/cart";
+import {
+  baseShippingFor,
+  cartSubtotal,
+  defaultInsured,
+  FREE_SHIPPING_FROM,
+  INSURANCE_FEE,
+  insuranceFeeFor,
+  insuranceIsIncluded,
+  INSURED_BY_DEFAULT_FROM,
+  missingForFreeShipping,
+  useCart,
+} from "@/lib/cart";
 import { useSettings } from "@/lib/settings-context";
 import type { Article } from "@/lib/types";
 
@@ -37,13 +48,17 @@ export default function CartPage() {
 
 function CartContent() {
   const { items, remove, clear, hydrated } = useCart();
-  const { paypalMe, handExchangeCapPrefixes, handExchangeCities } = useSettings();
-  const paypalConfigured = paypalMe.length > 0;
-  const capZonesLabel = handExchangeCapPrefixes.map((p) => `${p}xxx`).join(" / ");
+
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Assicurazione: default della fascia, poi decide il compratore. Il totale
+  // qui accanto si aggiorna all'istante.
+  const [insured, setInsured] = useState(false);
+  // Finche' non la tocca il compratore, la casella segue il default della
+  // fascia: aggiungendo articoli e superando i 50 € si spunta da sola.
+  const [insuredTouched, setInsuredTouched] = useState(false);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -67,7 +82,11 @@ function CartContent() {
           .filter((it) => !validIds.has(it.article_id))
           .forEach((it) => remove(it.article_id));
 
-        setArticles(valid.filter((a) => a.status === "PUBLISHED"));
+        // Fuori i venduti e i prenotati da un ordine altrui: non si possono
+        // comprare, e lasciarli nel riepilogo illuderebbe il compratore.
+        setArticles(
+          valid.filter((a) => a.status === "PUBLISHED" && !a.reserved),
+        );
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
@@ -84,7 +103,16 @@ function CartContent() {
   }, [hydrated, items.length]);
 
   const subtotal = cartSubtotal(articles);
-  const shippingTotal = aggregateShipping(articles);
+  const insuranceIncluded = insuranceIsIncluded(subtotal);
+  const effectiveInsured = insuranceIncluded || insured;
+  const baseShipping = baseShippingFor(subtotal);
+  const insuranceCost = insuranceFeeFor(subtotal, effectiveInsured);
+  const shippingTotal = baseShipping + insuranceCost;
+  const missingForFree = missingForFreeShipping(subtotal);
+
+  useEffect(() => {
+    if (!insuredTouched) setInsured(defaultInsured(subtotal));
+  }, [subtotal, insuredTouched]);
   const grandTotal = subtotal + shippingTotal;
   const currency = articles[0]?.currency || "EUR";
 
@@ -188,14 +216,32 @@ function CartContent() {
                   <dt className="text-ink-soft">
                     Spedizione{" "}
                     <span
-                      title="Spedizione aggregata: prendiamo il valore più alto tra gli articoli (il pacco unico ottimizza i costi)."
+                      title={`Fino a 25 €: 6 €. Da 25,01 a 249,99 €: 6 € + 4% (max 12 €). Da ${FREE_SHIPPING_FROM} €: gratis. Assicurazione +${INSURANCE_FEE.toFixed(2)} €, proposta dai ${INSURED_BY_DEFAULT_FROM} € in su.`}
                       className="text-[10px] underline decoration-dotted cursor-help"
                     >
                       come si calcola?
                     </span>
                   </dt>
-                  <dd className="tabular-nums">€ {shippingTotal.toFixed(2)}</dd>
+                  <dd className="tabular-nums">
+                    {baseShipping === 0 ? (
+                      <strong className="text-mint-deep">GRATIS</strong>
+                    ) : (
+                      `€ ${baseShipping.toFixed(2)}`
+                    )}
+                  </dd>
                 </div>
+                {effectiveInsured && (
+                  <div className="flex justify-between">
+                    <dt className="text-ink-soft">🛡 Assicurazione</dt>
+                    <dd className="tabular-nums">
+                      {insuranceCost === 0 ? (
+                        <strong className="text-mint-deep">INCLUSA</strong>
+                      ) : (
+                        `€ ${insuranceCost.toFixed(2)}`
+                      )}
+                    </dd>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-lg text-pink-deep pt-2 border-t border-ink/10">
                   <dt>Totale</dt>
                   <dd className="tabular-nums">
@@ -204,39 +250,76 @@ function CartContent() {
                 </div>
               </dl>
 
-              {paypalConfigured ? (
-                <button
-                  type="button"
-                  onClick={() => setDialogOpen(true)}
-                  className="btn btn-paypal w-full mt-5 text-base font-bold px-6 py-3.5 inline-flex items-center justify-center gap-2"
-                >
-                  <span>Procedi al pagamento</span>
-                  <span aria-hidden="true">→</span>
-                </button>
-              ) : (
-                <p className="text-xs text-ink-soft mt-5 text-center">
-                  PayPal non configurato. Scrivimi per concordare il pagamento.
-                </p>
-              )}
+              <label
+                className={
+                  "mt-4 flex items-start gap-2.5 rounded-xl p-3 text-sm leading-snug transition-colors " +
+                  (effectiveInsured
+                    ? "bg-mint-soft/60 ring-1 ring-mint-deep/40"
+                    : "bg-ink/4 ring-1 ring-ink/10") +
+                  (insuranceIncluded ? " cursor-default" : " cursor-pointer")
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={effectiveInsured}
+                  disabled={insuranceIncluded}
+                  onChange={(e) => {
+                    setInsuredTouched(true);
+                    setInsured(e.target.checked);
+                  }}
+                  className="mt-0.5 w-5 h-5 flex-shrink-0 accent-mint-deep cursor-pointer disabled:cursor-default"
+                />
+                <span>
+                  <strong>🛡 Assicura la spedizione</strong>
+                  {insuranceIncluded ? (
+                    <span className="text-mint-deep"> — inclusa</span>
+                  ) : (
+                    <span className="text-ink-soft">
+                      {" "}
+                      (+ € {INSURANCE_FEE.toFixed(2)})
+                    </span>
+                  )}
+                  <span className="block text-xs text-ink-soft mt-1">
+                    {insuranceIncluded
+                      ? "Compresa su questo ordine."
+                      : "Senza, il corriere rimborsa solo 1 € al kg."}
+                  </span>
+                </span>
+              </label>
 
-              <p className="text-xs text-ink-soft mt-3 leading-snug">
-                Conferma indirizzo + dati, ti scrivo per finalizzare la
-                spedizione. Pagamento via PayPal.
-              </p>
-              {articles.length > 0 && (
-                <div className="text-[11px] rounded-lg bg-mint-deep/12 text-mint-deep px-3 py-2 mt-3 leading-snug ring-1 ring-mint-deep/30">
-                  🤝 <strong>Consegna a mano gratuita</strong> a {handExchangeCities}
-                  {" "}(CAP {capZonesLabel}). Scegli l&apos;opzione al checkout per
-                  azzerare la spedizione.
+              {missingForFree > 0 ? (
+                <div className="mt-4 rounded-xl bg-mint-soft/50 ring-1 ring-mint-deep/30 px-3 py-2.5 text-sm leading-snug">
+                  🚚 Aggiungi{" "}
+                  <strong className="text-mint-deep">
+                    € {missingForFree.toFixed(2)}
+                  </strong>{" "}
+                  e la spedizione diventa <strong>gratuita</strong> (da €{" "}
+                  {FREE_SHIPPING_FROM.toFixed(2)}).
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl bg-mint-deep/15 ring-1 ring-mint-deep/40 px-3 py-2.5 text-sm leading-snug">
+                  🎉 <strong className="text-mint-deep">Spedizione gratuita</strong>{" "}
+                  — hai superato i € {FREE_SHIPPING_FROM.toFixed(2)}.
                 </div>
               )}
-              {paypalConfigured && articles.length > 0 && (
-                <p className="text-[11px] text-[#003087] bg-[#ffc439]/20 rounded-lg px-3 py-2 mt-2 leading-snug">
-                  💡 Su PayPal seleziona{" "}
-                  <strong>&quot;A un amico o familiare&quot;</strong> per evitare le
-                  commissioni.
-                </p>
-              )}
+
+              <button
+                type="button"
+                onClick={() => setDialogOpen(true)}
+                className="btn btn-primary w-full mt-5 text-base font-bold px-6 py-3.5 inline-flex items-center justify-center gap-2"
+              >
+                <span>Procedi al pagamento</span>
+                <span aria-hidden="true">→</span>
+              </button>
+
+              <p className="text-xs text-ink-soft mt-3 leading-snug">
+                Inserisci i dati di consegna, poi paghi nella finestra sicura di
+                PayPal o con carta.
+              </p>
+              <p className="text-[11px] text-ink-soft mt-3 leading-snug">
+                Il carrello resta com&apos;è finché il pagamento non risulta
+                ricevuto: se qualcosa va storto non perdi la selezione.
+              </p>
             </div>
           </aside>
         </div>
@@ -247,7 +330,7 @@ function CartContent() {
         onClose={() => setDialogOpen(false)}
         articles={articles}
         shippingTotal={shippingTotal}
-        onSuccess={() => clear()}
+        initialInsured={effectiveInsured}
       />
     </article>
   );

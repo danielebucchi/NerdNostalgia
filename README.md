@@ -154,6 +154,8 @@ Copia `.env.example` in `.env` e personalizza. Le principali:
 | `BACKUP_S3_BUCKET` | empty | Se valorizzato, upload backup su S3/R2 |
 | `TZ` / `APP_TIMEZONE` | `Europe/Rome` | Timezone della macchina e dello scheduler |
 | `DISABLE_SCHEDULER` | empty | Set a `1` per disabilitare APScheduler |
+| `GEOAPIFY_API_KEY` | empty | Suggerimenti indirizzo al checkout. Vuota = campo a mano |
+| `ADDRESS_COUNTRY_CODES` | `it` | Paesi dei suggerimenti indirizzo (ISO, csv) |
 
 ## Dev tooling
 

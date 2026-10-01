@@ -152,6 +152,10 @@ export interface OrderCreateInput {
   buyer_name: string;
   buyer_email: string;
   buyer_phone?: string;
+  /** Locker di ritiro. Obbligatorio solo quando la mappa InPost e' attiva:
+   *  senza token il sito ripiega sulla consegna a domicilio. */
+  inpost_point_id?: string;
+  inpost_point_name?: string;
   ship_street: string;
   ship_city: string;
   ship_postal_code: string;
@@ -159,24 +163,10 @@ export interface OrderCreateInput {
   ship_country?: string;
   items: OrderItemInput[];
   notes?: string;
-  hand_exchange?: boolean;
+  /** Assicurazione spedizione scelta dal compratore. Omesso = default della
+   *  fascia (attiva dai 50 € in su). */
+  insured?: boolean;
   website?: string; // honeypot
-}
-
-/**
- * Helper condiviso fra dialog e badge UI: il CAP rientra nelle zone in cui
- * il venditore propone la consegna a mano. I prefissi arrivano dalle
- * settings runtime (useSettings().handExchangeCapPrefixes) e DEVONO restare
- * allineati al backend `_is_hand_exchange_eligible` in api/orders.py
- * (che legge la stessa setting).
- */
-export function isHandExchangeEligible(
-  postalCode: string,
-  prefixes: string[],
-): boolean {
-  const digits = postalCode.replace(/\D/g, "").slice(0, 5);
-  if (digits.length < 2) return false;
-  return prefixes.includes(digits.slice(0, 2));
 }
 
 export interface OrderConfirmation {
@@ -188,6 +178,8 @@ export interface OrderConfirmation {
   grand_total: string;
   currency: string;
   status: string;
+  /** Serve a interrogare /status senza autenticarsi. Da conservare in locale. */
+  public_token: string | null;
   items: Array<{
     id: number;
     article_id: number | null;
@@ -236,6 +228,140 @@ export async function createStripeCheckout(orderId: number): Promise<string> {
   }
   const data = await res.json();
   return data.url as string;
+}
+
+export interface OrderPublicStatus {
+  id: number;
+  status: string;
+  paid: boolean;
+  cancelled: boolean;
+}
+
+/**
+ * Stato di un ordine letto dal compratore (non autenticato): serve l'id piu'
+ * il token ricevuto alla creazione. Ritorna null se l'ordine non esiste o il
+ * token non corrisponde — il chiamante tratta null come "non so", non come
+ * "non pagato", per non buttare via il carrello per un errore di rete.
+ */
+export async function getOrderPublicStatus(
+  orderId: number,
+  token: string,
+): Promise<OrderPublicStatus | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/orders/${orderId}/status?token=${encodeURIComponent(token)}`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as OrderPublicStatus;
+  } catch {
+    return null;
+  }
+}
+
+export interface AddressSuggestion {
+  label: string;
+  street: string;
+  postal_code: string;
+  city: string;
+  province: string;
+  country: string;
+  /** Coordinate del risultato: centrano la mappa dei locker. */
+  lat: number | null;
+  lon: number | null;
+}
+
+/**
+ * Suggerimenti per il campo indirizzo. Il backend fa da proxy verso Geoapify
+ * (la chiave non sta nel bundle). Lista vuota se il servizio non e'
+ * configurato o non risponde: il form resta compilabile a mano.
+ */
+export async function fetchAddressSuggestions(
+  query: string,
+  signal?: AbortSignal,
+): Promise<AddressSuggestion[]> {
+  const q = query.trim();
+  if (q.length < 3) return [];
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/address/autocomplete?q=${encodeURIComponent(q)}`,
+      { signal, cache: "no-store" },
+    );
+    if (!res.ok) return [];
+    const body = await res.json();
+    return (body?.suggestions ?? []) as AddressSuggestion[];
+  } catch {
+    return [];
+  }
+}
+
+export interface PaypalConfig {
+  configured: boolean;
+  client_id: string;
+  sandbox: boolean;
+  webhook_ready: boolean;
+}
+
+/** Config pubblica per caricare l'SDK PayPal (il client id e' pubblico). */
+export async function getPaypalConfig(): Promise<PaypalConfig | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/paypal/config`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as PaypalConfig;
+  } catch {
+    return null;
+  }
+}
+
+async function postOrThrow(url: string): Promise<Record<string, unknown>> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    let detail = `${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.detail) {
+        detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+/** Crea l'ordine su PayPal per un nostro ordine PENDING. Ritorna l'id PayPal. */
+export async function createPaypalOrder(orderId: number): Promise<string> {
+  const data = await postOrThrow(`${API_BASE}/api/paypal/orders/${orderId}`);
+  return data.id as string;
+}
+
+/** Incassa dopo l'approvazione nel popup: il backend porta l'ordine a PAGATO. */
+export async function capturePaypalOrder(orderId: number): Promise<void> {
+  await postOrThrow(`${API_BASE}/api/paypal/orders/${orderId}/capture`);
+}
+
+export interface InpostConfig {
+  configured: boolean;
+  token: string;
+  script_url: string;
+  style_url: string;
+  widget_config: string;
+  language: string;
+}
+
+/** Config della mappa locker. Il token e' pubblico ma legato al dominio. */
+export async function getInpostConfig(): Promise<InpostConfig | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/inpost/config`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as InpostConfig;
+  } catch {
+    return null;
+  }
 }
 
 export function formatPrice(article: Pick<Article, "price" | "currency">): string {
