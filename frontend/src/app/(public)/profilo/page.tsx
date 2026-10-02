@@ -33,7 +33,7 @@ interface MyOrder {
 
 const STATO: Record<MyOrder["status"], { label: string; chip: string }> = {
   PENDING: { label: "In attesa di pagamento", chip: "chip-star" },
-  PAID: { label: "Pagato — lo preparo", chip: "chip-mint" },
+  PAID: { label: "In preparazione", chip: "chip-mint" },
   SHIPPED: { label: "Spedito", chip: "chip-sky" },
   COMPLETED: { label: "Completato", chip: "chip-lilac" },
   CANCELLED: { label: "Annullato", chip: "chip-pink" },
