@@ -47,7 +47,6 @@ from helpers.reservation import (
     unavailable_article_ids,
 )
 from models.db import Article, ArticleStatus, Order, OrderItem, OrderStatus, User
-from utils.email import send_order_notification
 from utils.limiter import limiter
 from utils.session import get_db
 
@@ -285,11 +284,10 @@ def create_order(
     # questo ordine non viene confermato o annullato.
     reserve_for_order(db, order)
 
-    # Email all'admin (best-effort, log se fallisce ma ordine resta valido)
-    try:
-        send_order_notification(order)
-    except Exception as exc:  # noqa: BLE001
-        LOGGER.exception("Email order notification failed: %s", exc)
+    # Niente email qui: l'ordine e' ancora da pagare e la notifica partirebbe
+    # due volte (creazione + incasso), praticamente identica. Si manda una
+    # volta sola quando il pagamento risulta incassato; gli ordini mai pagati
+    # restano comunque visibili in /admin/ordini.
 
     return order
 
@@ -405,6 +403,18 @@ def update_order(
         # di nuovo in vendita.
         if payload.status == OrderStatus.PAID:
             mark_sold(db, order)
+            # Stesso trattamento di un incasso PayPal/Stripe: il compratore
+            # deve ricevere la conferma anche se il pagamento e' arrivato
+            # per altra via (bonifico, contanti) e l'hai segnato tu.
+            try:
+                from utils.email import (
+                    send_order_confirmation,
+                    send_order_notification,
+                )
+                send_order_notification(order)
+                send_order_confirmation(order)
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.warning("Email ordine %s non inviate: %s", order.id, exc)
         elif payload.status == OrderStatus.CANCELLED:
             release_order(db, order)
 
