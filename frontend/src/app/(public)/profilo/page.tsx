@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AddressBook } from "@/components/AddressBook";
 import {
   customerFetch,
   getMarketingConsent,
@@ -124,6 +125,8 @@ export default function ProfiloPage() {
           </div>
         </section>
       )}
+
+      <AddressBook />
 
       <ConsensoPromozionale />
     </article>

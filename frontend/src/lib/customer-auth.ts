@@ -143,11 +143,21 @@ export async function loginCustomer(
 
 /** Chiamata autenticata come cliente. Se il token è scaduto pulisce la
  *  sessione, così l'interfaccia non resta a mostrare dati di nessuno. */
-export async function customerFetch<T>(path: string): Promise<T> {
+export async function customerFetch<T>(
+  path: string,
+  init?: { method?: string; body?: unknown },
+): Promise<T> {
   const token = getCustomerToken();
   if (!token) throw new Error("Non autenticato");
   const res = await fetch(`${PUBLIC_API_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    method: init?.method ?? "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init?.body === undefined
+        ? {}
+        : { "Content-Type": "application/json" }),
+    },
+    body: init?.body === undefined ? undefined : JSON.stringify(init.body),
     cache: "no-store",
   });
   if (res.status === 401) {
@@ -155,6 +165,8 @@ export async function customerFetch<T>(path: string): Promise<T> {
     throw new Error("Sessione scaduta, accedi di nuovo.");
   }
   if (!res.ok) throw new Error(await parseError(res));
+  // 204: il DELETE della rubrica non restituisce un corpo da leggere.
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
