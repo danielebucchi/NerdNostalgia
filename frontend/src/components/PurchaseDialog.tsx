@@ -108,7 +108,7 @@ export function PurchaseDialog({
   const { stripeEnabled, freeShippingAll } = useSettings();
   // Chi ha un profilo non deve riscrivere nome ed email a ogni acquisto:
   // e' il motivo piu' concreto per registrarsi, piu' di qualsiasi banner.
-  const { user: cliente } = useCustomer();
+  const { user: cliente, loading: clienteInCaricamento } = useCustomer();
   // Rubrica: chi compra una seconda volta non deve riscrivere via, CAP,
   // citta' e telefono da capo.
   const [rubrica, setRubrica] = useState<Address[]>([]);
@@ -537,13 +537,7 @@ export function PurchaseDialog({
               L&apos;ordine finirà nel tuo profilo.
             </p>
           ) : (
-            <p className="text-[11px] text-ink-soft leading-snug">
-              Hai già un profilo?{" "}
-              <a href="/accedi" className="underline font-semibold">
-                Accedi
-              </a>{" "}
-              e nome ed email si compilano da soli.
-            </p>
+            !clienteInCaricamento && <InvitoProfilo />
           )}
 
           {/* ── Dove consegniamo ──
@@ -926,5 +920,59 @@ function Field({
       </span>
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+/** Invito a registrarsi, al momento dell'ordine.
+ *
+ * Chi arriva qui ha gia' deciso di comprare e il bottone "Accedi" in cima
+ * alla pagina non l'ha nemmeno guardato: e' il momento in cui l'offerta ha
+ * piu' senso, perche' quello che gli serve davvero — sapere dov'e' il
+ * pacco — nasce proprio adesso.
+ *
+ * I link aprono una scheda nuova di proposito. Mandarlo via da qui
+ * vorrebbe dire fargli perdere l'ordine a meta', che e' esattamente il
+ * contrario di quello che il banner dovrebbe ottenere; e la sessione si
+ * propaga da sola fra le schede (useCustomer ascolta l'evento `storage`),
+ * quindi appena si registra questi campi si compilano da soli senza che
+ * debba ricaricare niente.
+ */
+function InvitoProfilo() {
+  return (
+    <div className="rounded-2xl bg-lilac-deep/10 ring-1 ring-lilac-deep/40 p-4">
+      <p className="display text-base text-ink mb-1">
+        Crea il profilo e segui il tuo ordine
+      </p>
+      <p className="text-sm text-ink-soft leading-snug mb-3">
+        Ci trovi il codice di tracciamento quando spedisco e lo storico di
+        quello che hai comprato. E la prossima volta non riscrivi indirizzo
+        e telefono.
+      </p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <a
+          href="/registrati"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-primary text-sm"
+        >
+          Crea il profilo ↗
+        </a>
+        <span className="text-sm text-ink-soft">
+          Ce l&apos;hai già?{" "}
+          <a
+            href="/accedi"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline font-semibold hover:text-pink-deep"
+          >
+            Accedi ↗
+          </a>
+        </span>
+      </div>
+      <p className="text-[11px] text-ink-soft/80 leading-snug mt-2.5">
+        Si apre in una scheda nuova: l&apos;ordine resta qui come l&apos;hai
+        lasciato. Puoi anche comprare senza profilo, da questo stesso modulo.
+      </p>
+    </div>
   );
 }
