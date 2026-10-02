@@ -449,7 +449,7 @@ o aggiungi il mittente ai contatti. Cosi' l'avviso con il codice di
 tracciamento, che ti mando appena spedisco, non finisce li' anche lui.
 {invito_txt}
 
-Nerd.Nostalgia
+Nerd Nostalgia
 {_site_url()}
 """
 
@@ -489,13 +489,13 @@ Nerd.Nostalgia
     tracciamento, che ti mando appena spedisco, arriva dove lo vedi.
   </p>
   <p style="color:#888; font-size:0.9em;">
-    Nerd.Nostalgia · <a href="{_site_url()}">{_site_url()}</a>
+    Nerd Nostalgia · <a href="{_site_url()}">{_site_url()}</a>
   </p>
 </body></html>"""
 
     return send_email(
         to=order.buyer_email,
-        subject=f"Grazie! Il tuo ordine #{order.id} su Nerd.Nostalgia è confermato",
+        subject=f"Grazie! Il tuo ordine #{order.id} su Nerd Nostalgia è confermato",
         text_body=text_body,
         html_body=html_body,
         reply_to=cfg["to_admin"],
@@ -537,7 +537,7 @@ Arriva {dove}.
 Se dopo qualche giorno il tracciamento non si muove, rispondi a questa
 email e ci penso io.
 
-Nerd.Nostalgia
+Nerd Nostalgia
 {_site_url()}
 """
 
@@ -563,7 +563,7 @@ Nerd.Nostalgia
     <strong>rispondi a questa email</strong> e ci penso io.
   </p>
   <p style="color:#888; font-size:0.9em;">
-    Nerd.Nostalgia · <a href="{_site_url()}">{_site_url()}</a>
+    Nerd Nostalgia · <a href="{_site_url()}">{_site_url()}</a>
   </p>
 </body></html>"""
 
@@ -612,7 +612,7 @@ def send_welcome_email(user) -> bool:
 
     text_body = f"""{saluto}
 
-benvenuto su Nerd.Nostalgia.
+benvenuto su Nerd Nostalgia.
 
 Da adesso hai un profilo: ci trovi gli ordini in corso con il codice di
 tracciamento, e lo storico di quelli passati.
@@ -622,12 +622,12 @@ Il tuo profilo: {site}/profilo
 {promo_txt}
 
 A presto,
-Nerd.Nostalgia
+Nerd Nostalgia
 {site}
 """
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
-  <h2 style="color: #e879a8;">Benvenuto su Nerd.Nostalgia{f", {nome}" if nome else ""}!</h2>
+  <h2 style="color: #e879a8;">Benvenuto su Nerd Nostalgia{f", {nome}" if nome else ""}!</h2>
   <p>Da adesso hai un profilo: ci trovi gli <strong>ordini in corso</strong> con
      il codice di tracciamento, e lo storico di quelli passati.</p>
   <p style="margin:18px 0;">
@@ -637,13 +637,13 @@ Nerd.Nostalgia
   </p>
   {promo_html}
   <p style="color:#888; font-size:0.9em;">
-    Nerd.Nostalgia · <a href="{site}">{site}</a>
+    Nerd Nostalgia · <a href="{site}">{site}</a>
   </p>
 </body></html>"""
 
     return send_email(
         to=user.email,
-        subject="Benvenuto su Nerd.Nostalgia",
+        subject="Benvenuto su Nerd Nostalgia",
         text_body=text_body,
         html_body=html_body,
         reply_to=cfg["to_admin"],
@@ -680,7 +680,7 @@ Non e' obbligatorio e non te lo richiedero' piu': se non hai voglia, va
 benissimo cosi'.
 
 Grazie,
-Nerd.Nostalgia
+Nerd Nostalgia
 {site}
 """
 
@@ -701,7 +701,7 @@ Nerd.Nostalgia
     benissimo così.
   </p>
   <p style="color:#888; font-size:0.9em;">
-    Nerd.Nostalgia · <a href="{site}">{site}</a>
+    Nerd Nostalgia · <a href="{site}">{site}</a>
   </p>
 </body></html>"""
 
@@ -730,7 +730,7 @@ def send_password_reset(user, token: str) -> bool:
 
     text_body = f"""{saluto}
 
-hai chiesto di reimpostare la password del tuo profilo su Nerd.Nostalgia.
+hai chiesto di reimpostare la password del tuo profilo su Nerd Nostalgia.
 Apri questo link e scegline una nuova:
 
 {link}
@@ -740,7 +740,7 @@ Il link vale un'ora e una volta sola.
 Se non sei stato tu, puoi ignorare questo messaggio: la password di adesso
 resta quella che e', e senza aprire il link non cambia niente.
 
-Nerd.Nostalgia
+Nerd Nostalgia
 {site}
 """
 
@@ -748,7 +748,7 @@ Nerd.Nostalgia
   <p>{saluto}</p>
   <p>
     hai chiesto di reimpostare la password del tuo profilo su
-    <strong>Nerd.Nostalgia</strong>. Scegline una nuova da qui:
+    <strong>Nerd Nostalgia</strong>. Scegline una nuova da qui:
   </p>
   <p style="text-align:center; margin:28px 0;">
     <a href="{link}" style="display:inline-block; background:#a890d8; color:white; padding:12px 26px; border-radius:999px; text-decoration:none; font-weight:bold;">Scegli una nuova password</a>
@@ -762,7 +762,7 @@ Nerd.Nostalgia
   </p>
   <hr style="border:none; border-top:1px solid #efe9fa; margin:24px 0;">
   <p style="font-size:0.85em; color:#9b8db8;">
-    Nerd.Nostalgia — <a href="{site}" style="color:#a890d8;">{site}</a>
+    Nerd Nostalgia — <a href="{site}" style="color:#a890d8;">{site}</a>
   </p>
 </body></html>"""
 
