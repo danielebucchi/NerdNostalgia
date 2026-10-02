@@ -171,7 +171,10 @@ function OrderCard({ order: o }: { order: MyOrder }) {
         ))}
       </ul>
 
-      {o.tracking_code && (
+      {/* A ordine completato il pacco e' arrivato: il tracking non serve
+          piu' a nessuno e i corrieri smettono comunque di aggiornarlo,
+          quindi il link porterebbe a una pagina vuota o scaduta. */}
+      {o.tracking_code && o.status !== "COMPLETED" && (
         <div className="rounded-xl bg-sky-soft/40 ring-1 ring-sky-deep/30 px-3 py-2 text-sm leading-snug">
           📦 Spedizione{o.tracking_carrier ? ` con ${o.tracking_carrier}` : ""}:{" "}
           <strong className="text-ink">{o.tracking_code}</strong>
