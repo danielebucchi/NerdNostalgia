@@ -157,3 +157,54 @@ export async function customerFetch<T>(path: string): Promise<T> {
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as T;
 }
+
+export interface ConsentState {
+  email: string;
+  marketing_consent: boolean;
+}
+
+/** Consenso promozionale dal link nelle email: il token basta, niente login.
+ *  Chi vuole smettere di ricevere le email non deve prima ricordarsi la
+ *  password — e lo stesso link serve ad annullare un clic per sbaglio. */
+export async function setConsentByToken(
+  token: string,
+  marketing_consent: boolean,
+): Promise<ConsentState> {
+  const res = await fetch(`${PUBLIC_API_BASE}/api/auth/unsubscribe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, marketing_consent }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as ConsentState;
+}
+
+/** La stessa spunta, per chi è già dentro: è quella che l'email di
+ *  benvenuto promette di trovare nel profilo. */
+export async function getMarketingConsent(): Promise<ConsentState> {
+  return customerFetch<ConsentState>("/api/auth/me/marketing-consent");
+}
+
+export async function setMarketingConsent(
+  marketing_consent: boolean,
+): Promise<ConsentState> {
+  const token = getCustomerToken();
+  if (!token) throw new Error("Non autenticato");
+  const res = await fetch(
+    `${PUBLIC_API_BASE}/api/auth/me/marketing-consent`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ marketing_consent }),
+    },
+  );
+  if (res.status === 401) {
+    clearCustomerSession();
+    throw new Error("Sessione scaduta, accedi di nuovo.");
+  }
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as ConsentState;
+}
