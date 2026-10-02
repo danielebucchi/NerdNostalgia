@@ -549,3 +549,77 @@ Nerd.Nostalgia
         reply_to=cfg["to_admin"],
     )
 
+
+def send_welcome_email(user) -> bool:
+    """Benvenuto a chi si registra.
+
+    Serve anche da ricevuta del consenso promozionale: gli diciamo in chiaro
+    cosa ha scelto e come cambiare idea, perche' un consenso che non si puo'
+    revocare facilmente non e' valido.
+    """
+    cfg = _config()
+    nome = (user.full_name or "").split()[0] if user.full_name else ""
+    saluto = f"Ciao {nome}," if nome else "Ciao,"
+    site = _site_url()
+
+    if user.marketing_consent:
+        promo_txt = (
+            "Hai accettato di ricevere le novita' del sito: ti scrivero' quando\n"
+            "arrivano pezzi interessanti, senza esagerare. Puoi disiscriverti\n"
+            f"quando vuoi da qui: {site}/disiscriviti?t={user.unsubscribe_token or ''}"
+        )
+        promo_html = (
+            f'<p style="background:#e6f3f7; border-radius:8px; padding:10px 14px; font-size:0.9em;">'
+            f'Hai accettato di ricevere le novità del sito: ti scriverò quando arrivano '
+            f'pezzi interessanti, senza esagerare. '
+            f'<a href="{site}/disiscriviti?t={user.unsubscribe_token or ""}">Disiscriviti quando vuoi</a>.</p>'
+        )
+    else:
+        promo_txt = (
+            "Non riceverai email promozionali: hai lasciato la spunta vuota.\n"
+            "Se cambi idea la trovi nel tuo profilo."
+        )
+        promo_html = (
+            '<p style="color:#888; font-size:0.9em;">Non riceverai email promozionali: '
+            'hai lasciato la spunta vuota. Se cambi idea la trovi nel tuo profilo.</p>'
+        )
+
+    text_body = f"""{saluto}
+
+benvenuto su Nerd.Nostalgia.
+
+Da adesso hai un profilo: ci trovi gli ordini in corso con il codice di
+tracciamento, e lo storico di quelli passati.
+
+Il tuo profilo: {site}/profilo
+
+{promo_txt}
+
+A presto,
+Nerd.Nostalgia
+{site}
+"""
+
+    html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
+  <h2 style="color: #e879a8;">Benvenuto su Nerd.Nostalgia{f", {nome}" if nome else ""}!</h2>
+  <p>Da adesso hai un profilo: ci trovi gli <strong>ordini in corso</strong> con
+     il codice di tracciamento, e lo storico di quelli passati.</p>
+  <p style="margin:18px 0;">
+    <a href="{site}/profilo" style="display:inline-block; background:#e879a8; color:white; padding:12px 22px; border-radius:999px; text-decoration:none; font-weight:bold;">
+      Vai al tuo profilo →
+    </a>
+  </p>
+  {promo_html}
+  <p style="color:#888; font-size:0.9em;">
+    Nerd.Nostalgia · <a href="{site}">{site}</a>
+  </p>
+</body></html>"""
+
+    return send_email(
+        to=user.email,
+        subject="Benvenuto su Nerd.Nostalgia",
+        text_body=text_body,
+        html_body=html_body,
+        reply_to=cfg["to_admin"],
+    )
+

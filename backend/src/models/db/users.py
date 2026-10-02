@@ -1,7 +1,7 @@
 """
 Modello User per SQLAlchemy.
 """
-from sqlalchemy import Column, String, Boolean
+from sqlalchemy import Boolean, Column, DateTime, String
 from sqlalchemy import Enum as PgEnum
 from .base import BaseModel
 from models.entities.user import UserRole
@@ -24,6 +24,13 @@ class User(BaseModel):
 
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
+
+    # Consenso promozionale: spunta separata alla registrazione, revocabile.
+    # La data dimostra quando e' stato dato; il token permette di
+    # disiscriversi dal link nell'email, senza dover fare login.
+    marketing_consent = Column(Boolean, nullable=False, default=False)
+    marketing_consent_at = Column(DateTime)
+    unsubscribe_token = Column(String(64))
 
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"

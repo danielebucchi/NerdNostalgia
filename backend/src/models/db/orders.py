@@ -92,6 +92,13 @@ class Order(BaseModel):
     paypal_order_id = Column(String(64))
     paypal_capture_id = Column(String(64))
 
+    # Profilo del cliente. NULL per gli acquisti da ospite: si compra anche
+    # senza account, e l'ordine si riaggancia se poi ci si registra con la
+    # stessa email.
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
     # Locker InPost: id del punto (es. "IT12345") e descrizione leggibile.
     # I campi ship_* contengono l'indirizzo del locker, che e' la vera
     # destinazione della spedizione.
