@@ -18,6 +18,7 @@ const ALL_NAV_ITEMS = [
   { href: "/admin/wanted", label: "Cerco/Compro", icon: "🔍" },
   { href: "/admin/tassonomia", label: "Tassonomia", icon: "🏷" },
   { href: "/admin/import-vinted", label: "Sync Vinted", icon: "🛍" },
+  { href: "/admin/recensioni", label: "Recensioni", icon: "⭐" },
   { href: "/admin/markups", label: "Commissioni", icon: "💸" },
   { href: "/admin/impostazioni", label: "Impostazioni", icon: "⚙️" },
 ];

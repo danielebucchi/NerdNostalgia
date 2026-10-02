@@ -623,3 +623,67 @@ Nerd.Nostalgia
         reply_to=cfg["to_admin"],
     )
 
+
+def send_review_invite(order) -> bool:
+    """Invita a recensire, quando l'ordine viene chiuso.
+
+    Il link porta (id + token) dell'ordine: si recensisce anche senza
+    account, e nessuno puo' scrivere senza avere comprato davvero.
+
+    Lo diciamo esplicitamente che e' facoltativo: una richiesta di
+    recensione che sembra un obbligo infastidisce e basta.
+    """
+    cfg = _config()
+    nome = (order.buyer_name or "").split()[0] if order.buyer_name else ""
+    saluto = f"Ciao {nome}," if nome else "Ciao,"
+    site = _site_url()
+    link = f"{site}/recensione?order={order.id}&t={order.public_token or ''}"
+
+    text_body = f"""{saluto}
+
+l'ordine #{order.id} e' arrivato e per me e' chiuso. Spero sia andato tutto
+bene.
+
+Se ti va, lasciami una recensione: bastano due righe e mi aiuta parecchio,
+perche' chi compra da un piccolo negozio vuole sapere com'e' andata a chi
+l'ha fatto prima.
+
+{link}
+
+Non e' obbligatorio e non te lo richiedero' piu': se non hai voglia, va
+benissimo cosi'.
+
+Grazie,
+Nerd.Nostalgia
+{site}
+"""
+
+    html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
+  <h2 style="color: #e879a8;">Com'è andata con l'ordine #{order.id}?</h2>
+  <p>{saluto} il pacco è arrivato e per me l'ordine è chiuso. Spero sia andato
+     tutto bene.</p>
+  <p>Se ti va, <strong>lasciami una recensione</strong>: bastano due righe e mi
+     aiuta parecchio, perché chi compra da un piccolo negozio vuole sapere
+     com'è andata a chi l'ha fatto prima.</p>
+  <p style="margin:18px 0;">
+    <a href="{link}" style="display:inline-block; background:#e879a8; color:white; padding:12px 22px; border-radius:999px; text-decoration:none; font-weight:bold;">
+      Lascia una recensione →
+    </a>
+  </p>
+  <p style="color:#888; font-size:0.9em;">
+    Non è obbligatorio e non te lo richiederò più: se non hai voglia, va
+    benissimo così.
+  </p>
+  <p style="color:#888; font-size:0.9em;">
+    Nerd.Nostalgia · <a href="{site}">{site}</a>
+  </p>
+</body></html>"""
+
+    return send_email(
+        to=order.buyer_email,
+        subject=f"Com'è andata? Lascia una recensione per l'ordine #{order.id}",
+        text_body=text_body,
+        html_body=html_body,
+        reply_to=cfg["to_admin"],
+    )
+

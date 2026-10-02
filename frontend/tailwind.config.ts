@@ -32,7 +32,12 @@ const config: Config = {
           deep: "#a890d8",
           soft: "#efe9fa",
         },
-        star: "#fff4a8",
+        // DEFAULT resta il giallo pallido gia' in uso; "deep" serve alle
+        // stelle delle recensioni, che sul bianco devono leggersi.
+        star: {
+          DEFAULT: "#fff4a8",
+          deep: "#e8a317",
+        },
       },
       fontFamily: {
         display: ['"Fredoka"', "ui-sans-serif", "system-ui", "sans-serif"],

@@ -34,6 +34,7 @@ from api.misc_sales import router as misc_sales_router
 from api.orders import router as orders_router
 from api.paypal import router as paypal_router
 from api.personal_cards import router as personal_cards_router
+from api.reviews import router as reviews_router
 from api.settings import router as settings_router
 from api.stripe import router as stripe_router
 from api.users import router as users_router
@@ -102,6 +103,7 @@ app.include_router(vinted_pro_router)
 app.include_router(stripe_router)
 app.include_router(paypal_router)
 app.include_router(inpost_router)
+app.include_router(reviews_router)
 
 
 # Static files (uploaded images)

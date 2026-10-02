@@ -20,6 +20,7 @@ from .inventory import InventoryItem, InventoryItemStatus
 from .lot import Lot, LotStatus
 from .marketplace_fees import MarketplaceFee
 from .orders import Order, OrderItem, OrderStatus
+from .reviews import Review, ReviewStatus
 from .platform import Platform
 from .setting import Setting
 from .misc_sales import MiscSale, MiscSaleKind
@@ -58,6 +59,8 @@ __all__ = [
     "WantedStatus",
     "MarketplaceFee",
     "Order",
+    "Review",
+    "ReviewStatus",
     "OrderItem",
     "OrderStatus",
     "Platform",
