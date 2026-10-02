@@ -73,7 +73,6 @@ export function Header() {
         <SearchBox className="hidden md:block flex-1 max-w-xs mx-2" />
 
         <nav className="hidden md:flex items-center gap-2 flex-shrink-0">
-          <Link href="/cerco-compro" className="btn btn-ghost text-sm">Cerco/Compro</Link>
           <AlertBell variant="desktop" />
           <WishlistNavLink variant="desktop" />
           <CartNavLink variant="desktop" />
@@ -86,13 +85,6 @@ export function Header() {
           <WishlistNavLink variant="mobile" />
           <CartNavLink variant="mobile" />
           <CustomerNavLink variant="mobile" />
-          <Link
-            href="/cerco-compro"
-            className="btn btn-ghost text-xs px-2.5 py-1.5"
-            aria-label="Cerco / Compro"
-          >
-            🔍
-          </Link>
           <Link
             href="/contatti"
             className="btn btn-primary text-xs px-3 py-1.5"
