@@ -407,3 +407,64 @@ def test_free_shipping_switch_zeroes_everything(
     assert float(body["insurance_fee"]) == 0.0
     assert float(body["grand_total"]) == 120.0
 
+
+# ───────────────── Spedizione e chiusura ─────────────────
+
+def _paid_order(client, admin_headers, published_article):
+    o = client.post("/api/orders/", json=_payload(published_article["id"])).json()
+    client.patch(f"/api/orders/{o['id']}", headers=admin_headers,
+                 json={"status": "PAID"})
+    return o["id"]
+
+
+def test_cannot_ship_without_tracking(
+    client, admin_headers, published_article,
+):
+    """Un pacco partito e non tracciabile e' un problema che si scopre
+    tardi: senza codice non si marca spedito."""
+    oid = _paid_order(client, admin_headers, published_article)
+
+    r = client.patch(f"/api/orders/{oid}", headers=admin_headers,
+                     json={"status": "SHIPPED"})
+    assert r.status_code == 400
+    assert "tracciamento" in r.json()["detail"].lower()
+    assert client.get(f"/api/orders/{oid}", headers=admin_headers).json()["status"] == "PAID"
+
+
+def test_tracking_and_shipped_in_one_call(
+    client, admin_headers, published_article,
+):
+    """Codice e stato si possono mandare insieme: e' il gesto naturale."""
+    oid = _paid_order(client, admin_headers, published_article)
+
+    r = client.patch(f"/api/orders/{oid}", headers=admin_headers, json={
+        "status": "SHIPPED",
+        "tracking_carrier": "BRT",
+        "tracking_code": "ABC123456789",
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "SHIPPED"
+    assert body["tracking_code"] == "ABC123456789"
+    assert body["shipped_at"] is not None
+
+
+def test_completed_only_after_shipped(
+    client, admin_headers, published_article,
+):
+    oid = _paid_order(client, admin_headers, published_article)
+
+    # Da PAGATO non si salta a COMPLETATO
+    r = client.patch(f"/api/orders/{oid}", headers=admin_headers,
+                     json={"status": "COMPLETED"})
+    assert r.status_code == 400
+    assert "spedito" in r.json()["detail"].lower()
+
+    client.patch(f"/api/orders/{oid}", headers=admin_headers,
+                 json={"status": "SHIPPED", "tracking_code": "XYZ999"})
+    r = client.patch(f"/api/orders/{oid}", headers=admin_headers,
+                     json={"status": "COMPLETED"})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "COMPLETED"
+    assert r.json()["completed_at"] is not None
+
