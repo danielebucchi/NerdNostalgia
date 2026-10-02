@@ -155,6 +155,15 @@ def test_street_cannot_be_empty(client):
     assert r.status_code == 422
 
 
+def test_the_ceiling_is_five(client):
+    """Fissato di proposito: il test qui sotto legge la costante e
+    passerebbe con qualsiasi numero, quindi da solo non proteggerebbe
+    il limite da una modifica distratta."""
+    from api.addresses import MAX_INDIRIZZI
+
+    assert MAX_INDIRIZZI == 5
+
+
 def test_there_is_a_ceiling_on_how_many(client):
     from api.addresses import MAX_INDIRIZZI
 
