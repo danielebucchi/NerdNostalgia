@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { customerFetch, useCustomer } from "@/lib/customer-auth";
+import {
+  customerFetch,
+  getMarketingConsent,
+  setMarketingConsent,
+  useCustomer,
+} from "@/lib/customer-auth";
 
 interface OrderItem {
   id: number;
@@ -119,6 +124,8 @@ export default function ProfiloPage() {
           </div>
         </section>
       )}
+
+      <ConsensoPromozionale />
     </article>
   );
 }
@@ -184,5 +191,69 @@ function OrderCard({ order: o }: { order: MyOrder }) {
         </div>
       )}
     </div>
+  );
+}
+
+
+/** La spunta delle email promozionali.
+ *
+ * Sta qui perche' l'email di benvenuto dice "se cambi idea la trovi nel tuo
+ * profilo": finche' non c'era, quella frase era una promessa a vuoto. In
+ * fondo alla pagina di proposito — chi apre il profilo viene per gli ordini.
+ */
+function ConsensoPromozionale() {
+  const [consenso, setConsenso] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [errore, setErrore] = useState<string | null>(null);
+  const [salvato, setSalvato] = useState(false);
+
+  useEffect(() => {
+    getMarketingConsent()
+      .then((c) => setConsenso(c.marketing_consent))
+      .catch(() => setConsenso(null));
+  }, []);
+
+  async function cambia(valore: boolean) {
+    setBusy(true);
+    setErrore(null);
+    try {
+      const c = await setMarketingConsent(valore);
+      setConsenso(c.marketing_consent);
+      setSalvato(true);
+      window.setTimeout(() => setSalvato(false), 2500);
+    } catch (err) {
+      setErrore(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (consenso === null) return null;
+
+  return (
+    <section className="mt-10 pt-6 border-t border-ink/10">
+      <h2 className="display text-xl text-ink mb-3">Email promozionali</h2>
+      <label className="flex items-start gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={consenso}
+          disabled={busy}
+          onChange={(e) => cambia(e.target.checked)}
+          className="mt-1 h-4 w-4 accent-lilac-deep"
+        />
+        <span className="text-ink-soft text-sm leading-snug">
+          Avvisami quando arrivano pezzi interessanti. Niente di automatico e
+          niente ogni settimana: scrivo quando c&apos;è qualcosa che vale.
+          {salvato && (
+            <span className="text-ink font-semibold"> — salvato ✓</span>
+          )}
+        </span>
+      </label>
+      <p className="text-ink-soft/70 text-xs mt-2">
+        Le email sui tuoi ordini (conferma, spedizione, tracking) arrivano
+        comunque: servono a farti avere il pacco, non a venderti qualcosa.
+      </p>
+      {errore && <p className="text-pink-deep text-sm mt-2">⚠ {errore}</p>}
+    </section>
   );
 }
