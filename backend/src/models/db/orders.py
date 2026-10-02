@@ -72,6 +72,9 @@ class Order(BaseModel):
     # si perde traccia di un pacco gia' partito.
     tracking_carrier = Column(String(80))
     tracking_code = Column(String(120))
+    # Link diretto alla pagina del corriere: evita al compratore di cercare
+    # il sito giusto e incollarci dentro il codice.
+    tracking_url = Column(String(500))
     admin_notes = Column(Text)
 
     ip_address = Column(String(45))

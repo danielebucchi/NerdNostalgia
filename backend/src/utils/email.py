@@ -488,6 +488,7 @@ def send_shipping_notice(order) -> bool:
     saluto = f"Ciao {nome}," if nome else "Ciao,"
     corriere = (order.tracking_carrier or "").strip()
     codice = (order.tracking_code or "").strip()
+    link = (order.tracking_url or "").strip()
 
     dove = (
         f"al locker InPost {order.inpost_point_name or ''} "
@@ -503,6 +504,7 @@ il tuo ordine #{order.id} e' partito.
 
 Codice di tracciamento: {codice}
 {f"Corriere: {corriere}" if corriere else ""}
+{f"Segui la spedizione: {link}" if link else ""}
 
 Arriva {dove}.
 
@@ -522,6 +524,11 @@ Nerd.Nostalgia
     <strong style="font-size:1.2em; letter-spacing:0.5px;">{codice}</strong>
     {f'<br><span style="color:#888; font-size:0.9em;">Corriere: {corriere}</span>' if corriere else ''}
   </p>
+  {f'''<p style="margin:16px 0;">
+    <a href="{link}" style="display:inline-block; background:#7dd1b8; color:#15322a; padding:12px 22px; border-radius:999px; text-decoration:none; font-weight:bold;">
+      Segui la spedizione →
+    </a>
+  </p>''' if link else ''}
 
   <p>Arriva {dove}.</p>
 

@@ -189,6 +189,7 @@ CREATE TABLE IF NOT EXISTS orders (
     -- Spedizione: senza tracking non si puo' marcare spedito (vedi 0021)
     tracking_carrier VARCHAR(80),
     tracking_code VARCHAR(120),
+    tracking_url VARCHAR(500),
     admin_notes TEXT,
     -- Tracking IP per rate-limit / antifrode
     ip_address VARCHAR(45),
