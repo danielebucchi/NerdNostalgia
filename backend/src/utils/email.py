@@ -23,6 +23,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
 
+from utils import email_guard
+
 LOGGER = logging.getLogger("email")
 
 DEFAULT_ADMIN_EMAIL = "nerdnostalgiaita@gmail.com"
@@ -78,15 +80,26 @@ def send_email(
     text_body: str,
     html_body: Optional[str] = None,
     reply_to: Optional[str] = None,
+    critica: bool = False,
 ) -> bool:
     """Invia una email. Ritorna True se inviata, False altrimenti (con log).
 
     Non solleva eccezione: chi chiama non deve preoccuparsi del fallimento,
     l'azione principale (es. salvataggio inquiry) prosegue comunque.
+
+    `critica` salta il freno sugli invii: vale per le email legate a un
+    ordine pagato, dove perdere il messaggio costa un cliente vero. Per
+    abusarne bisognerebbe pagare un ordine a ogni email, quindi quella
+    strada si difende da sola.
     """
     cfg = _config()
     if not cfg["enabled"]:
         LOGGER.info("Email disabilitata (EMAIL_ENABLED=0)")
+        return False
+
+    # Prima di qualsiasi lavoro: se il freno dice no, non si apre nemmeno
+    # la connessione SMTP.
+    if not email_guard.consenti(to, critica=critica):
         return False
     if not cfg["user"] or not cfg["password"]:
         LOGGER.warning(
@@ -351,6 +364,7 @@ Email:     {order.buyer_email}</pre>
 
     return send_email(
         to=to_admin,
+        critica=True,  # un ordine incassato devo saperlo, sempre
         subject=(
             f"[NerdNostalgia] Ordine #{order.id} PAGATO — "
             f"{order.buyer_name} — € {float(order.grand_total):.2f}"
@@ -495,6 +509,7 @@ Nerd Nostalgia
 
     return send_email(
         to=order.buyer_email,
+        critica=True,  # ordine pagato: perderla costa un cliente vero
         subject=f"Grazie! Il tuo ordine #{order.id} su Nerd Nostalgia è confermato",
         text_body=text_body,
         html_body=html_body,
@@ -569,6 +584,7 @@ Nerd Nostalgia
 
     return send_email(
         to=order.buyer_email,
+        critica=True,  # il cliente aspetta il tracking del pacco pagato
         subject=f"Il tuo ordine #{order.id} è partito — tracking {codice}",
         text_body=text_body,
         html_body=html_body,
