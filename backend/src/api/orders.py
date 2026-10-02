@@ -33,7 +33,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy.orm import Session
 
-from helpers.auth import require_admin
+from helpers.auth import get_current_user, require_admin
 from helpers.shipping import (
     base_shipping,
     calc_shipping,
@@ -300,6 +300,29 @@ def create_order(
     # restano comunque visibili in /admin/ordini.
 
     return order
+
+
+# ─────────────────── Area cliente: i miei ordini ───────────────────
+@router.get("/mine", response_model=List[OrderResponse])
+def my_orders(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Ordini del cliente autenticato, dal piu' recente.
+
+    Li cerchiamo sia per profilo sia per email: chi ha comprato da ospite
+    PRIMA di registrarsi viene riagganciato all'iscrizione, ma chi compra da
+    ospite DOPO (magari senza accorgersi di essere sloggato) resterebbe
+    fuori. L'email e' la stessa persona.
+    """
+    return (
+        db.query(Order)
+        .filter(
+            (Order.user_id == user.id) | (Order.buyer_email == user.email)
+        )
+        .order_by(Order.created_at.desc())
+        .all()
+    )
 
 
 # ─────────────────── Public endpoint: stato ordine ───────────────────
