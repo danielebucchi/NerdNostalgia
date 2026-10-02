@@ -18,6 +18,11 @@ CREATE TABLE IF NOT EXISTS users (
         CHECK (role IN ('ADMIN','USER','GUEST')),
     is_active INTEGER NOT NULL DEFAULT 1,
     is_verified INTEGER NOT NULL DEFAULT 0,
+    -- Consenso promozionale: separato dalla registrazione e revocabile.
+    -- La data serve a dimostrare quando e' stato dato (vedi 0023).
+    marketing_consent BOOLEAN NOT NULL DEFAULT 0,
+    marketing_consent_at TIMESTAMP,
+    unsubscribe_token VARCHAR(64),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -201,6 +206,8 @@ CREATE TABLE IF NOT EXISTS orders (
     -- PayPal Orders v2 (vedi 0017)
     paypal_order_id VARCHAR(64),
     paypal_capture_id VARCHAR(64),
+    -- Profilo del cliente, NULL per gli acquisti da ospite (vedi 0023)
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     -- Locker InPost scelto dal compratore (vedi 0019)
     inpost_point_id VARCHAR(64),
     inpost_point_name VARCHAR(255),

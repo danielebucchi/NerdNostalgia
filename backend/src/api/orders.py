@@ -103,6 +103,8 @@ class OrderItemResponse(BaseModel):
 class OrderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    # Profilo del cliente, None per gli acquisti da ospite
+    user_id: Optional[int] = None
     buyer_name: str
     buyer_email: str
     buyer_phone: Optional[str]
