@@ -106,3 +106,63 @@ def test_list_pagination(client, seed_articles):
     assert len(body["items"]) == 2
     assert body["skip"] == 0
     assert body["limit"] == 2
+
+
+# ───────────────── Rincaro di listino ─────────────────
+
+def _make(client, admin_headers, admin_user, title, price, status="PUBLISHED"):
+    return client.post(
+        "/api/articles/", headers=admin_headers,
+        json={
+            "user_id": admin_user.id, "title": title, "price": price,
+            "currency": "EUR", "condition": "USED", "status": status,
+            "quantity": 1,
+        },
+    ).json()
+
+
+def test_bulk_markup_is_a_preview_by_default(client, admin_headers, admin_user):
+    """Riscrivere i prezzi di tutto il catalogo non deve poter partire per
+    sbaglio: senza dry_run=false non si tocca niente."""
+    art = _make(client, admin_headers, admin_user, "Carta", 10)
+
+    r = client.post(
+        "/api/articles/bulk-markup", headers=admin_headers,
+        json={"percent": 3.5},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["dry_run"] is True
+    assert any(c["id"] == art["id"] and c["new_price"] == 10.35
+               for c in body["changes"])
+    # Il prezzo in DB non e' cambiato
+    assert float(client.get(f"/api/articles/{art['id']}").json()["price"]) == 10.0
+
+
+def test_bulk_markup_applies_when_asked(client, admin_headers, admin_user):
+    art = _make(client, admin_headers, admin_user, "Console", 100)
+
+    client.post(
+        "/api/articles/bulk-markup", headers=admin_headers,
+        json={"percent": 3.5, "dry_run": False},
+    )
+    assert float(client.get(f"/api/articles/{art['id']}").json()["price"]) == 103.5
+
+
+def test_bulk_markup_leaves_sold_articles_alone(
+    client, admin_headers, admin_user,
+):
+    """Il prezzo di un pezzo venduto e' storia, non listino."""
+    sold = _make(client, admin_headers, admin_user, "Venduto", 50, status="SOLD")
+
+    client.post(
+        "/api/articles/bulk-markup", headers=admin_headers,
+        json={"percent": 3.5, "dry_run": False},
+    )
+    assert float(client.get(f"/api/articles/{sold['id']}").json()["price"]) == 50.0
+
+
+def test_bulk_markup_requires_admin(client):
+    r = client.post("/api/articles/bulk-markup", json={"percent": 3.5})
+    assert r.status_code == 401
+

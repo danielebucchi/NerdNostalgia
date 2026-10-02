@@ -17,15 +17,15 @@ from helpers.shipping import (
 
 
 @pytest.mark.parametrize("subtotal,expected", [
-    ("0.01", "6.00"),
-    ("10.00", "6.00"),
-    ("25.00", "6.00"),      # il confine appartiene allo scaglione basso
-    ("25.01", "7.00"),      # 4% = 1,0004 → sotto il minimo, resta 1,00
-    ("35.00", "7.40"),      # 4% = 1,40
-    ("50.00", "8.00"),      # 4% = 2,00
-    ("100.00", "10.00"),    # 4% = 4,00
-    ("150.00", "12.00"),    # 4% = 6,00 → tocca il tetto
-    ("249.99", "12.00"),    # oltre il tetto: resta 12
+    ("0.01", "6.21"),
+    ("10.00", "6.21"),
+    ("25.00", "6.21"),      # il confine appartiene allo scaglione basso
+    ("25.01", "7.21"),      # 4% = 1,0004 → sotto il minimo, resta 1,00
+    ("35.00", "7.61"),      # 4% = 1,40
+    ("50.00", "8.21"),      # 4% = 2,00
+    ("100.00", "10.21"),    # 4% = 4,00
+    ("150.00", "12.21"),    # 4% = 6,00: sotto il tetto di 6,21
+    ("249.99", "12.42"),    # oltre il tetto: resta al massimo
     ("250.00", "0.00"),     # gratis
     ("900.00", "0.00"),
 ])
@@ -36,8 +36,11 @@ def test_base_shipping_bands(subtotal, expected):
 def test_percentage_is_capped():
     """Il tetto sulla quota % esiste perche' l'etichetta costa uguale per un
     pacco da 30 € e per uno da 240 €: senza, chiederemmo 16 € di spedizione
-    su un ordine da 249 €."""
-    assert base_shipping(Decimal("150")) == base_shipping(Decimal("249.99"))
+    su un ordine da 249 €. Il tetto morde dove il 4% supera 6,21 €, cioe'
+    da ~155 € in su."""
+    assert base_shipping(Decimal("200")) == base_shipping(Decimal("249.99"))
+    # Sotto quella soglia comanda ancora la percentuale
+    assert base_shipping(Decimal("150")) < base_shipping(Decimal("200"))
 
 
 def test_insurance_is_a_flat_fee():
@@ -58,16 +61,16 @@ def test_buyer_can_override_in_both_directions():
     """Il punto della funzione: assicurare un ordine piccolo o rinunciare su
     uno grande."""
     # Ordine piccolo, assicurato per scelta
-    assert calc_shipping(Decimal("10"), insured=True) == Decimal("11.70")
-    assert calc_shipping(Decimal("10"), insured=False) == Decimal("6.00")
+    assert calc_shipping(Decimal("10"), insured=True) == Decimal("12.11")
+    assert calc_shipping(Decimal("10"), insured=False) == Decimal("6.21")
     # Ordine grande, scoperto per scelta
-    assert calc_shipping(Decimal("100"), insured=False) == Decimal("10.00")
-    assert calc_shipping(Decimal("100"), insured=True) == Decimal("15.70")
+    assert calc_shipping(Decimal("100"), insured=False) == Decimal("10.21")
+    assert calc_shipping(Decimal("100"), insured=True) == Decimal("16.11")
 
 
 def test_none_means_use_the_default_for_the_band():
-    assert calc_shipping(Decimal("10"), insured=None) == Decimal("6.00")
-    assert calc_shipping(Decimal("100"), insured=None) == Decimal("15.70")
+    assert calc_shipping(Decimal("10"), insured=None) == Decimal("6.21")
+    assert calc_shipping(Decimal("100"), insured=None) == Decimal("16.11")
 
 
 def test_above_free_threshold_insurance_is_included_and_not_removable():
@@ -78,8 +81,8 @@ def test_above_free_threshold_insurance_is_included_and_not_removable():
 
 
 def test_carrello_vuoto_non_esplode():
-    assert calc_shipping(0) == Decimal("6.00")
-    assert calc_shipping(None) == Decimal("6.00")
+    assert calc_shipping(0) == Decimal("6.21")
+    assert calc_shipping(None) == Decimal("6.21")
 
 
 def test_free_shipping_threshold_is_exposed():

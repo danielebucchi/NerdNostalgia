@@ -48,6 +48,7 @@ export default function CartPage() {
 
 function CartContent() {
   const { items, remove, clear, hydrated } = useCart();
+  const { freeShippingAll } = useSettings();
 
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
@@ -103,12 +104,15 @@ function CartContent() {
   }, [hydrated, items.length]);
 
   const subtotal = cartSubtotal(articles);
-  const insuranceIncluded = insuranceIsIncluded(subtotal);
+  // Promozione attiva: niente spese, niente premio, niente contatore
+  const insuranceIncluded = freeShippingAll || insuranceIsIncluded(subtotal);
   const effectiveInsured = insuranceIncluded || insured;
-  const baseShipping = baseShippingFor(subtotal);
-  const insuranceCost = insuranceFeeFor(subtotal, effectiveInsured);
+  const baseShipping = freeShippingAll ? 0 : baseShippingFor(subtotal);
+  const insuranceCost = freeShippingAll
+    ? 0
+    : insuranceFeeFor(subtotal, effectiveInsured);
   const shippingTotal = baseShipping + insuranceCost;
-  const missingForFree = missingForFreeShipping(subtotal);
+  const missingForFree = freeShippingAll ? 0 : missingForFreeShipping(subtotal);
 
   useEffect(() => {
     if (!insuredTouched) setInsured(defaultInsured(subtotal));

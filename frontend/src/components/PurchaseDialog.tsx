@@ -97,7 +97,7 @@ export function PurchaseDialog({
   // null = non lo sappiamo ancora (config in arrivo dal backend)
   const [paypalAvailable, setPaypalAvailable] = useState<boolean | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const { stripeEnabled } = useSettings();
+  const { stripeEnabled, freeShippingAll } = useSettings();
 
   const subtotal = articles.reduce(
     (acc, a) => acc + Number(a.price || 0),
@@ -105,10 +105,12 @@ export function PurchaseDialog({
   );
   // Ricalcolo in tempo reale: la casella assicurazione cambia subito il
   // totale, senza aspettare il server.
-  const insuranceIncluded = insuranceIsIncluded(subtotal);
+  const insuranceIncluded = freeShippingAll || insuranceIsIncluded(subtotal);
   const effectiveInsured = insuranceIncluded || insured;
-  const baseShipping = baseShippingFor(subtotal);
-  const insuranceCost = insuranceFeeFor(subtotal, effectiveInsured);
+  const baseShipping = freeShippingAll ? 0 : baseShippingFor(subtotal);
+  const insuranceCost = freeShippingAll
+    ? 0
+    : insuranceFeeFor(subtotal, effectiveInsured);
   const effectiveShipping = baseShipping + insuranceCost;
   const grandTotal = subtotal + effectiveShipping;
   const currency = articles[0]?.currency || "EUR";

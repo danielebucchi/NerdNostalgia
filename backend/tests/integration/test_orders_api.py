@@ -38,10 +38,10 @@ def test_shipping_follows_the_bands(client, published_article):
     r = client.post("/api/orders/", json=_payload(published_article["id"]))
     assert r.status_code == 201, r.text
     body = r.json()
-    # Articolo da 40 €: sotto i 50 € non si assicura → 6 € + 4% (1,60) = 7,60.
+    # Articolo da 40 €: sotto i 50 € non si assicura → 6,21 + 4% (1,60) = 7,81.
     # Non i 7 € del vecchio campo spedizione dell'articolo.
-    assert float(body["shipping_total"]) == 7.60
-    assert float(body["grand_total"]) == 47.60
+    assert float(body["shipping_total"]) == 7.81
+    assert float(body["grand_total"]) == 47.81
     assert body["hand_exchange"] is False
 
 
@@ -53,7 +53,7 @@ def test_hand_exchange_flag_is_ignored(client, published_article):
         json=_payload(published_article["id"], hand_exchange=True),
     )
     assert r.status_code == 201, r.text
-    assert float(r.json()["shipping_total"]) == 7.60
+    assert float(r.json()["shipping_total"]) == 7.81
     assert r.json()["hand_exchange"] is False
 
 
@@ -249,10 +249,10 @@ def test_shipping_is_computed_on_the_whole_order(
         ],
     }).json()
 
-    # 120 € → base 6 + 4% (4,80) = 10,80, piu' assicurazione 5,70 (attiva di
-    # default sopra i 50 €) = 16,50
+    # 120 € → base 6,21 + 4% (4,80) = 11,01, piu' assicurazione 5,90 (attiva
+    # di default sopra i 50 €) = 16,91
     assert float(body["subtotal"]) == 120.0
-    assert float(body["shipping_total"]) == 16.50
+    assert float(body["shipping_total"]) == 16.91
     assert body["insured"] is True
 
 
@@ -319,7 +319,7 @@ def test_insurance_defaults_off_below_fifty(client, published_article):
     body = client.post("/api/orders/", json=_payload(published_article["id"])).json()
     assert body["insured"] is False
     assert float(body["insurance_fee"]) == 0.0
-    assert float(body["shipping_total"]) == 7.60
+    assert float(body["shipping_total"]) == 7.81
 
 
 def test_buyer_can_insure_a_small_order(client, published_article):
@@ -329,9 +329,9 @@ def test_buyer_can_insure_a_small_order(client, published_article):
         json=_payload(published_article["id"]) | {"insured": True},
     ).json()
     assert body["insured"] is True
-    assert float(body["insurance_fee"]) == 5.70
-    assert float(body["shipping_total"]) == 13.30   # 7,60 + 5,70
-    assert float(body["grand_total"]) == 53.30      # 40 + 13,30
+    assert float(body["insurance_fee"]) == 5.90
+    assert float(body["shipping_total"]) == 13.71   # 7,81 + 5,90
+    assert float(body["grand_total"]) == 53.71      # 40 + 13,71
 
 
 def test_buyer_can_decline_insurance_on_a_big_order(
@@ -351,7 +351,7 @@ def test_buyer_can_decline_insurance_on_a_big_order(
         "/api/orders/", json=_payload(art["id"]) | {"insured": False},
     ).json()
     assert body["insured"] is False
-    assert float(body["shipping_total"]) == 10.00   # solo base, niente premio
+    assert float(body["shipping_total"]) == 10.21   # solo base, niente premio
 
 
 def test_free_shipping_orders_are_always_insured(
@@ -375,4 +375,35 @@ def test_free_shipping_orders_are_always_insured(
     assert body["insured"] is True
     assert float(body["insurance_fee"]) == 0.0
     assert float(body["shipping_total"]) == 0.0
+
+
+def test_free_shipping_switch_zeroes_everything(
+    client, admin_headers, published_article,
+):
+    """L'interruttore di /admin/impostazioni azzera la riga spedizione, premio
+    assicurativo compreso: e' una promozione, non uno sconto per ordine."""
+    # Prima: tariffa normale
+    before = client.post("/api/orders/", json=_payload(published_article["id"]))
+    assert float(before.json()["shipping_total"]) == 7.81
+
+    client.put(
+        "/api/settings/", headers=admin_headers,
+        json={"values": {"free_shipping_all": "true"}},
+    )
+    # L'articolo e' prenotato dal primo ordine: ne serve un altro
+    art = client.post(
+        "/api/articles/", headers=admin_headers,
+        json={
+            "user_id": 1, "title": "Secondo pezzo", "price": 120,
+            "currency": "EUR", "condition": "USED", "status": "PUBLISHED",
+            "quantity": 1,
+        },
+    ).json()
+
+    body = client.post(
+        "/api/orders/", json=_payload(art["id"]) | {"insured": True},
+    ).json()
+    assert float(body["shipping_total"]) == 0.0
+    assert float(body["insurance_fee"]) == 0.0
+    assert float(body["grand_total"]) == 120.0
 

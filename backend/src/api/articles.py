@@ -1,10 +1,11 @@
 """
 API endpoint per gli articoli.
 """
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from pydantic import BaseModel, Field
 
 from helpers.article import ArticleHelper, get_article_helper
 from helpers.auth import require_admin
@@ -259,6 +260,76 @@ def list_articles(
         skip=skip,
         limit=limit,
     )
+
+
+class BulkMarkupRequest(BaseModel):
+    """Rincaro percentuale su tutto il catalogo."""
+    percent: Decimal = Field(
+        ..., gt=0, le=50, max_digits=5, decimal_places=2,
+        description="Percentuale di aumento, es. 3.5",
+    )
+    # Di default si limita a mostrare cosa succederebbe: un'operazione che
+    # riscrive i prezzi di tutto il catalogo non parte per sbaglio.
+    dry_run: bool = True
+    include_drafts: bool = False
+
+
+@router.post("/bulk-markup")
+def bulk_markup(
+    payload: BulkMarkupRequest,
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Alza i prezzi di tutto il catalogo di una percentuale.
+
+    Serve a incorporare nel prezzo le commissioni di incasso senza passare
+    articolo per articolo. Con `dry_run` (default) restituisce solo
+    l'anteprima: nessun prezzo viene toccato finche' non si manda
+    esplicitamente dry_run=false.
+
+    Gli articoli VENDUTI non si toccano: il loro prezzo e' storia, non
+    listino.
+    """
+    statuses = [ArticleStatus.PUBLISHED]
+    if payload.include_drafts:
+        statuses.append(ArticleStatus.DRAFT)
+
+    db = article_helper.db
+    articles = (
+        db.query(Article)
+        .filter(Article.status.in_(statuses), Article.price.isnot(None))
+        .order_by(Article.id)
+        .all()
+    )
+
+    factor = Decimal("1") + payload.percent / Decimal("100")
+    changes = []
+    for a in articles:
+        old = Decimal(a.price)
+        new = (old * factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if new == old:
+            continue
+        changes.append({
+            "id": a.id,
+            "title": a.title[:60],
+            "old_price": float(old),
+            "new_price": float(new),
+            "delta": float(new - old),
+        })
+        if not payload.dry_run:
+            a.price = new
+
+    if not payload.dry_run and changes:
+        db.commit()
+
+    return {
+        "dry_run": payload.dry_run,
+        "percent": float(payload.percent),
+        "articles_considered": len(articles),
+        "articles_changed": len(changes),
+        "total_delta": round(sum(c["delta"] for c in changes), 2),
+        "changes": changes,
+    }
 
 
 @router.get("/{article_id}", response_model=ArticleResponse)

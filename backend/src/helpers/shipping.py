@@ -2,11 +2,18 @@
 Spese di spedizione del sito: base + assicurazione facoltativa.
 
 SPEDIZIONE BASE (sul subtotale articoli):
-  fino a  25,00 €    →   6,00 €
-  25,01 – 249,99 €   →   6,00 € + 4%, con la parte % fra 1,00 € e un tetto
+  fino a  25,00 €    →   6,21 €
+  25,01 – 249,99 €   →   6,21 € + 4%, con la parte % fra 1,00 € e un tetto
   da     250,00 €    →  gratis
 
-ASSICURAZIONE: +5,70 €, sempre la stessa cifra.
+ASSICURAZIONE: +5,90 €, sempre la stessa cifra.
+
+Le cifre includono il +3,5% applicato anche al listino articoli per coprire
+le commissioni di incasso: la commissione si calcola sul totale pagato dal
+cliente, spedizione compresa, quindi rincarare i soli articoli lascerebbe
+scoperta la parte percentuale sulla spedizione. Resta volutamente fuori il
+fisso da 0,35 € per transazione: assorbirlo avrebbe richiesto uno scalino
+sulle fasce basse, e si e' scelto di tenerlo a carico nostro.
   Attiva di default dai 50 € in su, ma il compratore puo' sempre cambiare
   idea nei due sensi: assicurare un ordine piccolo, o rinunciare su uno
   grande. Dai 250 € e' inclusa nella spedizione gratuita: a quel punto il
@@ -33,14 +40,14 @@ FREE_SHIPPING_FROM = Decimal("250.00")
 # Da qui in su l'assicurazione e' proposta gia' spuntata (ma si puo' togliere)
 INSURED_BY_DEFAULT_FROM = Decimal("50.00")
 # Premio assicurativo: cifra fissa, non percentuale (vedi docstring)
-INSURANCE_FEE = Decimal("5.70")
+INSURANCE_FEE = Decimal("5.90")
 
-BASE_SHIPPING = Decimal("6.00")
+BASE_SHIPPING = Decimal("6.21")
 PERCENT_BAND_FROM = Decimal("25.00")
 PERCENT_RATE = Decimal("0.04")
 PERCENT_MIN = Decimal("1.00")
 # Tetto alla sola quota percentuale: oltre, staremmo solo gonfiando il prezzo
-PERCENT_MAX = Decimal("6.00")
+PERCENT_MAX = Decimal("6.21")
 
 CENTS = Decimal("0.01")
 
@@ -87,8 +94,15 @@ def resolve_insured(subtotal, insured) -> bool:
     return default_insured(subtotal) if insured is None else bool(insured)
 
 
-def calc_shipping(subtotal, insured=None) -> Decimal:
-    """Spedizione totale: base + eventuale assicurazione."""
+def calc_shipping(subtotal, insured=None, free_all: bool = False) -> Decimal:
+    """Spedizione totale: base + eventuale assicurazione.
+
+    `free_all` e' l'interruttore "spedizione gratuita su tutto" di
+    /admin/impostazioni: azzera l'intera riga, assicurazione compresa, come
+    se l'ordine avesse superato la soglia di gratuita.
+    """
+    if free_all:
+        return Decimal("0.00")
     chosen = resolve_insured(subtotal, insured)
     return base_shipping(subtotal) + insurance_fee(subtotal, chosen)
 

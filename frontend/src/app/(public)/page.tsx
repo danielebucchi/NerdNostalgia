@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { listArticles } from "@/lib/api";
+import { getPublicSettings, listArticles } from "@/lib/api";
 import { CatalogSection } from "@/components/CatalogSection";
 import { LogoImage } from "@/components/LogoImage";
 
@@ -19,6 +19,17 @@ export default async function HomePage() {
     articles = data.items;
   } catch (err) {
     error = err instanceof Error ? err.message : "Errore sconosciuto";
+  }
+
+  // Promozione "spedizione gratuita su tutto": l'annuncio in home deve dire
+  // la stessa cosa che il carrello poi applica.
+  let freeShippingAll = false;
+  try {
+    const settings = await getPublicSettings();
+    freeShippingAll =
+      (settings.free_shipping_all || "").trim().toLowerCase() === "true";
+  } catch {
+    /* settings irraggiungibili: resta l'annuncio con la soglia */
   }
 
   return (
@@ -51,8 +62,8 @@ export default async function HomePage() {
             <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-mint-deep/15 ring-1 ring-mint-deep/40 px-4 py-2 text-sm font-semibold text-ink">
               <span aria-hidden="true" className="text-base">🚚</span>
               <span>
-                Spedizione <span className="text-mint-deep">gratuita</span> per
-                ordini da 250 €
+                Spedizione <span className="text-mint-deep">gratuita</span>{" "}
+                {freeShippingAll ? "su tutto il catalogo" : "per ordini da 250 €"}
               </span>
             </p>
             <div className="mt-5 flex flex-wrap gap-3 justify-center md:justify-start">
