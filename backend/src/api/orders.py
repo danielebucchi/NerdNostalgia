@@ -422,6 +422,10 @@ def update_order(
     if not order:
         raise HTTPException(status_code=404, detail="Ordine non trovato")
 
+    # Id da avvisare dopo il commit (vedi sotto): l'email di spedizione deve
+    # leggere un ordine gia' scritto, non uno a meta'.
+    _avvisa_spedizione = None
+
     # Il tracking si salva prima di valutare il cambio di stato: cosi' si
     # puo' mandare codice e "SPEDITO" nella stessa richiesta.
     if payload.tracking_carrier is not None:
@@ -458,12 +462,10 @@ def update_order(
             order.paid_at = now
         elif payload.status == OrderStatus.SHIPPED and not order.shipped_at:
             order.shipped_at = now
-            # Il compratore riceve il codice: e' il senso di averlo richiesto
-            try:
-                from utils.email import send_shipping_notice
-                send_shipping_notice(order)
-            except Exception as exc:  # noqa: BLE001
-                LOGGER.warning("Avviso spedizione %s non inviato: %s", order.id, exc)
+            # Il compratore riceve il codice: e' il senso di averlo richiesto.
+            # Parte dopo il commit, cosi' il thread rilegge un ordine gia'
+            # salvato con tracking e stato aggiornati.
+            _avvisa_spedizione = order.id
         elif payload.status == OrderStatus.COMPLETED and not order.completed_at:
             order.completed_at = now
         elif payload.status == OrderStatus.CANCELLED and not order.cancelled_at:
@@ -476,15 +478,9 @@ def update_order(
             # Stesso trattamento di un incasso PayPal/Stripe: il compratore
             # deve ricevere la conferma anche se il pagamento e' arrivato
             # per altra via (bonifico, contanti) e l'hai segnato tu.
-            try:
-                from utils.email import (
-                    send_order_confirmation,
-                    send_order_notification,
-                )
-                send_order_notification(order)
-                send_order_confirmation(order)
-            except Exception as exc:  # noqa: BLE001
-                LOGGER.warning("Email ordine %s non inviate: %s", order.id, exc)
+            from utils import mailer
+            mailer.order_notification(order.id)
+            mailer.order_confirmation(order.id)
         elif payload.status == OrderStatus.CANCELLED:
             release_order(db, order)
 
@@ -493,6 +489,11 @@ def update_order(
 
     db.commit()
     db.refresh(order)
+
+    if _avvisa_spedizione is not None:
+        from utils import mailer
+        mailer.shipping_notice(_avvisa_spedizione)
+
     return order
 
 
