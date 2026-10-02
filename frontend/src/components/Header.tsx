@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { getPublicSettings } from "@/lib/api";
-import { AlertBell } from "@/components/AlertBell";
 import { CartNavLink } from "@/components/CartNavLink";
-import { CustomerNavLink } from "@/components/CustomerNavLink";
+import { CustomerNav } from "@/components/CustomerNav";
 import { LogoImage } from "@/components/LogoImage";
 import { SearchBox } from "@/components/SearchBox";
-import { WishlistNavLink } from "@/components/WishlistNavLink";
 
 // Soglia allineata a FREE_SHIPPING_FROM in lib/cart.ts
 const SPEDIZIONE_A_SOGLIA = "🚚 Spedizione GRATUITA per ordini da 250 €";
@@ -73,18 +71,14 @@ export function Header() {
         <SearchBox className="hidden md:block flex-1 max-w-xs mx-2" />
 
         <nav className="hidden md:flex items-center gap-2 flex-shrink-0">
-          <AlertBell variant="desktop" />
-          <WishlistNavLink variant="desktop" />
           <CartNavLink variant="desktop" />
-          <CustomerNavLink variant="desktop" />
+          <CustomerNav variant="desktop" />
           <Link href="/contatti" className="btn btn-primary text-sm">Contattami</Link>
         </nav>
 
         <nav className="flex md:hidden gap-1.5 flex-shrink-0">
-          <AlertBell variant="mobile" />
-          <WishlistNavLink variant="mobile" />
           <CartNavLink variant="mobile" />
-          <CustomerNavLink variant="mobile" />
+          <CustomerNav variant="mobile" />
           <Link
             href="/contatti"
             className="btn btn-primary text-xs px-3 py-1.5"
