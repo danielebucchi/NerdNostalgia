@@ -8,9 +8,10 @@ devono inventarsi un nome da ricordare.
 
 NB: NIENTE `from __future__ import annotations` (vedi api/orders.py).
 """
+import hashlib
 import logging
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -263,4 +264,114 @@ def set_marketing_consent(
     return ConsentResponse(
         email=current_user.email,
         marketing_consent=current_user.marketing_consent,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Recupero password
+#
+# Il token viaggia solo dentro il link mandato per email: in tabella ne
+# finisce l'hash, cosi' chi riuscisse a leggere il database non potrebbe
+# entrare in tutti gli account.
+#
+# Vale un'ora e una volta sola. Un link che resta buono per sempre e' una
+# seconda password permanente, dimenticata in fondo a una casella di posta
+# che un domani puo' finire in mano a qualcun altro.
+# ---------------------------------------------------------------------------
+
+RESET_VALIDO_PER = timedelta(hours=1)
+
+
+def _hash_token(token: str) -> str:
+    """SHA-256 e non bcrypt di proposito: il token e' 32 byte casuali, non
+    una password indovinabile, quindi non c'e' niente da rallentare — e il
+    confronto avviene a ogni clic sul link."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=16, max_length=128)
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class MessageResponse(BaseModel):
+    detail: str
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+@limiter.limit("5/minute;20/hour")
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Manda il link per reimpostare la password.
+
+    Risponde sempre allo stesso modo, che l'account esista o no: una
+    risposta diversa trasformerebbe questo endpoint in un modo per
+    sapere chi e' iscritto al sito.
+    """
+    email = str(payload.email).strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+
+    if user is not None and user.is_active:
+        token = secrets.token_urlsafe(32)
+        user.reset_token_hash = _hash_token(token)
+        user.reset_token_expires_at = (
+            datetime.now(timezone.utc).replace(tzinfo=None) + RESET_VALIDO_PER
+        )
+        db.commit()
+
+        from utils import mailer
+        mailer.password_reset(user.id, token)
+        LOGGER.info("Richiesto recupero password per utente %s", user.id)
+    else:
+        LOGGER.info("Recupero password per email sconosciuta o disattivata")
+
+    return MessageResponse(
+        detail="Se esiste un account con questa email, ti ho mandato il link "
+               "per reimpostare la password. Controlla anche lo spam.",
+    )
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+@limiter.limit("10/minute;40/hour")
+def reset_password(
+    payload: ResetPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Imposta la nuova password e brucia il token."""
+    scaduto = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Il link non è più valido: vale un'ora e una volta sola. "
+               "Chiedine un altro e riprova.",
+    )
+
+    user = (
+        db.query(User)
+        .filter(User.reset_token_hash == _hash_token(payload.token))
+        .first()
+    )
+    if user is None or not user.is_active:
+        raise scaduto
+
+    adesso = datetime.now(timezone.utc).replace(tzinfo=None)
+    if user.reset_token_expires_at is None or user.reset_token_expires_at < adesso:
+        raise scaduto
+
+    user.hashed_password = hash_password(payload.password)
+    # Bruciato subito: il link vale una volta sola, e se e' finito in mano
+    # a qualcun altro ha appena smesso di funzionare.
+    user.reset_token_hash = None
+    user.reset_token_expires_at = None
+    db.commit()
+    LOGGER.info("Password reimpostata per utente %s", user.id)
+
+    return MessageResponse(
+        detail="Password aggiornata. Ora puoi accedere con quella nuova.",
     )

@@ -220,3 +220,30 @@ export async function setMarketingConsent(
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as ConsentState;
 }
+
+/** Chiede il link per reimpostare la password.
+ *
+ *  Il server risponde allo stesso modo che l'account esista o no: non
+ *  c'è niente da distinguere qui, e non deve esserci. */
+export async function requestPasswordReset(email: string): Promise<string> {
+  const res = await fetch(`${PUBLIC_API_BASE}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()).detail as string;
+}
+
+export async function resetPassword(
+  token: string,
+  password: string,
+): Promise<string> {
+  const res = await fetch(`${PUBLIC_API_BASE}/api/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()).detail as string;
+}

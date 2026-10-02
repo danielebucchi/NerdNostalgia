@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PasswordInput } from "@/components/PasswordInput";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { registerCustomer } from "@/lib/customer-auth";
@@ -78,14 +79,12 @@ export default function RegistratiPage() {
           <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
             Password *
           </span>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             autoComplete="new-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input mt-1"
+            onChange={setPassword}
           />
           <span className="text-[11px] text-ink-soft">Almeno 8 caratteri.</span>
         </label>

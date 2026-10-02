@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS users (
     marketing_consent BOOLEAN NOT NULL DEFAULT 0,
     marketing_consent_at TIMESTAMP,
     unsubscribe_token VARCHAR(64),
+    -- Recupero password (vedi 0026): in tabella l'hash, mai il token.
+    reset_token_hash VARCHAR(64),
+    reset_token_expires_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

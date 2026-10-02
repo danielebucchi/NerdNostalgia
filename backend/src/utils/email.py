@@ -713,3 +713,63 @@ Nerd.Nostalgia
         reply_to=cfg["to_admin"],
     )
 
+
+def send_password_reset(user, token: str) -> bool:
+    """Link per reimpostare la password.
+
+    Niente password dentro l'email, nemmeno temporanea: una password
+    scritta in chiaro resta leggibile per sempre in una casella di posta,
+    e chi legge quella casella entra nell'account anche fra due anni. Il
+    link invece smette di funzionare dopo un'ora.
+    """
+    cfg = _config()
+    nome = (user.full_name or "").split()[0] if user.full_name else ""
+    saluto = f"Ciao {nome}," if nome else "Ciao,"
+    site = _site_url()
+    link = f"{site}/reimposta-password?t={token}"
+
+    text_body = f"""{saluto}
+
+hai chiesto di reimpostare la password del tuo profilo su Nerd.Nostalgia.
+Apri questo link e scegline una nuova:
+
+{link}
+
+Il link vale un'ora e una volta sola.
+
+Se non sei stato tu, puoi ignorare questo messaggio: la password di adesso
+resta quella che e', e senza aprire il link non cambia niente.
+
+Nerd.Nostalgia
+{site}
+"""
+
+    html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
+  <p>{saluto}</p>
+  <p>
+    hai chiesto di reimpostare la password del tuo profilo su
+    <strong>Nerd.Nostalgia</strong>. Scegline una nuova da qui:
+  </p>
+  <p style="text-align:center; margin:28px 0;">
+    <a href="{link}" style="display:inline-block; background:#a890d8; color:white; padding:12px 26px; border-radius:999px; text-decoration:none; font-weight:bold;">Scegli una nuova password</a>
+  </p>
+  <p style="font-size:0.9em; color:#6b5b8a;">
+    Il link vale <strong>un'ora</strong> e una volta sola.
+  </p>
+  <p style="font-size:0.9em; color:#6b5b8a;">
+    Se non sei stato tu, ignora pure questo messaggio: senza aprire il link
+    non cambia niente e la password di adesso resta quella che è.
+  </p>
+  <hr style="border:none; border-top:1px solid #efe9fa; margin:24px 0;">
+  <p style="font-size:0.85em; color:#9b8db8;">
+    Nerd.Nostalgia — <a href="{site}" style="color:#a890d8;">{site}</a>
+  </p>
+</body></html>"""
+
+    return send_email(
+        to=user.email,
+        subject="Reimposta la password del tuo profilo",
+        text_body=text_body,
+        html_body=html_body,
+        reply_to=cfg["to_admin"],
+    )

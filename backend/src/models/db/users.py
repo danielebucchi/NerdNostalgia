@@ -32,6 +32,11 @@ class User(BaseModel):
     marketing_consent_at = Column(DateTime)
     unsubscribe_token = Column(String(64))
 
+    # Recupero password: in tabella l'HASH del token, mai il token. Chi
+    # legge il database non deve poter entrare in tutti gli account.
+    reset_token_hash = Column(String(64))
+    reset_token_expires_at = Column(DateTime)
+
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
 
