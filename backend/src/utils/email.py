@@ -389,12 +389,36 @@ def send_order_confirmation(order) -> bool:
     nome = (order.buyer_name or "").split()[0] if order.buyer_name else ""
     saluto = f"Ciao {nome}," if nome else "Ciao,"
     assicurata = bool(order.insured)
+    site = _site_url()
+    # L'invito a registrarsi ha senso solo per chi un profilo non ce l'ha:
+    # a chi e' gia' dentro suonerebbe come se non lo riconoscessimo.
+    ospite = order.user_id is None
 
     consegna_txt = (
         f"Ritiri al locker InPost {order.inpost_point_name or ''} "
         f"(codice {order.inpost_point_id})"
         if order.inpost_point_id
         else "Spedizione all'indirizzo che hai indicato"
+    )
+
+    invito_txt = (
+        f"""
+Vuoi seguire la spedizione da solo? Crea un profilo con questa stessa email
+e l'ordine ci finisce dentro automaticamente:
+{site}/registrati
+"""
+        if ospite
+        else ""
+    )
+    invito_html = (
+        f"""<p style="background:#d4c4f0; border-radius:8px; padding:12px 16px;">
+    <strong>Vuoi seguire la spedizione da solo?</strong> Crea un profilo con
+    questa stessa email e l'ordine ci finisce dentro automaticamente, con il
+    codice di tracciamento appena spedisco.<br>
+    <a href="{site}/registrati" style="display:inline-block; margin-top:8px; background:#a890d8; color:white; padding:9px 18px; border-radius:999px; text-decoration:none; font-weight:bold;">Crea il profilo &rarr;</a>
+  </p>"""
+        if ospite
+        else ""
     )
 
     text_body = f"""{saluto}
@@ -423,6 +447,7 @@ Se qualcosa non torna, rispondi a questa email: la leggo io.
 PS: se hai trovato questo messaggio nello spam, segnalalo come attendibile
 o aggiungi il mittente ai contatti. Cosi' l'avviso con il codice di
 tracciamento, che ti mando appena spedisco, non finisce li' anche lui.
+{invito_txt}
 
 Nerd.Nostalgia
 {_site_url()}
@@ -457,6 +482,7 @@ Nerd.Nostalgia
   <p style="margin-top:20px;">
     Se qualcosa non torna, <strong>rispondi a questa email</strong>: la leggo io.
   </p>
+  {invito_html}
   <p style="background:#fff4a8; border-radius:8px; padding:10px 14px; font-size:0.9em;">
     📬 <strong>Trovata nello spam?</strong> Segnala il mittente come
     attendibile o aggiungilo ai contatti: così l'avviso con il codice di
