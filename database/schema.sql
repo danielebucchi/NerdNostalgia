@@ -181,10 +181,14 @@ CREATE TABLE IF NOT EXISTS orders (
     -- perdere il dato degli ordini storici; i nuovi ordini sono sempre 0.
     hand_exchange BOOLEAN NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-        CHECK (status IN ('PENDING','PAID','SHIPPED','CANCELLED')),
+        CHECK (status IN ('PENDING','PAID','SHIPPED','COMPLETED','CANCELLED')),
     paid_at TIMESTAMP,
     shipped_at TIMESTAMP,
+    completed_at TIMESTAMP,
     cancelled_at TIMESTAMP,
+    -- Spedizione: senza tracking non si puo' marcare spedito (vedi 0021)
+    tracking_carrier VARCHAR(80),
+    tracking_code VARCHAR(120),
     admin_notes TEXT,
     -- Tracking IP per rate-limit / antifrode
     ip_address VARCHAR(45),

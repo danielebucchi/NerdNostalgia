@@ -26,6 +26,9 @@ class OrderStatus(enum.Enum):
     PENDING = "PENDING"
     PAID = "PAID"
     SHIPPED = "SHIPPED"
+    # Pratica chiusa: pacco consegnato e nulla in sospeso. Si arriva qui
+    # solo da SHIPPED.
+    COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
 
@@ -62,7 +65,13 @@ class Order(BaseModel):
     )
     paid_at = Column(DateTime)
     shipped_at = Column(DateTime)
+    completed_at = Column(DateTime)
     cancelled_at = Column(DateTime)
+
+    # Spedizione: il codice e' obbligatorio per passare a SPEDITO, cosi' non
+    # si perde traccia di un pacco gia' partito.
+    tracking_carrier = Column(String(80))
+    tracking_code = Column(String(120))
     admin_notes = Column(Text)
 
     ip_address = Column(String(45))

@@ -466,3 +466,70 @@ Nerd.Nostalgia
         reply_to=cfg["to_admin"],
     )
 
+
+def send_shipping_notice(order) -> bool:
+    """Avvisa il compratore che il pacco e' partito, col codice per seguirlo.
+
+    E' il motivo per cui il tracking e' obbligatorio prima di marcare
+    SPEDITO: senza codice questa email non avrebbe nulla da dire, e il
+    compratore resterebbe ad aspettare senza sapere dov'e' il pacco.
+    """
+    cfg = _config()
+    nome = (order.buyer_name or "").split()[0] if order.buyer_name else ""
+    saluto = f"Ciao {nome}," if nome else "Ciao,"
+    corriere = (order.tracking_carrier or "").strip()
+    codice = (order.tracking_code or "").strip()
+
+    dove = (
+        f"al locker InPost {order.inpost_point_name or ''} "
+        f"(codice {order.inpost_point_id})".strip()
+        if order.inpost_point_id
+        else f"all'indirizzo che hai indicato: {order.ship_street}, "
+             f"{order.ship_postal_code} {order.ship_city}"
+    )
+
+    text_body = f"""{saluto}
+
+il tuo ordine #{order.id} e' partito.
+
+Codice di tracciamento: {codice}
+{f"Corriere: {corriere}" if corriere else ""}
+
+Arriva {dove}.
+
+Se dopo qualche giorno il tracciamento non si muove, rispondi a questa
+email e ci penso io.
+
+Nerd.Nostalgia
+{_site_url()}
+"""
+
+    html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
+  <h2 style="color: #e879a8;">📦 Il tuo ordine #{order.id} è partito</h2>
+  <p>{saluto} il pacco è in viaggio.</p>
+
+  <p style="background:#e0f5ec; border-left:3px solid #7dd1b8; padding:12px 16px; border-radius:8px;">
+    <span style="color:#888; font-size:0.85em;">Codice di tracciamento</span><br>
+    <strong style="font-size:1.2em; letter-spacing:0.5px;">{codice}</strong>
+    {f'<br><span style="color:#888; font-size:0.9em;">Corriere: {corriere}</span>' if corriere else ''}
+  </p>
+
+  <p>Arriva {dove}.</p>
+
+  <p style="margin-top:20px;">
+    Se dopo qualche giorno il tracciamento non si muove,
+    <strong>rispondi a questa email</strong> e ci penso io.
+  </p>
+  <p style="color:#888; font-size:0.9em;">
+    Nerd.Nostalgia · <a href="{_site_url()}">{_site_url()}</a>
+  </p>
+</body></html>"""
+
+    return send_email(
+        to=order.buyer_email,
+        subject=f"Il tuo ordine #{order.id} è partito — tracking {codice}",
+        text_body=text_body,
+        html_body=html_body,
+        reply_to=cfg["to_admin"],
+    )
+

@@ -35,7 +35,10 @@ interface Order {
   currency: string;
   notes: string | null;
   hand_exchange?: boolean;
-  status: "PENDING" | "PAID" | "SHIPPED" | "CANCELLED";
+  status: "PENDING" | "PAID" | "SHIPPED" | "COMPLETED" | "CANCELLED";
+  tracking_carrier?: string | null;
+  tracking_code?: string | null;
+  completed_at?: string | null;
   paid_at: string | null;
   shipped_at: string | null;
   cancelled_at: string | null;
@@ -48,6 +51,7 @@ const STATUS_CHIP: Record<Order["status"], string> = {
   PENDING: "chip-lilac",
   PAID: "chip-mint",
   SHIPPED: "chip-sky",
+  COMPLETED: "chip-lilac",
   CANCELLED: "chip-pink",
 };
 
@@ -55,6 +59,7 @@ const STATUS_LABEL: Record<Order["status"], string> = {
   PENDING: "In attesa",
   PAID: "Pagato",
   SHIPPED: "Spedito",
+  COMPLETED: "Completato",
   CANCELLED: "Annullato",
 };
 
@@ -90,6 +95,9 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
+  // Bozza del tracking per ordine: senza codice non si puo' spedire, quindi
+  // il campo vive accanto al bottone invece che in una schermata a parte.
+  const [tracking, setTracking] = useState<Record<number, { carrier: string; code: string }>>({});
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -112,11 +120,17 @@ export default function AdminOrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterStatus]);
 
-  async function setStatus(id: number, status: Order["status"]) {
+  async function setStatus(
+    id: number,
+    status: Order["status"],
+    extra: Record<string, string> = {},
+  ) {
     setBusy(id);
+    setError(null);
     try {
       const updated = await adminApi.patch<Order>(`/api/orders/${id}`, {
         status,
+        ...extra,
       });
       setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
     } catch (err) {
@@ -195,6 +209,7 @@ export default function AdminOrdersPage() {
             <option value="PENDING">In attesa</option>
             <option value="PAID">Pagati</option>
             <option value="SHIPPED">Spediti</option>
+            <option value="COMPLETED">Completati</option>
             <option value="CANCELLED">Annullati</option>
           </select>
         </div>
@@ -414,6 +429,86 @@ export default function AdminOrdersPage() {
                         </>
                       )}
 
+                      {/* Spedizione: il codice è obbligatorio per marcare
+                          SPEDITO, così il compratore può seguire il pacco e
+                          l'avviso che riceve ha qualcosa da dire. */}
+                      {o.status === "PAID" && (
+                        <div className="rounded-xl bg-sky-soft/40 ring-1 ring-sky-deep/30 p-3 mb-3">
+                          <p className="text-xs font-bold uppercase tracking-wider text-ink-soft mb-2">
+                            Spedizione
+                          </p>
+                          <div className="flex flex-wrap gap-2 items-end">
+                            <label className="block">
+                              <span className="text-[11px] text-ink-soft">Corriere</span>
+                              <input
+                                type="text"
+                                placeholder="es. BRT"
+                                value={tracking[o.id]?.carrier ?? o.tracking_carrier ?? ""}
+                                onChange={(e) =>
+                                  setTracking((t) => ({
+                                    ...t,
+                                    [o.id]: {
+                                      carrier: e.target.value,
+                                      code: t[o.id]?.code ?? o.tracking_code ?? "",
+                                    },
+                                  }))
+                                }
+                                className="input mt-0.5 w-28"
+                              />
+                            </label>
+                            <label className="block flex-1 min-w-[180px]">
+                              <span className="text-[11px] text-ink-soft">
+                                Codice di tracciamento *
+                              </span>
+                              <input
+                                type="text"
+                                placeholder="obbligatorio per spedire"
+                                value={tracking[o.id]?.code ?? o.tracking_code ?? ""}
+                                onChange={(e) =>
+                                  setTracking((t) => ({
+                                    ...t,
+                                    [o.id]: {
+                                      carrier: t[o.id]?.carrier ?? o.tracking_carrier ?? "",
+                                      code: e.target.value,
+                                    },
+                                  }))
+                                }
+                                className="input mt-0.5"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              disabled={
+                                busy === o.id ||
+                                !(tracking[o.id]?.code ?? o.tracking_code ?? "").trim()
+                              }
+                              onClick={() =>
+                                setStatus(o.id, "SHIPPED", {
+                                  tracking_carrier:
+                                    tracking[o.id]?.carrier ?? o.tracking_carrier ?? "",
+                                  tracking_code:
+                                    tracking[o.id]?.code ?? o.tracking_code ?? "",
+                                })
+                              }
+                              className="btn btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              📦 Spedito
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-ink-soft mt-2">
+                            Appena segni spedito, il compratore riceve il codice via email.
+                          </p>
+                        </div>
+                      )}
+
+                      {o.tracking_code && o.status !== "PAID" && (
+                        <p className="text-xs text-ink-soft mb-3">
+                          📦 Tracking:{" "}
+                          <strong className="text-ink">{o.tracking_code}</strong>
+                          {o.tracking_carrier ? ` · ${o.tracking_carrier}` : ""}
+                        </p>
+                      )}
+
                       <div className="flex flex-wrap gap-2">
                         {o.status === "PENDING" && (
                           <button
@@ -425,14 +520,20 @@ export default function AdminOrdersPage() {
                             ✓ Pagato
                           </button>
                         )}
-                        {o.status === "PAID" && (
+                        {o.status === "COMPLETED" && (
+                          <span className="text-sm text-ink-soft self-center">
+                            ✓ Pratica chiusa
+                          </span>
+                        )}
+                        {o.status === "SHIPPED" && (
                           <button
                             type="button"
-                            onClick={() => setStatus(o.id, "SHIPPED")}
+                            onClick={() => setStatus(o.id, "COMPLETED")}
                             disabled={busy === o.id}
                             className="btn btn-primary text-sm"
+                            title="Pacco consegnato e nulla in sospeso"
                           >
-                            📦 Spedito
+                            🏁 Completato
                           </button>
                         )}
                         {(o.status === "PENDING" || o.status === "PAID") && (

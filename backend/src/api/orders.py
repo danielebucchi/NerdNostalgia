@@ -116,6 +116,9 @@ class OrderResponse(BaseModel):
     grand_total: Decimal
     currency: str
     notes: Optional[str]
+    tracking_carrier: Optional[str] = None
+    tracking_code: Optional[str] = None
+    completed_at: Optional[datetime] = None
     # Locker di ritiro scelto dal compratore
     inpost_point_id: Optional[str] = None
     inpost_point_name: Optional[str] = None
@@ -140,6 +143,9 @@ class OrderResponse(BaseModel):
 class OrderUpdate(BaseModel):
     status: Optional[OrderStatus] = None
     admin_notes: Optional[str] = None
+    # Spedizione: il codice serve PRIMA di poter marcare SHIPPED
+    tracking_carrier: Optional[str] = Field(None, max_length=80)
+    tracking_code: Optional[str] = Field(None, max_length=120)
 
 
 def _free_shipping_all(db: Session) -> bool:
@@ -389,13 +395,48 @@ def update_order(
     if not order:
         raise HTTPException(status_code=404, detail="Ordine non trovato")
 
+    # Il tracking si salva prima di valutare il cambio di stato: cosi' si
+    # puo' mandare codice e "SPEDITO" nella stessa richiesta.
+    if payload.tracking_carrier is not None:
+        order.tracking_carrier = payload.tracking_carrier.strip() or None
+    if payload.tracking_code is not None:
+        order.tracking_code = payload.tracking_code.strip() or None
+
     if payload.status is not None and payload.status != order.status:
+        # Senza codice di tracciamento non si marca spedito: un pacco gia'
+        # partito e non tracciabile e' un problema che si scopre tardi, e
+        # il compratore non ha modo di sapere dov'e'.
+        if payload.status == OrderStatus.SHIPPED and not (order.tracking_code or "").strip():
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Inserisci il codice di tracciamento prima di segnare "
+                    "l'ordine come spedito."
+                ),
+            )
+        # COMPLETATO chiude la pratica: ci si arriva solo da SPEDITO.
+        if (
+            payload.status == OrderStatus.COMPLETED
+            and order.status != OrderStatus.SHIPPED
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Un ordine si completa solo dopo essere stato spedito.",
+            )
         order.status = payload.status
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         if payload.status == OrderStatus.PAID and not order.paid_at:
             order.paid_at = now
         elif payload.status == OrderStatus.SHIPPED and not order.shipped_at:
             order.shipped_at = now
+            # Il compratore riceve il codice: e' il senso di averlo richiesto
+            try:
+                from utils.email import send_shipping_notice
+                send_shipping_notice(order)
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.warning("Avviso spedizione %s non inviato: %s", order.id, exc)
+        elif payload.status == OrderStatus.COMPLETED and not order.completed_at:
+            order.completed_at = now
         elif payload.status == OrderStatus.CANCELLED and not order.cancelled_at:
             order.cancelled_at = now
 
