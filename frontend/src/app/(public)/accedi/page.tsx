@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PasswordInput } from "@/components/PasswordInput";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { loginCustomer } from "@/lib/customer-auth";
@@ -53,15 +54,22 @@ export default function AccediPage() {
           <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
             Password
           </span>
-          <input
-            type="password"
+          <PasswordInput
             required
             autoComplete="current-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input mt-1"
+            onChange={setPassword}
           />
         </label>
+
+        <p className="text-sm text-ink-soft -mt-1">
+          <Link
+            href="/password-dimenticata"
+            className="underline hover:text-pink-deep"
+          >
+            Hai dimenticato la password?
+          </Link>
+        </p>
 
         <button
           type="submit"

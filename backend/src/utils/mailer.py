@@ -108,3 +108,27 @@ def review_invite(order_id: int) -> None:
     from utils.email import send_review_invite
     _with_order(order_id, send_review_invite, "recensione")
 
+
+def password_reset(user_id: int, token: str) -> None:
+    """Link per reimpostare la password.
+
+    Il token arriva come parametro e non si rilegge dal database: li' c'e'
+    solo il suo hash, e in chiaro esiste un istante solo — adesso.
+    """
+    if not _emails_enabled():
+        return
+
+    def job() -> None:
+        from models.db import User
+        from utils.session import SessionLocal
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if user is None:
+                return
+            from utils.email import send_password_reset
+            send_password_reset(user, token)
+        finally:
+            db.close()
+
+    _run_detached(job, f"recupero-password-{user_id}")
