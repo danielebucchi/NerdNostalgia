@@ -546,54 +546,6 @@ export function PurchaseDialog({
             </p>
           )}
 
-          <div className="grid sm:grid-cols-2 gap-3">
-            <Field label="Nome e cognome *">
-              <input
-                type="text"
-                required
-                autoComplete="name"
-                value={state.buyer_name}
-                onChange={(e) => set("buyer_name", e.target.value)}
-                className="input"
-              />
-            </Field>
-            <Field label="Email *">
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                value={state.buyer_email}
-                onChange={(e) => set("buyer_email", e.target.value)}
-                className="input"
-              />
-            </Field>
-          </div>
-
-          {/* Telefono: formalmente facoltativo, ma lo consigliamo con forza —
-              senza numero il corriere non ha modo di avvisare e il pacco
-              torna indietro. Il banner resta finche' il campo e' vuoto. */}
-          <Field label="Telefono (consigliato)">
-            <input
-              type="tel"
-              autoComplete="tel"
-              placeholder="es. 333 1234567"
-              value={state.buyer_phone}
-              onChange={(e) => set("buyer_phone", e.target.value)}
-              className="input"
-            />
-            {!state.buyer_phone.trim() && (
-              <p className="mt-2 flex items-start gap-2 rounded-xl bg-sky-soft/50 ring-1 ring-sky-deep/30 px-3 py-2 text-sm leading-snug text-ink">
-                <span aria-hidden="true" className="text-base leading-none">
-                  🚚
-                </span>
-                <span>
-                  Lascia il numero di telefono così il corriere può contattarti
-                  in caso di problemi con la consegna.
-                </span>
-              </p>
-            )}
-          </Field>
-
           {/* ── Dove consegniamo ──
               La modalita' la decide il server: con il token InPost si ritira
               al locker, senza si spedisce a casa. Il compratore non sceglie,
@@ -796,6 +748,60 @@ export function PurchaseDialog({
               )}
             </>
           )}
+
+          {/* I dati personali dopo l'indirizzo: chi compra pensa
+              prima a dove vuole il pacco. */}
+          <h3 className="display text-lg text-ink pt-2 border-t border-ink/10">
+            I tuoi dati
+          </h3>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Field label="Nome e cognome *">
+              <input
+                type="text"
+                required
+                autoComplete="name"
+                value={state.buyer_name}
+                onChange={(e) => set("buyer_name", e.target.value)}
+                className="input"
+              />
+            </Field>
+            <Field label="Email *">
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                value={state.buyer_email}
+                onChange={(e) => set("buyer_email", e.target.value)}
+                className="input"
+              />
+            </Field>
+          </div>
+
+          {/* Telefono: formalmente facoltativo, ma lo consigliamo con forza —
+              senza numero il corriere non ha modo di avvisare e il pacco
+              torna indietro. Il banner resta finche' il campo e' vuoto. */}
+          <Field label="Telefono (consigliato)">
+            <input
+              type="tel"
+              autoComplete="tel"
+              placeholder="es. 333 1234567"
+              value={state.buyer_phone}
+              onChange={(e) => set("buyer_phone", e.target.value)}
+              className="input"
+            />
+            {!state.buyer_phone.trim() && (
+              <p className="mt-2 flex items-start gap-2 rounded-xl bg-sky-soft/50 ring-1 ring-sky-deep/30 px-3 py-2 text-sm leading-snug text-ink">
+                <span aria-hidden="true" className="text-base leading-none">
+                  🚚
+                </span>
+                <span>
+                  Lascia il numero di telefono così il corriere può contattarti
+                  in caso di problemi con la consegna.
+                </span>
+              </p>
+            )}
+          </Field>
 
           <Field label="Note (opzionale)">
             <textarea
