@@ -100,9 +100,8 @@ export default function RegistratiPage() {
           <span className="text-sm leading-snug">
             Voglio ricevere le novità del sito via email
             <span className="block text-xs text-ink-soft mt-1">
-              Facoltativo: puoi iscriverti senza. Ti scrivo quando arrivano
-              pezzi interessanti, e puoi disiscriverti quando vuoi dal link in
-              fondo a ogni email.
+              Ti scrivo quando arrivano pezzi interessanti, e puoi
+              disiscriverti quando vuoi dal link in fondo a ogni email.
             </span>
           </span>
         </label>
