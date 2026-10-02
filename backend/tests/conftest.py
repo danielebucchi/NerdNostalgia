@@ -23,7 +23,34 @@ sys.path.insert(0, str(SRC))
 
 # Env coerenti coi test (JWT secret deterministica, niente email, niente cron)
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key")
-os.environ.setdefault("EMAIL_ENABLED", "0")
+
+# Email: di norma spente, e qui si IMPONE invece di usare setdefault.
+#
+# I test girano anche dentro il container, dove EMAIL_ENABLED vale 1 e le
+# credenziali SMTP sono quelle vere: con setdefault il valore gia'
+# presente vinceva, e la suite spediva davvero a ogni esecuzione.
+#
+# Con TEST_EMAILS=1 si spedisce apposta, per guardare come vengono
+# davvero. In quel caso TUTTO viene dirottato sulla casella dell'admin:
+# in prova i destinatari sono inventati (mario@example.com, @test.it) e
+# le email a domini inesistenti tornano indietro come bounce, che e' uno
+# dei motivi per cui poi quelle vere finiscono nello spam.
+if os.getenv("TEST_EMAILS") == "1":
+    os.environ["EMAIL_ENABLED"] = "1"
+    os.environ["EMAIL_REDIRECT_TO"] = (
+        os.getenv("EMAIL_REDIRECT_TO")
+        or os.getenv("EMAIL_TO_ADMIN")
+        or "nerdnostalgiaita@gmail.com"
+    )
+    # Il freno agli invii conta 5 messaggi l'ora per destinatario: con
+    # tutto dirottato su una casella sola bloccherebbe quasi tutto.
+    os.environ["EMAIL_GUARD"] = "0"
+else:
+    os.environ["EMAIL_ENABLED"] = "0"
+    # Seconda rete: anche se un test riaccendesse EMAIL_ENABLED, senza
+    # credenziali non si spedisce.
+    os.environ["SMTP_USER"] = ""
+    os.environ["SMTP_PASSWORD"] = ""
 os.environ.setdefault("DISABLE_SCHEDULER", "1")
 
 import pytest  # noqa: E402
