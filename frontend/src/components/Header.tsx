@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPublicSettings } from "@/lib/api";
 import { AlertBell } from "@/components/AlertBell";
 import { CartNavLink } from "@/components/CartNavLink";
+import { CustomerNavLink } from "@/components/CustomerNavLink";
 import { LogoImage } from "@/components/LogoImage";
 import { SearchBox } from "@/components/SearchBox";
 import { WishlistNavLink } from "@/components/WishlistNavLink";
@@ -76,6 +77,7 @@ export function Header() {
           <AlertBell variant="desktop" />
           <WishlistNavLink variant="desktop" />
           <CartNavLink variant="desktop" />
+          <CustomerNavLink variant="desktop" />
           <Link href="/contatti" className="btn btn-primary text-sm">Contattami</Link>
         </nav>
 
@@ -83,6 +85,7 @@ export function Header() {
           <AlertBell variant="mobile" />
           <WishlistNavLink variant="mobile" />
           <CartNavLink variant="mobile" />
+          <CustomerNavLink variant="mobile" />
           <Link
             href="/cerco-compro"
             className="btn btn-ghost text-xs px-2.5 py-1.5"

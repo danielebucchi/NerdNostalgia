@@ -453,3 +453,27 @@ h2.display {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* Campo di input condiviso.
+ *
+ * Era definito dentro un <style> in ogni pagina che ne aveva bisogno, quindi
+ * sulle pagine nuove i campi risultavano senza stile e invisibili. Qui vale
+ * ovunque; le definizioni locali rimaste continuano a funzionare perche'
+ * identiche. */
+.input {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(61, 42, 92, 0.15);
+  border-radius: 12px;
+  background: #fffaf3;
+  color: #3d2a5c;
+  font-family: inherit;
+  font-size: 0.92rem;
+  outline: none;
+  transition: box-shadow 200ms, border-color 200ms;
+}
+.input:focus {
+  box-shadow: 0 0 0 3px rgba(248, 168, 200, 0.45);
+  border-color: #e879a8;
+}
