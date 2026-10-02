@@ -425,6 +425,7 @@ def update_order(
     # Id da avvisare dopo il commit (vedi sotto): l'email di spedizione deve
     # leggere un ordine gia' scritto, non uno a meta'.
     _avvisa_spedizione = None
+    _invita_recensione = None
 
     # Il tracking si salva prima di valutare il cambio di stato: cosi' si
     # puo' mandare codice e "SPEDITO" nella stessa richiesta.
@@ -468,6 +469,9 @@ def update_order(
             _avvisa_spedizione = order.id
         elif payload.status == OrderStatus.COMPLETED and not order.completed_at:
             order.completed_at = now
+            # Pratica chiusa: e' il momento di chiedere com'e' andata.
+            # Come per la spedizione, l'invito parte dopo il commit.
+            _invita_recensione = order.id
         elif payload.status == OrderStatus.CANCELLED and not order.cancelled_at:
             order.cancelled_at = now
 
@@ -493,6 +497,9 @@ def update_order(
     if _avvisa_spedizione is not None:
         from utils import mailer
         mailer.shipping_notice(_avvisa_spedizione)
+    if _invita_recensione is not None:
+        from utils import mailer
+        mailer.review_invite(_invita_recensione)
 
     return order
 

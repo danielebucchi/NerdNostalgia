@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getPublicSettings, listArticles } from "@/lib/api";
 import { CatalogSection } from "@/components/CatalogSection";
+import { ReviewsSection } from "@/components/ReviewsSection";
 import { LogoImage } from "@/components/LogoImage";
 
 export const metadata: Metadata = {
@@ -86,6 +87,10 @@ export default async function HomePage() {
       </section>
 
       {/* Catalog (con filtri client-side) */}
+      {/* Prima del catalogo: chi arriva vuole sapere di chi si fida prima di
+          scegliere, non dopo aver scorso tutte le schede. */}
+      <ReviewsSection />
+
       <section id="catalogo">
         <div className="mb-6">
           <h2 className="display text-2xl sm:text-3xl text-ink">Catalogo</h2>

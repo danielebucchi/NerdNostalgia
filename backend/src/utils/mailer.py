@@ -101,3 +101,10 @@ def welcome(user_id: int) -> None:
             db.close()
 
     _run_detached(job, f"benvenuto-{user_id}")
+
+
+def review_invite(order_id: int) -> None:
+    """Al compratore: invito a recensire, a ordine chiuso."""
+    from utils.email import send_review_invite
+    _with_order(order_id, send_review_invite, "recensione")
+

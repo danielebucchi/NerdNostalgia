@@ -530,3 +530,24 @@ CREATE TABLE IF NOT EXISTS category_alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_category_alerts_category
     ON category_alerts(category_id);
+
+-- ============================================================
+-- reviews: recensioni del venditore, una per ordine (vedi 0024)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    author_name VARCHAR(255) NOT NULL,
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    body TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+        CHECK (status IN ('PENDING','APPROVED','REJECTED')),
+    reply TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    moderated_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(status);
+CREATE INDEX IF NOT EXISTS idx_reviews_created ON reviews(created_at DESC);
+

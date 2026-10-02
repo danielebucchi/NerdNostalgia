@@ -14,7 +14,7 @@ import type {
 //   tipicamente http://backend:7373 (service name Docker network) in dev.
 //   In prod (single host con Caddy esterno) puo' usare anche localhost dato che
 //   Caddy gira sull'host e i container espongono porte loopback.
-const API_BASE =
+export const API_BASE =
   typeof window === "undefined"
     ? (process.env.API_BASE_URL_INTERNAL ??
        process.env.NEXT_PUBLIC_API_BASE_URL ??
