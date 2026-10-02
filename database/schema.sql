@@ -551,3 +551,22 @@ CREATE TABLE IF NOT EXISTS reviews (
 CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(status);
 CREATE INDEX IF NOT EXISTS idx_reviews_created ON reviews(created_at DESC);
 
+
+-- Rubrica degli indirizzi di spedizione del cliente (vedi migrazione 0025).
+CREATE TABLE IF NOT EXISTS shipping_addresses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    label VARCHAR(60),
+    full_name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50),
+    street VARCHAR(255) NOT NULL,
+    city VARCHAR(120) NOT NULL,
+    postal_code VARCHAR(20) NOT NULL,
+    province VARCHAR(120),
+    country VARCHAR(80) NOT NULL DEFAULT 'Italia',
+    is_default BOOLEAN NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_shipping_addresses_user
+    ON shipping_addresses(user_id);

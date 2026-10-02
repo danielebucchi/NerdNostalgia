@@ -14,6 +14,7 @@ import os
 from utils.limiter import limiter
 
 from api.address import router as address_router
+from api.addresses import router as addresses_router
 from api.alerts import router as alerts_router
 from api.articles import router as articles_router
 from api.auth import router as auth_router
@@ -97,6 +98,7 @@ app.include_router(vinted_router)
 app.include_router(settings_router)
 app.include_router(alerts_router)
 app.include_router(address_router)
+app.include_router(addresses_router)
 app.include_router(cardtrader_router)
 app.include_router(ebay_router)
 app.include_router(vinted_pro_router)

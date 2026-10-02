@@ -23,6 +23,7 @@ from .orders import Order, OrderItem, OrderStatus
 from .reviews import Review, ReviewStatus
 from .platform import Platform
 from .setting import Setting
+from .shipping_addresses import ShippingAddress
 from .misc_sales import MiscSale, MiscSaleKind
 from .personal_card import PersonalCard, PersonalCardStatus
 from .vinted import VintedSettings, VintedSyncLog
@@ -65,4 +66,5 @@ __all__ = [
     "OrderStatus",
     "Platform",
     "Setting",
+    "ShippingAddress",
 ]

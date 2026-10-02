@@ -2,6 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { NUOVO, SavedAddresses } from "@/components/SavedAddresses";
+import {
+  type Address,
+  createAddress,
+  listAddresses,
+  sameAddress,
+} from "@/lib/addresses";
 import {
   InpostGeowidget,
   type InpostPoint,
@@ -102,6 +109,14 @@ export function PurchaseDialog({
   // Chi ha un profilo non deve riscrivere nome ed email a ogni acquisto:
   // e' il motivo piu' concreto per registrarsi, piu' di qualsiasi banner.
   const { user: cliente } = useCustomer();
+  // Rubrica: chi compra una seconda volta non deve riscrivere via, CAP,
+  // citta' e telefono da capo.
+  const [rubrica, setRubrica] = useState<Address[]>([]);
+  const [indirizzoScelto, setIndirizzoScelto] = useState<number>(NUOVO);
+  // Un indirizzo nuovo digitato da chi ha un profilo finisce in rubrica,
+  // cosi' la volta dopo e' gia' li'. Resta una spunta e non un automatismo
+  // muto: si spedisce anche a casa d'altri, per un regalo.
+  const [salvaInRubrica, setSalvaInRubrica] = useState(true);
 
   const subtotal = articles.reduce(
     (acc, a) => acc + Number(a.price || 0),
@@ -118,6 +133,9 @@ export function PurchaseDialog({
   const effectiveShipping = baseShipping + insuranceCost;
   const grandTotal = subtotal + effectiveShipping;
   const currency = articles[0]?.currency || "EUR";
+  // Con un indirizzo della rubrica selezionato i campi non servono: e' gia'
+  // tutto scritto nella scheda scelta qui sopra.
+  const indirizzoNuovo = indirizzoScelto === NUOVO;
 
   // Reset alla chiusura
   useEffect(() => {
@@ -133,6 +151,34 @@ export function PurchaseDialog({
       setInsured(initialInsured ?? defaultInsured(subtotal));
     }
   }, [open]);
+
+  // Carico la rubrica quando il dialog si apre. In un effetto a parte dal
+  // reset qui sopra perche' la sessione cliente arriva dal localStorage e
+  // puo' atterrare dopo l'apertura.
+  useEffect(() => {
+    if (!open || !cliente) {
+      setRubrica([]);
+      setIndirizzoScelto(NUOVO);
+      return;
+    }
+    let vivo = true;
+    listAddresses()
+      .then((elenco) => {
+        if (!vivo) return;
+        setRubrica(elenco);
+        const proposto = elenco.find((a) => a.is_default) ?? elenco[0];
+        if (proposto) {
+          setIndirizzoScelto(proposto.id);
+          applicaIndirizzo(proposto);
+        }
+      })
+      // La rubrica e' una comodita': se non arriva, il checkout resta
+      // quello di sempre coi campi da compilare.
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [open, cliente]);
 
   // Precompilazione in un effetto a parte: la sessione cliente viene letta
   // dal localStorage in un effetto suo, quindi puo' arrivare DOPO
@@ -181,6 +227,42 @@ export function PurchaseDialog({
   /** Suggerimento scelto. Compila i campi (servono alla consegna a
    *  domicilio) e intanto memorizza le coordinate, che col locker attivo
    *  centrano la mappa sulla zona del compratore. */
+  /** Riversa un indirizzo della rubrica nei campi del form. Il telefono
+   *  lo sovrascrive solo se ce n'e' uno salvato: cancellare quello appena
+   *  digitato sarebbe peggio che non precompilare niente. */
+  function applicaIndirizzo(a: Address) {
+    setState((s) => ({
+      ...s,
+      buyer_name: a.full_name || s.buyer_name,
+      buyer_phone: a.phone || s.buyer_phone,
+      ship_street: a.street,
+      ship_city: a.city,
+      ship_postal_code: a.postal_code,
+      ship_province: a.province || "",
+      ship_country: a.country || "Italia",
+    }));
+    // I campi arrivano gia' coerenti fra loro: non serve il suggerimento
+    // per sbloccarli, e senza questo resterebbero grigi e illeggibili.
+    setManualAddress(true);
+  }
+
+  function scegliIndirizzo(id: number) {
+    setIndirizzoScelto(id);
+    if (id === NUOVO) {
+      setState((s) => ({
+        ...s,
+        ship_street: "",
+        ship_city: "",
+        ship_postal_code: "",
+        ship_province: "",
+      }));
+      setManualAddress(false);
+      return;
+    }
+    const a = rubrica.find((x) => x.id === id);
+    if (a) applicaIndirizzo(a);
+  }
+
   function applySuggestion(sug: AddressSuggestion) {
     setState((s) => ({
       ...s,
@@ -242,7 +324,39 @@ export function PurchaseDialog({
       items: articles.map((a) => ({ article_id: a.id, quantity: 1 })),
     });
     setPendingOrder(order.id, order.public_token);
+    void salvaIndirizzoSeServe();
     return order;
+  }
+
+  /** Mette in rubrica l'indirizzo appena digitato.
+   *
+   * Dopo la creazione dell'ordine e senza farla aspettare: se la rubrica
+   * non risponde, il cliente deve comunque poter pagare. Al massimo la
+   * prossima volta riscrive l'indirizzo, che e' esattamente la situazione
+   * di prima. */
+  async function salvaIndirizzoSeServe() {
+    if (!cliente || !salvaInRubrica || !indirizzoNuovo) return;
+    // Il locker non e' un indirizzo del cliente: e' un punto di ritiro
+    // pubblico, e domani puo' sceglierne un altro.
+    if (point) return;
+
+    const nuovo = {
+      full_name: state.buyer_name.trim(),
+      phone: state.buyer_phone.trim() || null,
+      street: state.ship_street.trim(),
+      city: state.ship_city.trim(),
+      postal_code: state.ship_postal_code.trim(),
+      province: state.ship_province.trim() || null,
+      country: state.ship_country.trim() || "Italia",
+    };
+    if (!nuovo.street || !nuovo.city || !nuovo.postal_code) return;
+    if (rubrica.some((a) => sameAddress(a, nuovo))) return;
+
+    try {
+      await createAddress(nuovo);
+    } catch {
+      /* comodita', non un requisito: in silenzio */
+    }
   }
 
   /** Stripe: creiamo l'ordine e mandiamo alla pagina di pagamento ospitata. */
@@ -552,6 +666,20 @@ export function PurchaseDialog({
 
           {lockerMode === false && (
             <>
+              {/* Dire di che indirizzo si tratta: nel form c'e' anche
+                  l'email, e "indirizzo" da solo e' ambiguo. */}
+              <h3 className="display text-lg text-ink pt-2 border-t border-ink/10">
+                Indirizzo di spedizione
+              </h3>
+
+              <SavedAddresses
+                addresses={rubrica}
+                selectedId={indirizzoScelto}
+                onSelect={scegliIndirizzo}
+              />
+
+              {indirizzoNuovo && (
+                <>
               <div className="rounded-xl bg-lilac-deep/10 ring-1 ring-lilac-deep/35 px-3 py-2.5 text-sm leading-snug text-ink flex items-start gap-2">
                 <span aria-hidden="true" className="text-base leading-none">👆</span>
                 <span>
@@ -647,6 +775,25 @@ export function PurchaseDialog({
                   className="input"
                 />
               </Field>
+
+              {/* Solo a chi ha un profilo: senza account non c'e' nessuna
+                  rubrica in cui salvare. */}
+              {cliente && (
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={salvaInRubrica}
+                    onChange={(e) => setSalvaInRubrica(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 flex-shrink-0 accent-lilac-deep"
+                  />
+                  <span className="text-sm text-ink-soft leading-snug">
+                    Salva questo indirizzo nel mio profilo, così la prossima
+                    volta non lo riscrivo.
+                  </span>
+                </label>
+              )}
+                </>
+              )}
             </>
           )}
 
