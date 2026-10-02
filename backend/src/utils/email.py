@@ -185,14 +185,19 @@ Apri nell'admin: /admin/inquiries/{inquiry.id}
     )
 
 
-def send_order_notification(order) -> bool:
-    """Notifica all'admin di un nuovo ordine: dati compratore, articoli e
-    tutto il necessario per comprare l'etichetta di spedizione.
+def _site_url() -> str:
+    """URL pubblico del sito, per costruire i link agli articoli."""
+    return (os.getenv("SITE_PUBLIC_URL") or "https://nerdnostalgia.store").rstrip("/")
 
-    Viene mandata due volte nel ciclo di vita dell'ordine: quando il
-    compratore conferma (stato PENDING) e quando il pagamento risulta
-    incassato (PayPal/Stripe). Il riquadro con i dati del destinatario serve
-    a creare la spedizione su Packlink senza dover aprire l'admin.
+
+def send_order_notification(order) -> bool:
+    """Notifica all'admin che un ordine e' stato PAGATO: dati compratore,
+    articoli e tutto il necessario per comprare l'etichetta.
+
+    Parte UNA volta sola, all'incasso. Prima ne partivano due (creazione +
+    pagamento) e si somigliavano troppo per distinguerle a colpo d'occhio.
+    Gli ordini creati ma mai pagati restano visibili in /admin/ordini:
+    non c'e' niente da fare finche' non arrivano i soldi.
     """
     cfg = _config()
     to_admin = cfg["to_admin"]
@@ -202,10 +207,15 @@ def send_order_notification(order) -> bool:
     for it in order.items:
         line = f"  - {it.title_snapshot} × {it.quantity} → € {float(it.price_snapshot):.2f}"
         items_lines.append(line)
+        # Link all'articolo: serve a ritrovarlo subito per prepararlo
+        link = f"{_site_url()}/articles/{it.article_id}" if it.article_id else None
+        if link:
+            items_lines.append(f"    {link}")
         items_html.append(
             f"<li><strong>{it.title_snapshot}</strong> × {it.quantity}"
-            f" <span style='color:#888'>(art. #{it.article_id})</span>"
-            f" → € {float(it.price_snapshot):.2f}</li>"
+            f" → € {float(it.price_snapshot):.2f}"
+            + (f"<br><a href='{link}' style='font-size:0.85em;'>{link}</a>" if link else "")
+            + "</li>"
         )
 
     wa_url = _whatsapp_url(
@@ -213,7 +223,7 @@ def send_order_notification(order) -> bool:
         default_text=f"Ciao {order.buyer_name.split()[0] if order.buyer_name else ''}, "
         f"ti scrivo da NerdNostalgia per il tuo ordine #{order.id}.",
     )
-    text_body = f"""Nuovo ordine #{order.id} su NerdNostalgia
+    text_body = f"""Ordine #{order.id} PAGATO — {order.buyer_name}
 ==========================================
 
 Compratore
@@ -223,10 +233,9 @@ Email: {order.buyer_email}
 {f"Tel:   {order.buyer_phone}" if order.buyer_phone else ""}
 {f"WhatsApp: {wa_url}" if wa_url else ""}
 
-Ritiro al locker InPost
+{"Ritiro al locker InPost" if order.inpost_point_id else "Spedizione a"}
 -----------------------
-{order.inpost_point_name or "(nome non disponibile)"}
-Codice punto: {order.inpost_point_id or "—"}
+{f'{order.inpost_point_name or "Locker InPost"} (codice {order.inpost_point_id})' + chr(10) if order.inpost_point_id else ""}{order.buyer_name}
 {order.ship_street}
 {order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}
 {order.ship_country}
@@ -257,7 +266,7 @@ Telefono:  {order.buyer_phone or "NON FORNITO"}
 Email:     {order.buyer_email}
 Assicurazione: {"SI - valore " + f"{float(order.subtotal):.2f} EUR" if order.insured else "no"}
 
-Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
+Pagamento incassato. Dettaglio ordine: /admin/ordini/{order.id}
 """
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto;">
@@ -285,10 +294,10 @@ Stato: PENDING (in attesa di conferma pagamento da /admin/ordini/{order.id})
     </a>''' if wa_url else ''}
   </div>
 
-  <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">Ritiro al locker InPost</h3>
+  <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">{"Ritiro al locker InPost" if order.inpost_point_id else "Spedizione a"}</h3>
   <address style="background:#fbf7f4; padding:10px 14px; border-radius:8px; font-style:normal;">
-    <strong>{order.inpost_point_name or "(nome non disponibile)"}</strong><br>
-    <code style="background:#eee; padding:1px 5px; border-radius:4px;">{order.inpost_point_id or "—"}</code><br>
+    {f'<strong>{order.inpost_point_name or "Locker InPost"}</strong><br><code style="background:#eee; padding:1px 5px; border-radius:4px;">{order.inpost_point_id}</code><br>' if order.inpost_point_id else ""}
+    <strong>{order.buyer_name}</strong><br>
     {order.ship_street}<br>
     {order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}<br>
     {order.ship_country}
@@ -335,15 +344,125 @@ Telefono:  {order.buyer_phone or "NON FORNITO"}
 Email:     {order.buyer_email}</pre>
   {f'<p style="background:#e0f5ec; border-left:3px solid #7dd1b8; padding:8px 12px; font-size:0.9em;">🛡 <strong>Spedizione assicurata</strong> — il compratore ha pagato il premio ({float(order.insurance_fee):.2f} €). Dichiara un valore di <strong>{float(order.subtotal):.2f} €</strong> quando compri l&apos;etichetta.</p>' if order.insured else '<p style="font-size:0.85em; color:#888;">Spedizione non assicurata: il compratore non l&apos;ha richiesta.</p>'}
   <p style="font-size: 0.85em; color: #888;">
-    Stato: <strong>PENDING</strong> — conferma il pagamento ricevuto da
+    Pagamento incassato. Dettaglio ordine:
     <code>/admin/ordini/{order.id}</code>
   </p>
 </body></html>"""
 
     return send_email(
         to=to_admin,
-        subject=f"[NerdNostalgia] Nuovo ordine #{order.id} — € {float(order.grand_total):.2f}",
+        subject=(
+            f"[NerdNostalgia] Ordine #{order.id} PAGATO — "
+            f"{order.buyer_name} — € {float(order.grand_total):.2f}"
+        ),
         text_body=text_body,
         html_body=html_body,
         reply_to=order.buyer_email,
     )
+
+
+def send_order_confirmation(order) -> bool:
+    """Conferma d'ordine al COMPRATORE, mandata quando il pagamento risulta
+    incassato.
+
+    Finora riceveva solo una conferma dentro PayPal: niente che gli dicesse
+    cosa ha comprato, da chi e a chi scrivere se qualcosa non va. Teniamo
+    `reply_to` sulla nostra casella, cosi' rispondendo scrive direttamente
+    a noi.
+    """
+    cfg = _config()
+
+    items_lines: list[str] = []
+    items_html: list[str] = []
+    for it in order.items:
+        items_lines.append(
+            f"  - {it.title_snapshot} × {it.quantity} → € {float(it.price_snapshot):.2f}"
+        )
+        link = f"{_site_url()}/articles/{it.article_id}" if it.article_id else None
+        items_html.append(
+            f"<li><strong>{it.title_snapshot}</strong> × {it.quantity}"
+            f" → € {float(it.price_snapshot):.2f}"
+            + (f"<br><a href='{link}' style='font-size:0.85em;'>rivedi l&apos;articolo</a>" if link else "")
+            + "</li>"
+        )
+
+    nome = (order.buyer_name or "").split()[0] if order.buyer_name else ""
+    saluto = f"Ciao {nome}," if nome else "Ciao,"
+    assicurata = bool(order.insured)
+
+    consegna_txt = (
+        f"Ritiri al locker InPost {order.inpost_point_name or ''} "
+        f"(codice {order.inpost_point_id})"
+        if order.inpost_point_id
+        else "Spedizione all'indirizzo che hai indicato"
+    )
+
+    text_body = f"""{saluto}
+
+grazie! Ho ricevuto il tuo pagamento e il tuo ordine #{order.id} e' confermato.
+
+Cosa hai preso
+--------------
+{chr(10).join(items_lines)}
+
+Totali
+------
+Subtotale:  EUR {float(order.subtotal):.2f}
+Spedizione: EUR {float(order.shipping_total):.2f}{" (assicurata)" if assicurata else ""}
+TOTALE:     EUR {float(order.grand_total):.2f}
+
+Consegna
+--------
+{consegna_txt}
+{order.ship_street}
+{order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}
+
+Preparo il pacco e ti scrivo appena spedisco.
+Se qualcosa non torna, rispondi a questa email: la leggo io.
+
+Nerd.Nostalgia
+{_site_url()}
+"""
+
+    html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
+  <h2 style="color: #e879a8;">Grazie {nome}! Ordine #{order.id} confermato</h2>
+  <p>Ho ricevuto il tuo pagamento. Preparo il pacco e ti scrivo appena spedisco.</p>
+
+  <h3 style="border-bottom:1px solid #eee; padding-bottom:4px;">Cosa hai preso</h3>
+  <ul>{''.join(items_html)}</ul>
+
+  <table style="margin-top:12px;">
+    <tr><td>Subtotale</td><td style="text-align:right; padding-left:24px;">€ {float(order.subtotal):.2f}</td></tr>
+    <tr>
+      <td>Spedizione{' <strong style="color:#7dd1b8;">assicurata</strong>' if assicurata else ''}</td>
+      <td style="text-align:right; padding-left:24px;">€ {float(order.shipping_total):.2f}</td>
+    </tr>
+    <tr style="font-weight:bold; font-size:1.1em; color:#e879a8;">
+      <td>TOTALE</td>
+      <td style="text-align:right; padding-left:24px;">€ {float(order.grand_total):.2f}</td>
+    </tr>
+  </table>
+
+  <h3 style="border-bottom:1px solid #eee; padding-bottom:4px; margin-top:20px;">Consegna</h3>
+  <address style="background:#fbf7f4; padding:10px 14px; border-radius:8px; font-style:normal;">
+    {consegna_txt}<br>
+    {order.ship_street}<br>
+    {order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}
+  </address>
+
+  <p style="margin-top:20px;">
+    Se qualcosa non torna, <strong>rispondi a questa email</strong>: la leggo io.
+  </p>
+  <p style="color:#888; font-size:0.9em;">
+    Nerd.Nostalgia · <a href="{_site_url()}">{_site_url()}</a>
+  </p>
+</body></html>"""
+
+    return send_email(
+        to=order.buyer_email,
+        subject=f"Grazie! Il tuo ordine #{order.id} su Nerd.Nostalgia è confermato",
+        text_body=text_body,
+        html_body=html_body,
+        reply_to=cfg["to_admin"],
+    )
+

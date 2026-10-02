@@ -68,7 +68,8 @@ def _mark_paid(db: Session, order_id: int, payment_intent) -> None:
     mark_sold(db, order)
     LOGGER.info("Ordine %s marcato PAID via Stripe", order_id)
     try:
-        from utils.email import send_order_notification
-        send_order_notification(order)
+        from utils.email import send_order_confirmation, send_order_notification
+        send_order_notification(order)       # a noi: cosa preparare e spedire
+        send_order_confirmation(order)       # al compratore: conferma d'ordine
     except Exception as exc:  # noqa: BLE001
         LOGGER.warning("Notifica ordine pagato fallita (%s): %s", order_id, exc)
