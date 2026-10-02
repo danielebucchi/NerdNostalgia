@@ -9,8 +9,25 @@ import type { Category } from "@/lib/types";
  * iscrive l'email agli avvisi per una categoria top-level (o tutte) via
  * POST /api/alerts/. Le categorie vengono fetchate lazy alla prima apertura.
  */
-export function AlertBell({ variant = "desktop" }: { variant?: "desktop" | "mobile" }) {
-  const [open, setOpen] = useState(false);
+export function AlertBell({
+  variant = "desktop",
+  open: openEsterno,
+  onOpenChange,
+}: {
+  variant?: "desktop" | "mobile";
+  /* Comandata da fuori: serve al menù del profilo, che apre questo dialog
+   * da una sua voce. Il bottone proprio non viene disegnato, altrimenti
+   * nell'header comparirebbe due volte. */
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+}) {
+  const comandata = openEsterno !== undefined;
+  const [openInterno, setOpenInterno] = useState(false);
+  const open = comandata ? openEsterno : openInterno;
+  const setOpen = (v: boolean) => {
+    if (comandata) onOpenChange?.(v);
+    else setOpenInterno(v);
+  };
   const [categories, setCategories] = useState<Category[]>([]);
   const [email, setEmail] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
@@ -88,7 +105,7 @@ export function AlertBell({ variant = "desktop" }: { variant?: "desktop" | "mobi
 
   return (
     <>
-      {variant === "mobile" ? (
+      {comandata ? null : variant === "mobile" ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
