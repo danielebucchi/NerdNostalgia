@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { BulkMarkupPanel } from "@/components/admin/BulkMarkupPanel";
 import { Sortable } from "@/components/admin/Sortable";
 import { SwipeRow } from "@/components/admin/SwipeRow";
 import { useUndo } from "@/components/admin/useUndo";
@@ -39,6 +40,10 @@ function ArticlesListContent() {
   // Filtri client-side: marca, modello, sku, categoria
   const [extraFiltered, setExtraFiltered] = useState<Article[]>([]);
 
+  // Bump per ricaricare la lista dopo operazioni che cambiano i dati
+  // (es. il rincaro di listino), senza duplicare la fetch.
+  const [reloadBump, setReloadBump] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -65,7 +70,7 @@ function ArticlesListContent() {
     return () => {
       cancelled = true;
     };
-  }, [status, debouncedQuery]);
+  }, [status, debouncedQuery, reloadBump]);
 
   // Filtro ulteriore client-side sui campi che il backend non cerca
   // (brand, model, sku, category name): l'utente può digitare anche queste.
@@ -155,6 +160,11 @@ function ArticlesListContent() {
         <Link href="/admin/articles/new" className="btn btn-primary">
           ➕ Nuovo
         </Link>
+      </div>
+
+      {/* Rincaro di listino: pannello chiuso di default, si apre al bisogno */}
+      <div className="mb-4">
+        <BulkMarkupPanel onApplied={() => setReloadBump((b) => b + 1)} />
       </div>
 
       {/* Search */}

@@ -188,11 +188,11 @@ export function usePaidOrderCleanup(): void {
 
 /* ───────────────────── Spese di spedizione ─────────────────────
  * SPEDIZIONE BASE (sul subtotale articoli):
- *   fino a  25,00 €    →   6,00 €
- *   25,01 – 249,99 €   →   6,00 € + 4% (quota % fra 1,00 € e 6,00 €)
+ *   fino a  25,00 €    →   6,21 €
+ *   25,01 – 249,99 €   →   6,21 € + 4% (quota % fra 1,00 € e 6,21 €)
  *   da     250,00 €    →  gratis
  *
- * ASSICURAZIONE: +5,70 €, cifra fissa. Proposta già attiva dai 50 € in su,
+ * ASSICURAZIONE: +5,90 €, cifra fissa. Proposta già attiva dai 50 € in su,
  * ma il compratore può sempre cambiare idea nei due sensi. Dai 250 € è
  * inclusa nella spedizione gratuita.
  *
@@ -203,12 +203,12 @@ export function usePaidOrderCleanup(): void {
 
 export const FREE_SHIPPING_FROM = 250;
 export const INSURED_BY_DEFAULT_FROM = 50;
-export const INSURANCE_FEE = 5.7;
-const BASE_SHIPPING = 6;
+export const INSURANCE_FEE = 5.9;
+const BASE_SHIPPING = 6.21;
 const PERCENT_BAND_FROM = 25;
 const PERCENT_RATE = 0.04;
 const PERCENT_MIN = 1;
-const PERCENT_MAX = 6;
+const PERCENT_MAX = 6.21;
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -243,8 +243,15 @@ export function insuranceFeeFor(subtotal: number, insured: boolean): number {
   return INSURANCE_FEE;
 }
 
-/** Spedizione totale: base + eventuale assicurazione. */
-export function shippingFor(subtotal: number, insured?: boolean): number {
+/** Spedizione totale: base + eventuale assicurazione.
+ *  `freeAll` è la promozione "spedizione gratuita su tutto" dalle settings:
+ *  azzera la riga intera, assicurazione compresa. */
+export function shippingFor(
+  subtotal: number,
+  insured?: boolean,
+  freeAll = false,
+): number {
+  if (freeAll) return 0;
   const chosen = insuranceIsIncluded(subtotal)
     ? true
     : insured ?? defaultInsured(subtotal);

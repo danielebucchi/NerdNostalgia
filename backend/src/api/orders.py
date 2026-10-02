@@ -143,6 +143,18 @@ class OrderUpdate(BaseModel):
     admin_notes: Optional[str] = None
 
 
+def _free_shipping_all(db: Session) -> bool:
+    """Promozione "spedizione gratuita su tutto" dalle settings runtime.
+    In caso di problemi si ripiega sul comportamento normale: meglio far
+    pagare la spedizione che regalarla per un errore di lettura."""
+    try:
+        from helpers.setting import SettingHelper
+        raw = SettingHelper(db=db).get_value("free_shipping_all")
+        return (raw or "").strip().lower() == "true"
+    except Exception:  # noqa: BLE001
+        return False
+
+
 # ─────────────────── Public endpoint: crea ordine ───────────────────
 @router.post(
     "/",
@@ -229,9 +241,14 @@ def create_order(
     # Spedizione a scaglioni sul subtotale + assicurazione facoltativa
     # (vedi helpers/shipping.py). La calcola il server, mai il browser:
     # dal client arriva solo la scelta si/no sull'assicurazione.
+    #
+    # L'interruttore "spedizione gratuita su tutto" di /admin/impostazioni
+    # azzera la riga intera: e' una promozione, non uno sconto sul singolo
+    # ordine, quindi la decisione sta nelle settings e non nel payload.
+    free_all = _free_shipping_all(db)
     insured = resolve_insured(subtotal, payload.insured)
-    insurance = insurance_fee(subtotal, insured)
-    shipping_total = base_shipping(subtotal) + insurance
+    insurance = Decimal("0.00") if free_all else insurance_fee(subtotal, insured)
+    shipping_total = Decimal("0.00") if free_all else base_shipping(subtotal) + insurance
     grand_total = subtotal + shipping_total
 
     # IP per audit/rate-limit info

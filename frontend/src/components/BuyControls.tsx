@@ -22,11 +22,11 @@ interface Props {
 export function BuyControls({ article }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { has, toggle } = useCart();
-  const { paymentsEnabled, contactWhatsapp } = useSettings();
+  const { paymentsEnabled, contactWhatsapp, freeShippingAll } = useSettings();
   // Spedizione a scaglioni sul prezzo: comprando questo pezzo da solo e'
   // questa, ma nel carrello cambia col totale (e sopra i 200 € sparisce).
   const price = Number(article.price || 0);
-  const ship = shippingFor(price);
+  const ship = shippingFor(price, undefined, freeShippingAll);
   const grandTotal = price + ship;
   const inCart = has(article.id);
 
@@ -120,9 +120,13 @@ export function BuyControls({ article }: Props) {
           </>
         )}
       </p>
-      {paymentsEnabled && article.status === "PUBLISHED" && ship > 0 && (
+      {paymentsEnabled && article.status === "PUBLISHED" && (
         <p className="text-[11px] text-mint-deep font-semibold mt-1.5 leading-snug">
-          🚚 Spedizione gratuita per ordini da € {FREE_SHIPPING_FROM.toFixed(2)}
+          {freeShippingAll
+            ? "🚚 Spedizione gratuita su tutto il catalogo"
+            : ship > 0
+              ? `🚚 Spedizione gratuita per ordini da € ${FREE_SHIPPING_FROM.toFixed(2)}`
+              : ""}
         </p>
       )}
       {paymentsEnabled && (

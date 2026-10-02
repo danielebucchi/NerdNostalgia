@@ -25,6 +25,7 @@ interface PublicSettings {
   payments_enabled: string;        // "true"/"false"/"" (vuoto = fallback env)
   contact_whatsapp: string;
   contact_email: string;
+  free_shipping_all: string;
   cardtrader_shop_url: string;
   stripe_enabled: string;
 }
@@ -34,6 +35,7 @@ const ENV_DEFAULTS: PublicSettings = {
   payments_enabled: (process.env.NEXT_PUBLIC_PAYMENTS_ENABLED ?? "").trim(),
   contact_whatsapp: "",
   contact_email: "nerdnostalgiaita@gmail.com",
+  free_shipping_all: "",
   cardtrader_shop_url: "",
   stripe_enabled: "",
 };
@@ -45,6 +47,8 @@ export interface SettingsValue {
   paymentsEnabled: boolean;
   contactWhatsapp: string;
   contactEmail: string;
+  /** Promozione: spedizione gratuita su ogni ordine. */
+  freeShippingAll: boolean;
   cardtraderShopUrl: string;
   stripeEnabled: boolean;
 }
@@ -56,6 +60,7 @@ function toValue(raw: PublicSettings, loaded: boolean): SettingsValue {
     paymentsEnabled: raw.payments_enabled.trim().toLowerCase() === "true",
     contactWhatsapp: raw.contact_whatsapp.trim(),
     contactEmail: raw.contact_email.trim(),
+    freeShippingAll: raw.free_shipping_all.trim().toLowerCase() === "true",
     cardtraderShopUrl: raw.cardtrader_shop_url.trim(),
     stripeEnabled: raw.stripe_enabled.trim().toLowerCase() === "true",
   };

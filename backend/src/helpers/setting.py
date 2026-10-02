@@ -42,6 +42,15 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "label": "Email di contatto",
         "help": "Mostrata nelle pagine pubbliche (privacy, contatti).",
     },
+    "free_shipping_all": {
+        "default": "",
+        "public": True,
+        "label": "Spedizione gratuita su tutto",
+        "help": "true/false. Se true azzera le spese di spedizione su ogni "
+                "ordine (assicurazione compresa), indipendentemente dagli "
+                "scaglioni. Serve per le promozioni e per le prove: si "
+                "accende e si spegne da qui, senza deploy.",
+    },
     "article_description_footer": {
         "default": "Spedizione veloce",
         "public": True,

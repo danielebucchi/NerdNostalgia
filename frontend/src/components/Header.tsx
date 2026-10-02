@@ -6,15 +6,27 @@ import { LogoImage } from "@/components/LogoImage";
 import { SearchBox } from "@/components/SearchBox";
 import { WishlistNavLink } from "@/components/WishlistNavLink";
 
-const TOPBAR_MESSAGES = [
-  "Compro · Vendo · Scambio",
-  "Videogiochi, carte Pokémon, Funko & nerderie",
-  // Soglia allineata a FREE_SHIPPING_FROM in lib/cart.ts
-  "🚚 Spedizione GRATUITA per ordini da 250 €",
-  "Spedizioni in tutta Italia",
-];
+// Soglia allineata a FREE_SHIPPING_FROM in lib/cart.ts
+const SPEDIZIONE_A_SOGLIA = "🚚 Spedizione GRATUITA per ordini da 250 €";
+const SPEDIZIONE_SEMPRE_GRATIS = "🚚 Spedizione GRATUITA su tutto il catalogo";
 
-export function Topbar() {
+function topbarMessages(freeShippingAll: boolean): string[] {
+  return [
+    "Compro · Vendo · Scambio",
+    "Videogiochi, carte Pokémon, Funko & nerderie",
+    freeShippingAll ? SPEDIZIONE_SEMPRE_GRATIS : SPEDIZIONE_A_SOGLIA,
+    "Spedizioni in tutta Italia",
+  ];
+}
+
+/** Striscia promozionale. Legge le settings lato server: con la promozione
+ *  attiva annuncia la gratuita su tutto invece della soglia, altrimenti
+ *  prometterebbe una cosa diversa da quella che il carrello poi applica. */
+export async function Topbar() {
+  const settings = await getPublicSettings();
+  const freeShippingAll =
+    (settings.free_shipping_all || "").trim().toLowerCase() === "true";
+  const TOPBAR_MESSAGES = topbarMessages(freeShippingAll);
   return (
     <div className="topbar overflow-hidden">
       {/* Su mobile (<sm): scorrimento orizzontale marquee */}
