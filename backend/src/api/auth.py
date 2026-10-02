@@ -140,11 +140,10 @@ def register(
         db.commit()
         LOGGER.info("Collegati %s ordini da ospite a %s", recuperati, email)
 
-    try:
-        from utils.email import send_welcome_email
-        send_welcome_email(user)
-    except Exception as exc:  # noqa: BLE001
-        LOGGER.warning("Email di benvenuto non inviata a %s: %s", email, exc)
+    # In background: chi si registra non deve guardare uno spinner mentre
+    # aspettiamo che Gmail risponda.
+    from utils import mailer
+    mailer.welcome(user.id)
 
     token = create_access_token(subject=user.username, role=user.role.value)
     return TokenResponse(

@@ -144,8 +144,8 @@ def _mark_paid(db: Session, order: Order, capture_id) -> None:
     mark_sold(db, order)
     LOGGER.info("Ordine %s marcato PAID via PayPal", order.id)
     try:
-        from utils.email import send_order_confirmation, send_order_notification
-        send_order_notification(order)       # a noi: cosa preparare e spedire
-        send_order_confirmation(order)       # al compratore: conferma d'ordine
+        from utils import mailer
+        mailer.order_notification(order.id)   # a noi: cosa preparare e spedire
+        mailer.order_confirmation(order.id)   # al compratore: conferma d'ordine
     except Exception as exc:  # noqa: BLE001
         LOGGER.warning("Notifica ordine pagato fallita (%s): %s", order.id, exc)
