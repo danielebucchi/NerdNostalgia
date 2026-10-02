@@ -681,7 +681,8 @@ export function PurchaseDialog({
             </button>
           </div>
           <p className="text-xs text-ink-soft text-center">
-            Ti arriverà una conferma via email. Il pagamento si apre nella
+            Ti arriverà una conferma via email — se non la vedi,{" "}
+            <strong>controlla nello spam</strong>. Il pagamento si apre nella
             finestra sicura di {stripeEnabled ? "Stripe o PayPal" : "PayPal"}: i
             dati della carta non passano mai da questo sito.
           </p>

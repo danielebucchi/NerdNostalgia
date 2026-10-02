@@ -26,8 +26,14 @@ export default async function OrderThankYouPage({
         ) : null}{" "}
         è confermato.
       </p>
-      <p className="text-ink-soft leading-relaxed mb-8">
+      <p className="text-ink-soft leading-relaxed mb-4">
         Ti ho mandato una email di riepilogo e ti scriverò appena spedisco.
+      </p>
+      <p className="text-sm bg-star/40 ring-1 ring-ink/10 rounded-xl px-4 py-3 mb-8 leading-snug">
+        📬 <strong>Non vedi l&apos;email?</strong> Controlla nella cartella
+        spam o promozioni: capita che i primi messaggi finiscano lì. Segnala
+        il mittente come attendibile e i prossimi arriveranno in posta in
+        arrivo.
       </p>
       <Link href="/" className="btn btn-primary">
         Torna al negozio

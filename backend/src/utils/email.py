@@ -420,6 +420,10 @@ Consegna
 Preparo il pacco e ti scrivo appena spedisco.
 Se qualcosa non torna, rispondi a questa email: la leggo io.
 
+PS: se hai trovato questo messaggio nello spam, segnalalo come attendibile
+o aggiungi il mittente ai contatti. Cosi' l'avviso con il codice di
+tracciamento, che ti mando appena spedisco, non finisce li' anche lui.
+
 Nerd.Nostalgia
 {_site_url()}
 """
@@ -452,6 +456,11 @@ Nerd.Nostalgia
 
   <p style="margin-top:20px;">
     Se qualcosa non torna, <strong>rispondi a questa email</strong>: la leggo io.
+  </p>
+  <p style="background:#fff4a8; border-radius:8px; padding:10px 14px; font-size:0.9em;">
+    📬 <strong>Trovata nello spam?</strong> Segnala il mittente come
+    attendibile o aggiungilo ai contatti: così l'avviso con il codice di
+    tracciamento, che ti mando appena spedisco, arriva dove lo vedi.
   </p>
   <p style="color:#888; font-size:0.9em;">
     Nerd.Nostalgia · <a href="{_site_url()}">{_site_url()}</a>
