@@ -21,6 +21,7 @@ import {
   insuranceIsIncluded,
   setPendingOrder,
 } from "@/lib/cart";
+import { useCustomer } from "@/lib/customer-auth";
 import { useSettings } from "@/lib/settings-context";
 import type { Article } from "@/lib/types";
 
@@ -98,6 +99,9 @@ export function PurchaseDialog({
   const [paypalAvailable, setPaypalAvailable] = useState<boolean | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const { stripeEnabled, freeShippingAll } = useSettings();
+  // Chi ha un profilo non deve riscrivere nome ed email a ogni acquisto:
+  // e' il motivo piu' concreto per registrarsi, piu' di qualsiasi banner.
+  const { user: cliente } = useCustomer();
 
   const subtotal = articles.reduce(
     (acc, a) => acc + Number(a.price || 0),
@@ -129,6 +133,20 @@ export function PurchaseDialog({
       setInsured(initialInsured ?? defaultInsured(subtotal));
     }
   }, [open]);
+
+  // Precompilazione in un effetto a parte: la sessione cliente viene letta
+  // dal localStorage in un effetto suo, quindi puo' arrivare DOPO
+  // l'apertura del dialog. Tenerla insieme al reset qui sopra avrebbe
+  // voluto dire rimettere l'assicurazione al default ogni volta che la
+  // sessione cambia, cancellando la scelta appena fatta.
+  useEffect(() => {
+    if (!open || !cliente) return;
+    setState((s) => ({
+      ...s,
+      buyer_name: s.buyer_name || cliente.full_name || "",
+      buyer_email: s.buyer_email || cliente.email,
+    }));
+  }, [open, cliente]);
 
   // Modalita' di consegna: la decide la presenza del token InPost lato
   // server, non una scelta del compratore. Cosi' il giorno in cui il token
@@ -398,6 +416,21 @@ export function PurchaseDialog({
               />
             </label>
           </div>
+
+          {cliente ? (
+            <p className="text-[11px] text-ink-soft leading-snug">
+              Stai comprando come <strong className="text-ink">{cliente.email}</strong>.
+              L&apos;ordine finirà nel tuo profilo.
+            </p>
+          ) : (
+            <p className="text-[11px] text-ink-soft leading-snug">
+              Hai già un profilo?{" "}
+              <a href="/accedi" className="underline font-semibold">
+                Accedi
+              </a>{" "}
+              e nome ed email si compilano da soli.
+            </p>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-3">
             <Field label="Nome e cognome *">

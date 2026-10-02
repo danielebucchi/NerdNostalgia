@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { OrderPaidCartCleanup } from "@/components/OrderPaidCartCleanup";
+import { RegistrationInvite } from "@/components/RegistrationInvite";
 
 export const metadata = {
   title: "Grazie per il tuo ordine — Nerd.Nostalgia",
@@ -35,6 +36,8 @@ export default async function OrderThankYouPage({
         il mittente come attendibile e i prossimi arriveranno in posta in
         arrivo.
       </p>
+      <RegistrationInvite />
+
       <Link href="/" className="btn btn-primary">
         Torna al negozio
       </Link>
