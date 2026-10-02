@@ -23,9 +23,10 @@ LOGGER = logging.getLogger("addresses")
 
 router = APIRouter(prefix="/api/addresses", tags=["addresses"])
 
-# Un tetto basso ma piu' che sufficiente: serve a impedire che un account
-# diventi un magazzino di righe, non a limitare un uso normale.
-MAX_INDIRIZZI = 20
+# Casa, lavoro, i genitori, un paio di amici a cui si spediscono regali:
+# oltre non si va, e una rubrica corta resta leggibile al checkout, dove
+# gli indirizzi si scorrono tutti per sceglierne uno.
+MAX_INDIRIZZI = 5
 
 
 class AddressRequest(BaseModel):

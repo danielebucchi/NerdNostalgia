@@ -20,6 +20,10 @@ import {
  * Tenere la gestione fuori dal momento del pagamento è voluto: in mezzo a
  * un acquisto ogni passaggio in più costa un ordine. */
 
+/** Deve restare allineato a MAX_INDIRIZZI in api/addresses.py: se
+ *  divergono, il bottone promette un indirizzo che il server rifiuta. */
+const MAX_INDIRIZZI = 5;
+
 const VUOTO: AddressInput = {
   label: "",
   full_name: "",
@@ -142,7 +146,7 @@ export function AddressBook() {
     <section className="mt-10 pt-6 border-t border-ink/10">
       <div className="flex items-center justify-between gap-3 mb-3">
         <h2 className="display text-xl text-ink">Indirizzi di spedizione</h2>
-        {modifica === null && (
+        {modifica === null && lista.length < MAX_INDIRIZZI && (
           <button
             type="button"
             onClick={apriNuovo}
@@ -154,6 +158,13 @@ export function AddressBook() {
       </div>
 
       {errore && <p className="text-pink-deep text-sm mb-3">⚠ {errore}</p>}
+
+      {lista.length >= MAX_INDIRIZZI && modifica === null && (
+        <p className="text-ink-soft text-sm mb-3">
+          Hai raggiunto il massimo di {MAX_INDIRIZZI} indirizzi. Per
+          aggiungerne un altro, elimina prima uno di questi.
+        </p>
+      )}
 
       {lista.length === 0 && modifica === null && (
         <p className="text-ink-soft text-sm">
