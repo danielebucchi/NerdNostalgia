@@ -70,6 +70,12 @@ def _config() -> dict:
         "from_addr": os.getenv("EMAIL_FROM") or os.getenv("SMTP_USER", ""),
         "to_admin": os.getenv("EMAIL_TO_ADMIN", DEFAULT_ADMIN_EMAIL),
         "enabled": os.getenv("EMAIL_ENABLED", "1") == "1",
+        # Dirotta OGNI destinatario su un solo indirizzo. Serve a vedere le
+        # email vere senza spedirle a chi non le ha chieste: in prova i
+        # destinatari sono inventati, e le email a domini inesistenti
+        # tornano indietro come bounce — che e' uno dei motivi per cui poi
+        # quelle vere finiscono nello spam.
+        "redirect_to": os.getenv("EMAIL_REDIRECT_TO", "").strip(),
     }
 
 
@@ -98,9 +104,20 @@ def send_email(
         return False
 
     # Prima di qualsiasi lavoro: se il freno dice no, non si apre nemmeno
-    # la connessione SMTP.
+    # la connessione SMTP. Si conta il destinatario vero, non quello
+    # dirottato, se no in prova tutto sembrerebbe diretto a un indirizzo
+    # solo e il freno scatterebbe al quinto messaggio.
     if not email_guard.consenti(to, critica=critica):
         return False
+
+    destinatario = to
+    if cfg["redirect_to"]:
+        LOGGER.info("Email per %s dirottata su %s", to, cfg["redirect_to"])
+        # L'indirizzo vero finisce nell'oggetto: altrimenti in casella si
+        # ritrovano dieci messaggi identici e non si capisce chi doveva
+        # riceverli.
+        subject = f"[→ {to}] {subject}"
+        destinatario = cfg["redirect_to"]
     if not cfg["user"] or not cfg["password"]:
         LOGGER.warning(
             "SMTP non configurato: imposta SMTP_USER e SMTP_PASSWORD. "
@@ -111,7 +128,7 @@ def send_email(
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = cfg["from_addr"]
-    msg["To"] = to
+    msg["To"] = destinatario
     if reply_to:
         msg["Reply-To"] = reply_to
 
@@ -126,7 +143,7 @@ def send_email(
             smtp.ehlo()
             smtp.login(cfg["user"], cfg["password"])
             smtp.send_message(msg)
-        LOGGER.info("Email inviata a %s (subject=%r)", to, subject)
+        LOGGER.info("Email inviata a %s (subject=%r)", destinatario, subject)
         return True
     except Exception as exc:  # noqa: BLE001
         LOGGER.exception("SMTP send failed: %s", exc)
