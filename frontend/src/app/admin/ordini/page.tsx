@@ -38,6 +38,7 @@ interface Order {
   status: "PENDING" | "PAID" | "SHIPPED" | "COMPLETED" | "CANCELLED";
   tracking_carrier?: string | null;
   tracking_code?: string | null;
+  tracking_url?: string | null;
   completed_at?: string | null;
   paid_at: string | null;
   shipped_at: string | null;
@@ -97,7 +98,9 @@ export default function AdminOrdersPage() {
   const [busy, setBusy] = useState<number | null>(null);
   // Bozza del tracking per ordine: senza codice non si puo' spedire, quindi
   // il campo vive accanto al bottone invece che in una schermata a parte.
-  const [tracking, setTracking] = useState<Record<number, { carrier: string; code: string }>>({});
+  const [tracking, setTracking] = useState<
+    Record<number, { carrier: string; code: string; url: string }>
+  >({});
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -450,6 +453,7 @@ export default function AdminOrdersPage() {
                                     [o.id]: {
                                       carrier: e.target.value,
                                       code: t[o.id]?.code ?? o.tracking_code ?? "",
+                                      url: t[o.id]?.url ?? o.tracking_url ?? "",
                                     },
                                   }))
                                 }
@@ -470,6 +474,28 @@ export default function AdminOrdersPage() {
                                     [o.id]: {
                                       carrier: t[o.id]?.carrier ?? o.tracking_carrier ?? "",
                                       code: e.target.value,
+                                      url: t[o.id]?.url ?? o.tracking_url ?? "",
+                                    },
+                                  }))
+                                }
+                                className="input mt-0.5"
+                              />
+                            </label>
+                            <label className="block w-full">
+                              <span className="text-[11px] text-ink-soft">
+                                Link per seguire la spedizione
+                              </span>
+                              <input
+                                type="url"
+                                placeholder="https://… la pagina del corriere"
+                                value={tracking[o.id]?.url ?? o.tracking_url ?? ""}
+                                onChange={(e) =>
+                                  setTracking((t) => ({
+                                    ...t,
+                                    [o.id]: {
+                                      carrier: t[o.id]?.carrier ?? o.tracking_carrier ?? "",
+                                      code: t[o.id]?.code ?? o.tracking_code ?? "",
+                                      url: e.target.value,
                                     },
                                   }))
                                 }
@@ -488,6 +514,8 @@ export default function AdminOrdersPage() {
                                     tracking[o.id]?.carrier ?? o.tracking_carrier ?? "",
                                   tracking_code:
                                     tracking[o.id]?.code ?? o.tracking_code ?? "",
+                                  tracking_url:
+                                    tracking[o.id]?.url ?? o.tracking_url ?? "",
                                 })
                               }
                               className="btn btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
@@ -496,7 +524,8 @@ export default function AdminOrdersPage() {
                             </button>
                           </div>
                           <p className="text-[11px] text-ink-soft mt-2">
-                            Appena segni spedito, il compratore riceve il codice via email.
+                            Appena segni spedito, il compratore riceve codice e
+                            link via email.
                           </p>
                         </div>
                       )}
@@ -506,6 +535,19 @@ export default function AdminOrdersPage() {
                           📦 Tracking:{" "}
                           <strong className="text-ink">{o.tracking_code}</strong>
                           {o.tracking_carrier ? ` · ${o.tracking_carrier}` : ""}
+                          {o.tracking_url && (
+                            <>
+                              {" · "}
+                              <a
+                                href={o.tracking_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline font-semibold text-pink-deep"
+                              >
+                                segui la spedizione ↗
+                              </a>
+                            </>
+                          )}
                         </p>
                       )}
 

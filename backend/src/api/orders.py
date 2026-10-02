@@ -118,6 +118,7 @@ class OrderResponse(BaseModel):
     notes: Optional[str]
     tracking_carrier: Optional[str] = None
     tracking_code: Optional[str] = None
+    tracking_url: Optional[str] = None
     completed_at: Optional[datetime] = None
     # Locker di ritiro scelto dal compratore
     inpost_point_id: Optional[str] = None
@@ -146,6 +147,7 @@ class OrderUpdate(BaseModel):
     # Spedizione: il codice serve PRIMA di poter marcare SHIPPED
     tracking_carrier: Optional[str] = Field(None, max_length=80)
     tracking_code: Optional[str] = Field(None, max_length=120)
+    tracking_url: Optional[str] = Field(None, max_length=500)
 
 
 def _free_shipping_all(db: Session) -> bool:
@@ -401,6 +403,8 @@ def update_order(
         order.tracking_carrier = payload.tracking_carrier.strip() or None
     if payload.tracking_code is not None:
         order.tracking_code = payload.tracking_code.strip() or None
+    if payload.tracking_url is not None:
+        order.tracking_url = payload.tracking_url.strip() or None
 
     if payload.status is not None and payload.status != order.status:
         # Senza codice di tracciamento non si marca spedito: un pacco gia'

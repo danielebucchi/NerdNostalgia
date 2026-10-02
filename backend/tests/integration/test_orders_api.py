@@ -441,11 +441,13 @@ def test_tracking_and_shipped_in_one_call(
         "status": "SHIPPED",
         "tracking_carrier": "BRT",
         "tracking_code": "ABC123456789",
+        "tracking_url": "https://vas.brt.it/vas/sped_det_show.hsm?ChiSono=ABC123456789",
     })
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["status"] == "SHIPPED"
     assert body["tracking_code"] == "ABC123456789"
+    assert body["tracking_url"].startswith("https://vas.brt.it/")
     assert body["shipped_at"] is not None
 
 
