@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { PUBLIC_API_BASE } from "@/lib/api";
 import type { Category } from "@/lib/types";
 
@@ -22,6 +23,14 @@ export function AlertBell({
   onOpenChange?: (v: boolean) => void;
 }) {
   const comandata = openEsterno !== undefined;
+  // Il dialog esce dal flusso e va appeso al body: l'header ha un
+  // backdrop-filter, e un backdrop-filter rende l'header il blocco di
+  // contenimento dei discendenti `position: fixed`. Senza portal
+  // `inset-0` si misura sull'header invece che sulla finestra, e il
+  // riquadro esce tagliato sotto la barra. `montato` serve perche' in
+  // render lato server document non esiste.
+  const [montato, setMontato] = useState(false);
+  useEffect(() => setMontato(true), []);
   const [openInterno, setOpenInterno] = useState(false);
   const open = comandata ? openEsterno : openInterno;
   const setOpen = (v: boolean) => {
@@ -127,7 +136,7 @@ export function AlertBell({
         </button>
       )}
 
-      {open && (
+      {open && montato && createPortal(
         <div
           className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 bg-ink/40 backdrop-blur-sm overflow-y-auto"
           onClick={() => setOpen(false)}
@@ -238,7 +247,8 @@ export function AlertBell({
               }
             `}</style>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
