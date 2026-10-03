@@ -16,7 +16,7 @@ from urllib.parse import quote
 from sqlalchemy.orm import Session
 
 from models.db import Article, CategoryAlert
-from utils.email import send_email
+from utils.email import _h, send_email
 
 LOGGER = logging.getLogger("category_alerts")
 
@@ -111,17 +111,17 @@ def notify_new_article(db: Session, article: Article) -> int:
         ]
         html = f"""
         <div style="font-family:sans-serif;max-width:560px">
-          <h2 style="color:#3d2a5c">✨ Nuovo arrivo{f" in {category_name}" if category_name else ""}</h2>
-          <p style="font-size:16px"><strong>{article.title}</strong></p>
-          <p style="font-size:15px">Prezzo: <strong>{price}</strong></p>
-          <p><a href="{article_url}"
+          <h2 style="color:#3d2a5c">✨ Nuovo arrivo{f" in {_h(category_name)}" if category_name else ""}</h2>
+          <p style="font-size:16px"><strong>{_h(article.title)}</strong></p>
+          <p style="font-size:15px">Prezzo: <strong>{_h(price)}</strong></p>
+          <p><a href="{_h(article_url)}"
                 style="display:inline-block;background:#e879a8;color:#fff;
                        padding:10px 22px;border-radius:999px;text-decoration:none;
                        font-weight:bold">Guardalo sul sito</a></p>
           <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
           <p style="font-size:12px;color:#888">
             Ricevi questa mail perche' ti sei iscritto agli avvisi di NerdNostalgia.<br>
-            <a href="{unsub_url}" style="color:#888">Disiscriviti</a>
+            <a href="{_h(unsub_url)}" style="color:#888">Disiscriviti</a>
           </p>
         </div>
         """
