@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+import html as _html
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -59,6 +60,21 @@ def _whatsapp_url(phone: Optional[str], default_text: str = "") -> Optional[str]
         return url
     # Numero non riconosciuto come italiano: prudente, no WA
     return None
+
+
+def _h(valore) -> str:
+    """Neutralizza il testo altrui prima di metterlo dentro una email HTML.
+
+    Senza, chi scrive dal form contatti puo' chiudere il <pre> e infilare
+    nel messaggio che arriva a me un link suo: un'email di phishing
+    partita davvero dal mio sito, che supera ogni controllo antispam
+    perche' il mittente e' autentico. Lo stesso vale per il nome o
+    l'indirizzo scritti in un ordine.
+
+    Va chiamata SOLO nei corpi HTML: nel testo semplice trasformerebbe
+    le apostrofi in &#x27; e si leggerebbe peggio di prima.
+    """
+    return _html.escape(str(valore if valore is not None else ""), quote=True)
 
 
 def _config() -> dict:
@@ -170,8 +186,8 @@ def send_inquiry_notification(
         if article_url:
             article_block_text += f"\nLink: {article_url}"
         article_block_html = (
-            f"<p><strong>Articolo:</strong> {article_title}"
-            + (f' (<a href="{article_url}">apri</a>)' if article_url else "")
+            f"<p><strong>Articolo:</strong> {_h(article_title)}"
+            + (f' (<a href="{_h(article_url)}">apri</a>)' if article_url else "")
             + "</p>"
         )
 
@@ -191,15 +207,15 @@ Apri nell'admin: /admin/inquiries/{inquiry.id}
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 600px; margin: auto;">
   <h2 style="color: #e879a8;">✉ Nuova richiesta da NerdNostalgia</h2>
   <p>
-    <strong>Da:</strong> {inquiry.name}
-    &lt;<a href="mailto:{inquiry.email}">{inquiry.email}</a>&gt;<br>
-    {f"<strong>Tel:</strong> {inquiry.phone}<br>" if inquiry.phone else ""}
-    <strong>Oggetto:</strong> {subject_short}
+    <strong>Da:</strong> {_h(inquiry.name)}
+    &lt;<a href="mailto:{_h(inquiry.email)}">{_h(inquiry.email)}</a>&gt;<br>
+    {f"<strong>Tel:</strong> {_h(inquiry.phone)}<br>" if inquiry.phone else ""}
+    <strong>Oggetto:</strong> {_h(subject_short)}
   </p>
   {article_block_html}
   <hr>
   <p><strong>Messaggio:</strong></p>
-  <pre style="white-space: pre-wrap; background: #fbf7f4; padding: 12px; border-radius: 8px;">{inquiry.message}</pre>
+  <pre style="white-space: pre-wrap; background: #fbf7f4; padding: 12px; border-radius: 8px;">{_h(inquiry.message)}</pre>
   <hr>
   <p style="font-size: 0.85em; color: #888;">
     Apri nell'admin: <code>/admin/inquiries/{inquiry.id}</code>
@@ -235,16 +251,16 @@ def send_order_notification(order) -> bool:
     items_lines: list[str] = []
     items_html: list[str] = []
     for it in order.items:
-        line = f"  - {it.title_snapshot} × {it.quantity} → € {float(it.price_snapshot):.2f}"
+        line = f"  - {it.title_snapshot} × {_h(it.quantity)} → € {float(it.price_snapshot):.2f}"
         items_lines.append(line)
         # Link all'articolo: serve a ritrovarlo subito per prepararlo
         link = f"{_site_url()}/articles/{it.article_id}" if it.article_id else None
         if link:
             items_lines.append(f"    {link}")
         items_html.append(
-            f"<li><strong>{it.title_snapshot}</strong> × {it.quantity}"
+            f"<li><strong>{_h(it.title_snapshot)}</strong> × {_h(it.quantity)}"
             f" → € {float(it.price_snapshot):.2f}"
-            + (f"<br><a href='{link}' style='font-size:0.85em;'>{link}</a>" if link else "")
+            + (f"<br><a href='{_h(link)}' style='font-size:0.85em;'>{_h(link)}</a>" if link else "")
             + "</li>"
         )
 
@@ -304,21 +320,21 @@ Pagamento incassato. Dettaglio ordine: /admin/ordini/{order.id}
 
   <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">Compratore</h3>
   <p>
-    <strong>{order.buyer_name}</strong><br>
-    Email: <a href="mailto:{order.buyer_email}">{order.buyer_email}</a><br>
-    {f"Tel: <a href='tel:{order.buyer_phone}'>{order.buyer_phone}</a><br>" if order.buyer_phone else ""}
+    <strong>{_h(order.buyer_name)}</strong><br>
+    Email: <a href="mailto:{_h(order.buyer_email)}">{_h(order.buyer_email)}</a><br>
+    {f"Tel: <a href='tel:{_h(order.buyer_phone)}'>{_h(order.buyer_phone)}</a><br>" if order.buyer_phone else ""}
   </p>
   <!-- Bottoni contatto rapido: tap-to-mail / tap-to-call / WhatsApp -->
   <div style="margin: 10px 0 16px;">
-    <a href="mailto:{order.buyer_email}?subject=Ordine%20%23{order.id}%20NerdNostalgia"
+    <a href="mailto:{_h(order.buyer_email)}?subject=Ordine%20%23{order.id}%20NerdNostalgia"
        style="display:inline-block; background:#a890d8; color:white; padding:8px 14px; border-radius:999px; text-decoration:none; font-weight:bold; font-size:0.85em; margin-right:6px; margin-bottom:6px;">
       ✉ Email
     </a>
-    {f'''<a href="tel:{order.buyer_phone}"
+    {f'''<a href="tel:{_h(order.buyer_phone)}"
        style="display:inline-block; background:#7dd3c0; color:white; padding:8px 14px; border-radius:999px; text-decoration:none; font-weight:bold; font-size:0.85em; margin-right:6px; margin-bottom:6px;">
       📞 Chiama
     </a>''' if order.buyer_phone else ''}
-    {f'''<a href="{wa_url}" target="_blank"
+    {f'''<a href="{_h(wa_url)}" target="_blank"
        style="display:inline-block; background:#25D366; color:white; padding:8px 14px; border-radius:999px; text-decoration:none; font-weight:bold; font-size:0.85em; margin-right:6px; margin-bottom:6px;">
       💬 WhatsApp
     </a>''' if wa_url else ''}
@@ -326,11 +342,11 @@ Pagamento incassato. Dettaglio ordine: /admin/ordini/{order.id}
 
   <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">{"Ritiro al locker InPost" if order.inpost_point_id else "Spedizione a"}</h3>
   <address style="background:#fbf7f4; padding:10px 14px; border-radius:8px; font-style:normal;">
-    {f'<strong>{order.inpost_point_name or "Locker InPost"}</strong><br><code style="background:#eee; padding:1px 5px; border-radius:4px;">{order.inpost_point_id}</code><br>' if order.inpost_point_id else ""}
-    <strong>{order.buyer_name}</strong><br>
-    {order.ship_street}<br>
-    {order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}<br>
-    {order.ship_country}
+    {f'<strong>{_h(order.inpost_point_name or "Locker InPost")}</strong><br><code style="background:#eee; padding:1px 5px; border-radius:4px;">{_h(order.inpost_point_id)}</code><br>' if order.inpost_point_id else ""}
+    <strong>{_h(order.buyer_name)}</strong><br>
+    {_h(order.ship_street)}<br>
+    {_h(order.ship_postal_code)} {_h(order.ship_city)}{f" ({_h(order.ship_province)})" if order.ship_province else ""}<br>
+    {_h(order.ship_country)}
   </address>
 
   <h3 style="color:#3d2a5c; border-bottom: 1px solid #eee; padding-bottom: 4px;">Articoli</h3>
@@ -346,11 +362,11 @@ Pagamento incassato. Dettaglio ordine: /admin/ordini/{order.id}
     </tr>
     <tr style="font-weight:bold; font-size:1.1em; color:#e879a8;">
       <td>TOTALE</td>
-      <td style="text-align:right; padding-left:24px;">€ {float(order.grand_total):.2f} {order.currency}</td>
+      <td style="text-align:right; padding-left:24px;">€ {float(order.grand_total):.2f} {_h(order.currency)}</td>
     </tr>
   </table>
 
-  {f'<h3 style="color:#3d2a5c;">Note compratore</h3><pre style="white-space:pre-wrap; background:#fbf7f4; padding:12px; border-radius:8px;">{order.notes}</pre>' if order.notes else ""}
+  {f'<h3 style="color:#3d2a5c;">Note compratore</h3><pre style="white-space:pre-wrap; background:#fbf7f4; padding:12px; border-radius:8px;">{_h(order.notes)}</pre>' if order.notes else ""}
 
   <hr>
   <h3 style="color:#3d2a5c;">Spedizione</h3>
@@ -364,14 +380,14 @@ Pagamento incassato. Dettaglio ordine: /admin/ordini/{order.id}
     Packlink non accetta i dati dal link: il riquadro qui sotto è fatto per
     essere selezionato e incollato campo per campo.
   </p>
-  <pre style="background:#fbf7f4; border:1px solid #e7e0f0; border-radius:8px; padding:12px; font-size:0.85em; line-height:1.6; white-space:pre-wrap; color:#3d2a5c;">Nome:      {order.buyer_name}
-Indirizzo: {order.ship_street}
-CAP:       {order.ship_postal_code}
-Città:     {order.ship_city}
-Provincia: {order.ship_province or "-"}
-Paese:     {order.ship_country}
-Telefono:  {order.buyer_phone or "NON FORNITO"}
-Email:     {order.buyer_email}</pre>
+  <pre style="background:#fbf7f4; border:1px solid #e7e0f0; border-radius:8px; padding:12px; font-size:0.85em; line-height:1.6; white-space:pre-wrap; color:#3d2a5c;">Nome:      {_h(order.buyer_name)}
+Indirizzo: {_h(order.ship_street)}
+CAP:       {_h(order.ship_postal_code)}
+Città:     {_h(order.ship_city)}
+Provincia: {_h(order.ship_province or "-")}
+Paese:     {_h(order.ship_country)}
+Telefono:  {_h(order.buyer_phone or "NON FORNITO")}
+Email:     {_h(order.buyer_email)}</pre>
   {f'<p style="background:#e0f5ec; border-left:3px solid #7dd1b8; padding:8px 12px; font-size:0.9em;">🛡 <strong>Spedizione assicurata</strong> — il compratore ha pagato il premio ({float(order.insurance_fee):.2f} €). Dichiara un valore di <strong>{float(order.subtotal):.2f} €</strong> quando compri l&apos;etichetta.</p>' if order.insured else '<p style="font-size:0.85em; color:#888;">Spedizione non assicurata: il compratore non l&apos;ha richiesta.</p>'}
   <p style="font-size: 0.85em; color: #888;">
     Pagamento incassato. Dettaglio ordine:
@@ -407,13 +423,13 @@ def send_order_confirmation(order) -> bool:
     items_html: list[str] = []
     for it in order.items:
         items_lines.append(
-            f"  - {it.title_snapshot} × {it.quantity} → € {float(it.price_snapshot):.2f}"
+            f"  - {it.title_snapshot} × {_h(it.quantity)} → € {float(it.price_snapshot):.2f}"
         )
         link = f"{_site_url()}/articles/{it.article_id}" if it.article_id else None
         items_html.append(
-            f"<li><strong>{it.title_snapshot}</strong> × {it.quantity}"
+            f"<li><strong>{_h(it.title_snapshot)}</strong> × {_h(it.quantity)}"
             f" → € {float(it.price_snapshot):.2f}"
-            + (f"<br><a href='{link}' style='font-size:0.85em;'>rivedi l&apos;articolo</a>" if link else "")
+            + (f"<br><a href='{_h(link)}' style='font-size:0.85em;'>rivedi l&apos;articolo</a>" if link else "")
             + "</li>"
         )
 
@@ -485,7 +501,7 @@ Nerd Nostalgia
 """
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
-  <h2 style="color: #e879a8;">Grazie {nome}! Ordine #{order.id} confermato</h2>
+  <h2 style="color: #e879a8;">Grazie {_h(nome)}! Ordine #{order.id} confermato</h2>
   <p>Ho ricevuto il tuo pagamento. Preparo il pacco e ti scrivo appena spedisco.</p>
 
   <h3 style="border-bottom:1px solid #eee; padding-bottom:4px;">Cosa hai preso</h3>
@@ -505,9 +521,9 @@ Nerd Nostalgia
 
   <h3 style="border-bottom:1px solid #eee; padding-bottom:4px; margin-top:20px;">Consegna</h3>
   <address style="background:#fbf7f4; padding:10px 14px; border-radius:8px; font-style:normal;">
-    {consegna_txt}<br>
-    {order.ship_street}<br>
-    {order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}
+    {_h(consegna_txt)}<br>
+    {_h(order.ship_street)}<br>
+    {_h(order.ship_postal_code)} {_h(order.ship_city)}{f" ({_h(order.ship_province)})" if order.ship_province else ""}
   </address>
 
   <p style="margin-top:20px;">
@@ -575,20 +591,20 @@ Nerd Nostalgia
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
   <h2 style="color: #e879a8;">📦 Il tuo ordine #{order.id} è partito</h2>
-  <p>{saluto} il pacco è in viaggio.</p>
+  <p>{_h(saluto)} il pacco è in viaggio.</p>
 
   <p style="background:#e0f5ec; border-left:3px solid #7dd1b8; padding:12px 16px; border-radius:8px;">
     <span style="color:#888; font-size:0.85em;">Codice di tracciamento</span><br>
-    <strong style="font-size:1.2em; letter-spacing:0.5px;">{codice}</strong>
-    {f'<br><span style="color:#888; font-size:0.9em;">Corriere: {corriere}</span>' if corriere else ''}
+    <strong style="font-size:1.2em; letter-spacing:0.5px;">{_h(codice)}</strong>
+    {f'<br><span style="color:#888; font-size:0.9em;">Corriere: {_h(corriere)}</span>' if corriere else ''}
   </p>
   {f'''<p style="margin:16px 0;">
-    <a href="{link}" style="display:inline-block; background:#7dd1b8; color:#15322a; padding:12px 22px; border-radius:999px; text-decoration:none; font-weight:bold;">
+    <a href="{_h(link)}" style="display:inline-block; background:#7dd1b8; color:#15322a; padding:12px 22px; border-radius:999px; text-decoration:none; font-weight:bold;">
       Segui la spedizione →
     </a>
   </p>''' if link else ''}
 
-  <p>Arriva {dove}.</p>
+  <p>Arriva {_h(dove)}.</p>
 
   <p style="margin-top:20px;">
     Se dopo qualche giorno il tracciamento non si muove,
@@ -631,7 +647,7 @@ def send_welcome_email(user) -> bool:
             f'<p style="background:#e6f3f7; border-radius:8px; padding:10px 14px; font-size:0.9em;">'
             f'Hai accettato di ricevere le novità del sito: ti scriverò quando arrivano '
             f'pezzi interessanti, senza esagerare. '
-            f'<a href="{site}/disiscriviti?t={user.unsubscribe_token or ""}">Disiscriviti quando vuoi</a>.</p>'
+            f'<a href="{site}/disiscriviti?t={_h(user.unsubscribe_token or "")}">Disiscriviti quando vuoi</a>.</p>'
         )
     else:
         promo_txt = (
@@ -660,7 +676,7 @@ Nerd Nostalgia
 """
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
-  <h2 style="color: #e879a8;">Benvenuto su Nerd Nostalgia{f", {nome}" if nome else ""}!</h2>
+  <h2 style="color: #e879a8;">Benvenuto su Nerd Nostalgia{f", {_h(nome)}" if nome else ""}!</h2>
   <p>Da adesso hai un profilo: ci trovi gli <strong>ordini in corso</strong> con
      il codice di tracciamento, e lo storico di quelli passati.</p>
   <p style="margin:18px 0;">
@@ -719,13 +735,13 @@ Nerd Nostalgia
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
   <h2 style="color: #e879a8;">Com'è andata con l'ordine #{order.id}?</h2>
-  <p>{saluto} il pacco è arrivato e per me l'ordine è chiuso. Spero sia andato
+  <p>{_h(saluto)} il pacco è arrivato e per me l'ordine è chiuso. Spero sia andato
      tutto bene.</p>
   <p>Se ti va, <strong>lasciami una recensione</strong>: bastano due righe e mi
      aiuta parecchio, perché chi compra da un piccolo negozio vuole sapere
      com'è andata a chi l'ha fatto prima.</p>
   <p style="margin:18px 0;">
-    <a href="{link}" style="display:inline-block; background:#e879a8; color:white; padding:12px 22px; border-radius:999px; text-decoration:none; font-weight:bold;">
+    <a href="{_h(link)}" style="display:inline-block; background:#e879a8; color:white; padding:12px 22px; border-radius:999px; text-decoration:none; font-weight:bold;">
       Lascia una recensione →
     </a>
   </p>
@@ -778,13 +794,13 @@ Nerd Nostalgia
 """
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
-  <p>{saluto}</p>
+  <p>{_h(saluto)}</p>
   <p>
     hai chiesto di reimpostare la password del tuo profilo su
     <strong>Nerd Nostalgia</strong>. Scegline una nuova da qui:
   </p>
   <p style="text-align:center; margin:28px 0;">
-    <a href="{link}" style="display:inline-block; background:#a890d8; color:white; padding:12px 26px; border-radius:999px; text-decoration:none; font-weight:bold;">Scegli una nuova password</a>
+    <a href="{_h(link)}" style="display:inline-block; background:#a890d8; color:white; padding:12px 26px; border-radius:999px; text-decoration:none; font-weight:bold;">Scegli una nuova password</a>
   </p>
   <p style="font-size:0.9em; color:#6b5b8a;">
     Il link vale <strong>un'ora</strong> e una volta sola.
