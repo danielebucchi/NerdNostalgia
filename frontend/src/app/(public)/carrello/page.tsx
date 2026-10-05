@@ -127,7 +127,7 @@ function CartContent() {
       </Link>
 
       <h1 className="display text-3xl sm:text-4xl text-ink mb-6">
-        🛒 Il Suo carrello
+        🛒 Il mio carrello
       </h1>
 
       {!hydrated || loading ? (

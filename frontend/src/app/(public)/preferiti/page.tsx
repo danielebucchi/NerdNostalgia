@@ -43,7 +43,7 @@ export default function WishlistPage() {
     <div>
       <div className="flex items-end justify-between mb-6 gap-3 flex-wrap">
         <div>
-          <h1 className="display text-3xl sm:text-4xl text-ink">I Suoi preferiti</h1>
+          <h1 className="display text-3xl sm:text-4xl text-ink">I miei preferiti</h1>
           <p className="text-ink-soft mt-1 text-sm">
             {hydrated && count > 0
               ? `${count} articol${count === 1 ? "o" : "i"} salvati nel Suo browser.`

@@ -72,7 +72,7 @@ export default function ProfiloPage() {
     <article>
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="display text-3xl text-ink">Il Suo profilo</h1>
+          <h1 className="display text-3xl text-ink">Il mio profilo</h1>
           <p className="text-ink-soft text-sm mt-1">
             {user?.full_name || user?.email}
           </p>
