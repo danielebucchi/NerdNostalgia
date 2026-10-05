@@ -247,3 +247,22 @@ export async function resetPassword(
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()).detail as string;
 }
+
+/** Cancella il profilo. La password serve al server come prova che a
+ *  chiederlo sia il titolare, non chi gli ha trovato il telefono
+ *  sbloccato. */
+export async function deleteAccount(password: string): Promise<string> {
+  const token = getCustomerToken();
+  if (!token) throw new Error("Non autenticato");
+  const res = await fetch(`${PUBLIC_API_BASE}/api/auth/me`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ password }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  clearCustomerSession();
+  return (await res.json()).detail as string;
+}
