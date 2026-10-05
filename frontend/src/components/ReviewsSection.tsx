@@ -2,15 +2,7 @@
 // pubblico (localhost:7373) dal container del frontend punterebbe a se
 // stesso invece che al backend.
 import { API_BASE } from "@/lib/api";
-
-interface Review {
-  id: number;
-  author_name: string;
-  rating: number;
-  body: string | null;
-  reply: string | null;
-  created_at: string;
-}
+import { ReviewsCarousel, type Review } from "@/components/ReviewsCarousel";
 
 interface Summary {
   count: number;
@@ -27,9 +19,15 @@ function Stelle({ n }: { n: number }) {
 }
 
 /**
- * Cosa dicono i clienti. Si vede solo se c'è qualcosa da mostrare: una
- * sezione "recensioni" vuota su un negozio nuovo fa l'effetto opposto a
- * quello che serve.
+ * Cosa dicono i clienti: le ultime 10, in un carosello che gira.
+ *
+ * È un componente server e non guarda nessuna sessione — le recensioni
+ * sono pubbliche e si vedono anche da sloggati. Il motivo per cui a
+ * volte sembravano sparite era la cache: ora dura un minuto, così una
+ * recensione appena approvata compare quasi subito.
+ *
+ * Resta nascosta solo se non ce n'è nessuna: una sezione "recensioni"
+ * vuota su un negozio nuovo fa l'effetto opposto a quello che serve.
  */
 export async function ReviewsSection() {
   let reviews: Review[] = [];
@@ -37,8 +35,8 @@ export async function ReviewsSection() {
 
   try {
     const [r1, r2] = await Promise.all([
-      fetch(`${API_BASE}/api/reviews/?limit=6`, { next: { revalidate: 300 } }),
-      fetch(`${API_BASE}/api/reviews/summary`, { next: { revalidate: 300 } }),
+      fetch(`${API_BASE}/api/reviews/?limit=10`, { next: { revalidate: 60 } }),
+      fetch(`${API_BASE}/api/reviews/summary`, { next: { revalidate: 60 } }),
     ]);
     if (r1.ok) reviews = await r1.json();
     if (r2.ok) summary = await r2.json();
@@ -64,24 +62,8 @@ export async function ReviewsSection() {
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {reviews.map((r) => (
-          <div key={r.id} className="card p-4 flex flex-col gap-2">
-            <Stelle n={r.rating} />
-            {r.body && (
-              <p className="text-sm text-ink leading-relaxed flex-1">
-                “{r.body}”
-              </p>
-            )}
-            <p className="text-xs text-ink-soft">— {r.author_name}</p>
-            {r.reply && (
-              <p className="text-xs text-ink-soft bg-pink-soft/30 rounded-lg p-2 leading-snug">
-                <strong className="text-ink">La mia risposta:</strong> {r.reply}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
+      <ReviewsCarousel reviews={reviews} />
+
     </section>
   );
 }
