@@ -40,7 +40,7 @@ export default async function CercoCompoPage() {
           </h1>
           <p className="text-ink-soft text-base sm:text-lg mt-4 max-w-xl mx-auto md:mx-0">
             Ha una di queste cose in cantina? Ci scriva e ne parliamo. Paghiamo in
-            fretta, ritiro o spedizione a mio carico.
+            fretta, ritiro o spedizione a nostro carico.
           </p>
         </div>
       </div>
@@ -54,9 +54,9 @@ export default async function CercoCompoPage() {
 
       {!error && items.length === 0 && (
         <div className="card p-10 text-center">
-          <p className="display text-xl text-ink mb-2">Per ora non cerco niente</p>
+          <p className="display text-xl text-ink mb-2">Al momento non cerchiamo nulla</p>
           <p className="text-ink-soft">
-            Torna a trovarmi: pubblico nuove richieste quando ho un wishlist da svaligiare.
+            Torni a trovarci: pubblichiamo nuove richieste non appena ci sono pezzi da cercare.
           </p>
           <Link href="/" className="btn btn-primary mt-6 inline-flex">
             Vai al catalogo

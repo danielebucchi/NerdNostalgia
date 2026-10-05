@@ -50,7 +50,7 @@ export async function ReviewsSection() {
     <section className="mb-10">
       <div className="flex flex-wrap items-baseline gap-3 mb-5">
         <h2 className="display text-2xl sm:text-3xl text-ink">
-          Dicono di me
+          Dicono di noi
         </h2>
         {summary.average != null && (
           <p className="text-ink-soft text-sm">

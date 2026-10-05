@@ -105,7 +105,7 @@ export async function Footer() {
           <h3 className="display text-lg sm:text-xl text-ink">Nerd.Nostalgia</h3>
           <p className="text-ink-soft mt-2 text-sm leading-relaxed">
             Un piccolo angolo nerd dove ridare casa a videogiochi, carte e gadget
-            che hanno fatto la storia (almeno la mia).
+            che hanno fatto la storia (almeno la nostra).
           </p>
         </div>
         <div>

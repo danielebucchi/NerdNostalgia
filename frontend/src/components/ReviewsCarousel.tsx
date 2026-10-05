@@ -83,7 +83,7 @@ export function ReviewsCarousel({ reviews }: { reviews: Review[] }) {
                 <p className="text-sm text-ink-soft">— {r.author_name}</p>
                 {r.reply && (
                   <p className="text-sm text-ink-soft bg-pink-soft/30 rounded-lg p-3 leading-snug">
-                    <strong className="text-ink">La mia risposta:</strong>{" "}
+                    <strong className="text-ink">La nostra risposta:</strong>{" "}
                     {r.reply}
                   </p>
                 )}
