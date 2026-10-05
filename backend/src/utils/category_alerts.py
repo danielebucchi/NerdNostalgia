@@ -97,31 +97,33 @@ def notify_new_article(db: Session, article: Article) -> int:
             f"{_api_url()}/api/alerts/unsubscribe"
             f"?email={quote(email_addr)}&token={token}"
         )
-        subject = f"✨ Nuovo arrivo: {article.title}"
+        subject = f"Nuovo arrivo in catalogo: {article.title}"
         text_lines = [
-            f"E' arrivato un nuovo articolo{f' in {category_name}' if category_name else ''}!",
+            f"Le segnaliamo un nuovo articolo disponibile in catalogo"
+            f"{f' nella categoria {category_name}' if category_name else ''}.",
             "",
             article.title,
             f"Prezzo: {price}",
             "",
-            f"Guardalo qui: {article_url}",
+            f"Puo' consultarlo qui: {article_url}",
             "",
             "--",
-            f"Non vuoi piu' ricevere questi avvisi? {unsub_url}",
+            f"Per non ricevere piu' queste comunicazioni: {unsub_url}",
         ]
         html = f"""
         <div style="font-family:sans-serif;max-width:560px">
-          <h2 style="color:#3d2a5c">✨ Nuovo arrivo{f" in {_h(category_name)}" if category_name else ""}</h2>
+          <h2 style="color:#3d2a5c">Nuovo arrivo in catalogo{f" — {_h(category_name)}" if category_name else ""}</h2>
           <p style="font-size:16px"><strong>{_h(article.title)}</strong></p>
           <p style="font-size:15px">Prezzo: <strong>{_h(price)}</strong></p>
           <p><a href="{_h(article_url)}"
                 style="display:inline-block;background:#e879a8;color:#fff;
                        padding:10px 22px;border-radius:999px;text-decoration:none;
-                       font-weight:bold">Guardalo sul sito</a></p>
+                       font-weight:bold">Vedi l&apos;articolo</a></p>
           <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
           <p style="font-size:12px;color:#888">
-            Ricevi questa mail perche' ti sei iscritto agli avvisi di NerdNostalgia.<br>
-            <a href="{_h(unsub_url)}" style="color:#888">Disiscriviti</a>
+            Riceve questa comunicazione in quanto iscritto agli avvisi di
+            Nerd Nostalgia.<br>
+            <a href="{_h(unsub_url)}" style="color:#888">Revoca il consenso</a>
           </p>
         </div>
         """

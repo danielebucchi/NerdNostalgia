@@ -62,6 +62,17 @@ def _whatsapp_url(phone: Optional[str], default_text: str = "") -> Optional[str]
     return None
 
 
+def _saluto(nome_completo) -> str:
+    """Apertura formale delle email ai clienti.
+
+    Nome e cognome per intero: "Gentile Mario" col solo nome di battesimo
+    e' una via di mezzo che non sta ne' di qua ne' di la'. Senza nome si
+    ripiega su "Cliente", che e' impersonale ma mai sbagliato.
+    """
+    nome = (nome_completo or "").strip()
+    return f"Gentile {nome}," if nome else "Gentile Cliente,"
+
+
 def _h(valore) -> str:
     """Neutralizza il testo altrui prima di metterlo dentro una email HTML.
 
@@ -266,8 +277,9 @@ def send_order_notification(order) -> bool:
 
     wa_url = _whatsapp_url(
         order.buyer_phone,
-        default_text=f"Ciao {order.buyer_name.split()[0] if order.buyer_name else ''}, "
-        f"ti scrivo da NerdNostalgia per il tuo ordine #{order.id}.",
+        # Lo legge il compratore su WhatsApp: stesso registro delle email.
+        default_text=f"Buongiorno {order.buyer_name or ''}, La contattiamo da "
+        f"Nerd Nostalgia in merito al Suo ordine #{order.id}.",
     )
     text_body = f"""Ordine #{order.id} PAGATO — {order.buyer_name}
 ==========================================
@@ -429,12 +441,11 @@ def send_order_confirmation(order) -> bool:
         items_html.append(
             f"<li><strong>{_h(it.title_snapshot)}</strong> × {_h(it.quantity)}"
             f" → € {float(it.price_snapshot):.2f}"
-            + (f"<br><a href='{_h(link)}' style='font-size:0.85em;'>rivedi l&apos;articolo</a>" if link else "")
+            + (f"<br><a href='{_h(link)}' style='font-size:0.85em;'>dettagli dell&apos;articolo</a>" if link else "")
             + "</li>"
         )
 
-    nome = (order.buyer_name or "").split()[0] if order.buyer_name else ""
-    saluto = f"Ciao {nome}," if nome else "Ciao,"
+    saluto = _saluto(order.buyer_name)
     assicurata = bool(order.insured)
     site = _site_url()
     # L'invito a registrarsi ha senso solo per chi un profilo non ce l'ha:
@@ -442,16 +453,16 @@ def send_order_confirmation(order) -> bool:
     ospite = order.user_id is None
 
     consegna_txt = (
-        f"Ritiri al locker InPost {order.inpost_point_name or ''} "
+        f"Ritiro presso il locker InPost {order.inpost_point_name or ''} "
         f"(codice {order.inpost_point_id})"
         if order.inpost_point_id
-        else "Spedizione all'indirizzo che hai indicato"
+        else "Spedizione all'indirizzo indicato"
     )
 
     invito_txt = (
         f"""
-Vuoi seguire la spedizione da solo? Crea un profilo con questa stessa email
-e l'ordine ci finisce dentro automaticamente:
+Desidera seguire la spedizione in autonomia? Creando un profilo con questo
+stesso indirizzo email, l'ordine vi verra' associato automaticamente:
 {site}/registrati
 """
         if ospite
@@ -459,9 +470,9 @@ e l'ordine ci finisce dentro automaticamente:
     )
     invito_html = (
         f"""<p style="background:#d4c4f0; border-radius:8px; padding:12px 16px;">
-    <strong>Vuoi seguire la spedizione da solo?</strong> Crea un profilo con
-    questa stessa email e l'ordine ci finisce dentro automaticamente, con il
-    codice di tracciamento appena spedisco.<br>
+    <strong>Desidera seguire la spedizione in autonomia?</strong> Creando un
+    profilo con questo stesso indirizzo email, l'ordine vi verra' associato
+    automaticamente, insieme al codice di tracciamento.<br>
     <a href="{site}/registrati" style="display:inline-block; margin-top:8px; background:#a890d8; color:white; padding:9px 18px; border-radius:999px; text-decoration:none; font-weight:bold;">Crea il profilo &rarr;</a>
   </p>"""
         if ospite
@@ -470,14 +481,15 @@ e l'ordine ci finisce dentro automaticamente:
 
     text_body = f"""{saluto}
 
-grazie! Ho ricevuto il tuo pagamento e il tuo ordine #{order.id} e' confermato.
+La ringraziamo per il Suo ordine. Le confermiamo di aver ricevuto il
+pagamento: l'ordine #{order.id} è stato registrato correttamente.
 
-Cosa hai preso
---------------
+Riepilogo dell'ordine
+---------------------
 {chr(10).join(items_lines)}
 
-Totali
-------
+Importi
+-------
 Subtotale:  EUR {float(order.subtotal):.2f}
 Spedizione: EUR {float(order.shipping_total):.2f}{" (assicurata)" if assicurata else ""}
 TOTALE:     EUR {float(order.grand_total):.2f}
@@ -488,23 +500,29 @@ Consegna
 {order.ship_street}
 {order.ship_postal_code} {order.ship_city}{f" ({order.ship_province})" if order.ship_province else ""}
 
-Preparo il pacco e ti scrivo appena spedisco.
-Se qualcosa non torna, rispondi a questa email: la leggo io.
+Procederemo con la preparazione del pacco e Le invieremo una comunicazione
+al momento della spedizione, con il relativo codice di tracciamento.
 
-PS: se hai trovato questo messaggio nello spam, segnalalo come attendibile
-o aggiungi il mittente ai contatti. Cosi' l'avviso con il codice di
-tracciamento, che ti mando appena spedisco, non finisce li' anche lui.
+Per qualsiasi necessità può rispondere direttamente a questo messaggio.
+
+Nota: qualora questa comunicazione fosse stata recapitata fra la posta
+indesiderata, La invitiamo a contrassegnare il mittente come attendibile,
+affinchè anche l'avviso di spedizione Le venga consegnato regolarmente.
 {invito_txt}
 
+Cordiali saluti
 Nerd Nostalgia
 {_site_url()}
 """
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
-  <h2 style="color: #e879a8;">Grazie {_h(nome)}! Ordine #{order.id} confermato</h2>
-  <p>Ho ricevuto il tuo pagamento. Preparo il pacco e ti scrivo appena spedisco.</p>
+  <h2 style="color: #e879a8;">Conferma dell&apos;ordine #{order.id}</h2>
+  <p>{_h(saluto)}</p>
+  <p>La ringraziamo per il Suo ordine. Le confermiamo di aver ricevuto il
+     pagamento. Procederemo con la preparazione del pacco e Le invieremo una
+     comunicazione al momento della spedizione.</p>
 
-  <h3 style="border-bottom:1px solid #eee; padding-bottom:4px;">Cosa hai preso</h3>
+  <h3 style="border-bottom:1px solid #eee; padding-bottom:4px;">Riepilogo dell&apos;ordine</h3>
   <ul>{''.join(items_html)}</ul>
 
   <table style="margin-top:12px;">
@@ -527,13 +545,14 @@ Nerd Nostalgia
   </address>
 
   <p style="margin-top:20px;">
-    Se qualcosa non torna, <strong>rispondi a questa email</strong>: la leggo io.
+    Per qualsiasi necessita' puo' <strong>rispondere direttamente a questo
+    messaggio</strong>.
   </p>
   {invito_html}
   <p style="background:#fff4a8; border-radius:8px; padding:10px 14px; font-size:0.9em;">
-    📬 <strong>Trovata nello spam?</strong> Segnala il mittente come
-    attendibile o aggiungilo ai contatti: così l'avviso con il codice di
-    tracciamento, che ti mando appena spedisco, arriva dove lo vedi.
+    📬 <strong>Questo messaggio e&apos; finito fra la posta indesiderata?</strong>
+    La invitiamo a contrassegnare il mittente come attendibile, affinche&apos;
+    anche l&apos;avviso di spedizione Le venga consegnato regolarmente.
   </p>
   <p style="color:#888; font-size:0.9em;">
     Nerd Nostalgia · <a href="{_site_url()}">{_site_url()}</a>
@@ -543,7 +562,7 @@ Nerd Nostalgia
     return send_email(
         to=order.buyer_email,
         critica=True,  # ordine pagato: perderla costa un cliente vero
-        subject=f"Grazie! Il tuo ordine #{order.id} su Nerd Nostalgia è confermato",
+        subject=f"Conferma dell'ordine #{order.id} — Nerd Nostalgia",
         text_body=text_body,
         html_body=html_body,
         reply_to=cfg["to_admin"],
@@ -558,8 +577,7 @@ def send_shipping_notice(order) -> bool:
     compratore resterebbe ad aspettare senza sapere dov'e' il pacco.
     """
     cfg = _config()
-    nome = (order.buyer_name or "").split()[0] if order.buyer_name else ""
-    saluto = f"Ciao {nome}," if nome else "Ciao,"
+    saluto = _saluto(order.buyer_name)
     corriere = (order.tracking_carrier or "").strip()
     codice = (order.tracking_code or "").strip()
     link = (order.tracking_url or "").strip()
@@ -568,30 +586,33 @@ def send_shipping_notice(order) -> bool:
         f"al locker InPost {order.inpost_point_name or ''} "
         f"(codice {order.inpost_point_id})".strip()
         if order.inpost_point_id
-        else f"all'indirizzo che hai indicato: {order.ship_street}, "
+        else f"all'indirizzo da Lei indicato: {order.ship_street}, "
              f"{order.ship_postal_code} {order.ship_city}"
     )
 
     text_body = f"""{saluto}
 
-il tuo ordine #{order.id} e' partito.
+Le comunichiamo che il Suo ordine #{order.id} è stato spedito.
 
 Codice di tracciamento: {codice}
 {f"Corriere: {corriere}" if corriere else ""}
 {f"Segui la spedizione: {link}" if link else ""}
 
-Arriva {dove}.
+La consegna è prevista {dove}.
 
-Se dopo qualche giorno il tracciamento non si muove, rispondi a questa
-email e ci penso io.
+Qualora il tracciamento non registrasse aggiornamenti per alcuni giorni,
+La invitiamo a rispondere a questo messaggio: provvederemo noi alle
+verifiche con il corriere.
 
+Cordiali saluti
 Nerd Nostalgia
 {_site_url()}
 """
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
-  <h2 style="color: #e879a8;">📦 Il tuo ordine #{order.id} è partito</h2>
-  <p>{_h(saluto)} il pacco è in viaggio.</p>
+  <h2 style="color: #e879a8;">📦 Spedizione dell&apos;ordine #{order.id}</h2>
+  <p>{_h(saluto)}</p>
+  <p>Le comunichiamo che il Suo ordine è stato spedito.</p>
 
   <p style="background:#e0f5ec; border-left:3px solid #7dd1b8; padding:12px 16px; border-radius:8px;">
     <span style="color:#888; font-size:0.85em;">Codice di tracciamento</span><br>
@@ -604,11 +625,12 @@ Nerd Nostalgia
     </a>
   </p>''' if link else ''}
 
-  <p>Arriva {_h(dove)}.</p>
+  <p>La consegna è prevista {_h(dove)}.</p>
 
   <p style="margin-top:20px;">
-    Se dopo qualche giorno il tracciamento non si muove,
-    <strong>rispondi a questa email</strong> e ci penso io.
+    Qualora il tracciamento non registrasse aggiornamenti per alcuni giorni,
+    La invitiamo a <strong>rispondere a questo messaggio</strong>:
+    provvederemo noi alle verifiche con il corriere.
   </p>
   <p style="color:#888; font-size:0.9em;">
     Nerd Nostalgia · <a href="{_site_url()}">{_site_url()}</a>
@@ -618,7 +640,7 @@ Nerd Nostalgia
     return send_email(
         to=order.buyer_email,
         critica=True,  # il cliente aspetta il tracking del pacco pagato
-        subject=f"Il tuo ordine #{order.id} è partito — tracking {codice}",
+        subject=f"Spedizione dell'ordine #{order.id} — tracciamento {codice}",
         text_body=text_body,
         html_body=html_body,
         reply_to=cfg["to_admin"],
@@ -633,55 +655,60 @@ def send_welcome_email(user) -> bool:
     revocare facilmente non e' valido.
     """
     cfg = _config()
-    nome = (user.full_name or "").split()[0] if user.full_name else ""
-    saluto = f"Ciao {nome}," if nome else "Ciao,"
+    nome = (user.full_name or "").strip()
+    saluto = _saluto(user.full_name)
     site = _site_url()
 
     if user.marketing_consent:
         promo_txt = (
-            "Hai accettato di ricevere le novita' del sito: ti scrivero' quando\n"
-            "arrivano pezzi interessanti, senza esagerare. Puoi disiscriverti\n"
-            f"quando vuoi da qui: {site}/disiscriviti?t={user.unsubscribe_token or ''}"
+            "Ha acconsentito a ricevere le comunicazioni promozionali: Le\n"
+            "scriveremo in occasione di nuovi arrivi di particolare interesse.\n"
+            "Può revocare il consenso in qualsiasi momento da questo indirizzo:\n"
+            f"{site}/disiscriviti?t={user.unsubscribe_token or ''}"
         )
         promo_html = (
             f'<p style="background:#e6f3f7; border-radius:8px; padding:10px 14px; font-size:0.9em;">'
-            f'Hai accettato di ricevere le novità del sito: ti scriverò quando arrivano '
-            f'pezzi interessanti, senza esagerare. '
-            f'<a href="{site}/disiscriviti?t={_h(user.unsubscribe_token or "")}">Disiscriviti quando vuoi</a>.</p>'
+            f'Ha acconsentito a ricevere le comunicazioni promozionali: Le scriveremo '
+            f'in occasione di nuovi arrivi di particolare interesse. '
+            f'<a href="{site}/disiscriviti?t={_h(user.unsubscribe_token or "")}">Puo&apos; revocare il consenso in qualsiasi momento</a>.</p>'
         )
     else:
         promo_txt = (
-            "Non riceverai email promozionali: hai lasciato la spunta vuota.\n"
-            "Se cambi idea la trovi nel tuo profilo."
+            "Non riceverà comunicazioni promozionali: non ha prestato il\n"
+            "relativo consenso. Può modificare questa scelta in qualsiasi\n"
+            "momento dal Suo profilo."
         )
         promo_html = (
-            '<p style="color:#888; font-size:0.9em;">Non riceverai email promozionali: '
-            'hai lasciato la spunta vuota. Se cambi idea la trovi nel tuo profilo.</p>'
+            '<p style="color:#888; font-size:0.9em;">Non ricevera&apos; comunicazioni '
+            'promozionali: non ha prestato il relativo consenso. Puo&apos; modificare '
+            'questa scelta in qualsiasi momento dal Suo profilo.</p>'
         )
 
     text_body = f"""{saluto}
 
-benvenuto su Nerd Nostalgia.
+Le confermiamo che la registrazione è andata a buon fine.
 
-Da adesso hai un profilo: ci trovi gli ordini in corso con il codice di
-tracciamento, e lo storico di quelli passati.
+Dal Suo profilo può consultare gli ordini in corso, con il relativo
+codice di tracciamento, e lo storico degli acquisti già conclusi.
 
-Il tuo profilo: {site}/profilo
+Il Suo profilo: {site}/profilo
 
 {promo_txt}
 
-A presto,
+Cordiali saluti
 Nerd Nostalgia
 {site}
 """
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
-  <h2 style="color: #e879a8;">Benvenuto su Nerd Nostalgia{f", {_h(nome)}" if nome else ""}!</h2>
-  <p>Da adesso hai un profilo: ci trovi gli <strong>ordini in corso</strong> con
-     il codice di tracciamento, e lo storico di quelli passati.</p>
+  <h2 style="color: #e879a8;">Registrazione completata</h2>
+  <p>{_h(saluto)}</p>
+  <p>Le confermiamo che la registrazione è andata a buon fine. Dal Suo profilo
+     può consultare gli <strong>ordini in corso</strong>, con il relativo codice
+     di tracciamento, e lo storico degli acquisti già conclusi.</p>
   <p style="margin:18px 0;">
     <a href="{site}/profilo" style="display:inline-block; background:#e879a8; color:white; padding:12px 22px; border-radius:999px; text-decoration:none; font-weight:bold;">
-      Vai al tuo profilo →
+      Vai al Suo profilo →
     </a>
   </p>
   {promo_html}
@@ -692,7 +719,7 @@ Nerd Nostalgia
 
     return send_email(
         to=user.email,
-        subject="Benvenuto su Nerd Nostalgia",
+        subject="Registrazione completata — Nerd Nostalgia",
         text_body=text_body,
         html_body=html_body,
         reply_to=cfg["to_admin"],
@@ -709,45 +736,45 @@ def send_review_invite(order) -> bool:
     recensione che sembra un obbligo infastidisce e basta.
     """
     cfg = _config()
-    nome = (order.buyer_name or "").split()[0] if order.buyer_name else ""
-    saluto = f"Ciao {nome}," if nome else "Ciao,"
+    saluto = _saluto(order.buyer_name)
     site = _site_url()
     link = f"{site}/recensione?order={order.id}&t={order.public_token or ''}"
 
     text_body = f"""{saluto}
 
-l'ordine #{order.id} e' arrivato e per me e' chiuso. Spero sia andato tutto
-bene.
+Le comunichiamo che l'ordine #{order.id} risulta consegnato e concluso.
+Ci auguriamo che sia stato tutto di Suo gradimento.
 
-Se ti va, lasciami una recensione: bastano due righe e mi aiuta parecchio,
-perche' chi compra da un piccolo negozio vuole sapere com'e' andata a chi
-l'ha fatto prima.
+Se desidera, può lasciare una recensione sull'acquisto: sono sufficienti
+poche righe, e il Suo giudizio è di grande aiuto a chi valuta di
+acquistare da un piccolo negozio.
 
 {link}
 
-Non e' obbligatorio e non te lo richiedero' piu': se non hai voglia, va
-benissimo cosi'.
+La recensione è del tutto facoltativa e non Le invieremo ulteriori
+solleciti in merito.
 
-Grazie,
+Cordiali saluti
 Nerd Nostalgia
 {site}
 """
 
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
-  <h2 style="color: #e879a8;">Com'è andata con l'ordine #{order.id}?</h2>
-  <p>{_h(saluto)} il pacco è arrivato e per me l'ordine è chiuso. Spero sia andato
-     tutto bene.</p>
-  <p>Se ti va, <strong>lasciami una recensione</strong>: bastano due righe e mi
-     aiuta parecchio, perché chi compra da un piccolo negozio vuole sapere
-     com'è andata a chi l'ha fatto prima.</p>
+  <h2 style="color: #e879a8;">Ordine #{order.id} concluso</h2>
+  <p>{_h(saluto)}</p>
+  <p>Le comunichiamo che l&apos;ordine risulta consegnato e concluso. Ci
+     auguriamo che sia stato tutto di Suo gradimento.</p>
+  <p>Se desidera, può <strong>lasciare una recensione</strong> sull&apos;acquisto:
+     sono sufficienti poche righe, e il Suo giudizio è di grande aiuto a chi
+     valuta di acquistare da un piccolo negozio.</p>
   <p style="margin:18px 0;">
     <a href="{_h(link)}" style="display:inline-block; background:#e879a8; color:white; padding:12px 22px; border-radius:999px; text-decoration:none; font-weight:bold;">
       Lascia una recensione →
     </a>
   </p>
   <p style="color:#888; font-size:0.9em;">
-    Non è obbligatorio e non te lo richiederò più: se non hai voglia, va
-    benissimo così.
+    La recensione è del tutto facoltativa e non Le invieremo ulteriori
+    solleciti in merito.
   </p>
   <p style="color:#888; font-size:0.9em;">
     Nerd Nostalgia · <a href="{site}">{site}</a>
@@ -756,7 +783,7 @@ Nerd Nostalgia
 
     return send_email(
         to=order.buyer_email,
-        subject=f"Com'è andata? Lascia una recensione per l'ordine #{order.id}",
+        subject=f"Ordine #{order.id} concluso — richiesta di recensione",
         text_body=text_body,
         html_body=html_body,
         reply_to=cfg["to_admin"],
@@ -772,23 +799,24 @@ def send_password_reset(user, token: str) -> bool:
     link invece smette di funzionare dopo un'ora.
     """
     cfg = _config()
-    nome = (user.full_name or "").split()[0] if user.full_name else ""
-    saluto = f"Ciao {nome}," if nome else "Ciao,"
+    saluto = _saluto(user.full_name)
     site = _site_url()
     link = f"{site}/reimposta-password?t={token}"
 
     text_body = f"""{saluto}
 
-hai chiesto di reimpostare la password del tuo profilo su Nerd Nostalgia.
-Apri questo link e scegline una nuova:
+abbiamo ricevuto una richiesta di reimpostazione della password per il Suo
+profilo su Nerd Nostalgia. Può sceglierne una nuova dal seguente indirizzo:
 
 {link}
 
-Il link vale un'ora e una volta sola.
+Il collegamento è valido per un'ora e per un solo utilizzo.
 
-Se non sei stato tu, puoi ignorare questo messaggio: la password di adesso
-resta quella che e', e senza aprire il link non cambia niente.
+Se non è stata Lei a inoltrare la richiesta, può ignorare questo
+messaggio: senza accedere al collegamento la password attuale resta
+invariata.
 
+Cordiali saluti
 Nerd Nostalgia
 {site}
 """
@@ -796,18 +824,21 @@ Nerd Nostalgia
     html_body = f"""<html><body style="font-family: sans-serif; max-width: 640px; margin: auto; color:#3d2a5c;">
   <p>{_h(saluto)}</p>
   <p>
-    hai chiesto di reimpostare la password del tuo profilo su
-    <strong>Nerd Nostalgia</strong>. Scegline una nuova da qui:
+    abbiamo ricevuto una richiesta di reimpostazione della password per il Suo
+    profilo su <strong>Nerd Nostalgia</strong>. Può sceglierne una nuova dal
+    pulsante qui sotto:
   </p>
   <p style="text-align:center; margin:28px 0;">
     <a href="{_h(link)}" style="display:inline-block; background:#a890d8; color:white; padding:12px 26px; border-radius:999px; text-decoration:none; font-weight:bold;">Scegli una nuova password</a>
   </p>
   <p style="font-size:0.9em; color:#6b5b8a;">
-    Il link vale <strong>un'ora</strong> e una volta sola.
+    Il collegamento è valido per <strong>un&apos;ora</strong> e per un solo
+    utilizzo.
   </p>
   <p style="font-size:0.9em; color:#6b5b8a;">
-    Se non sei stato tu, ignora pure questo messaggio: senza aprire il link
-    non cambia niente e la password di adesso resta quella che è.
+    Se non è stata Lei a inoltrare la richiesta, può ignorare questo
+    messaggio: senza accedere al collegamento la password attuale resta
+    invariata.
   </p>
   <hr style="border:none; border-top:1px solid #efe9fa; margin:24px 0;">
   <p style="font-size:0.85em; color:#9b8db8;">
@@ -817,7 +848,7 @@ Nerd Nostalgia
 
     return send_email(
         to=user.email,
-        subject="Reimposta la password del tuo profilo",
+        subject="Reimpostazione della password — Nerd Nostalgia",
         text_body=text_body,
         html_body=html_body,
         reply_to=cfg["to_admin"],
