@@ -148,7 +148,7 @@ function RecensioneContent() {
 
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-ink-soft block mb-2">
-            Il Suo voto *
+            Il mio voto *
           </span>
           <Stelle value={rating} onChange={setRating} />
         </div>

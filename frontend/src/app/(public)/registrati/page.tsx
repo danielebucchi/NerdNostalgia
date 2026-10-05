@@ -37,7 +37,7 @@ export default function RegistratiPage() {
 
   return (
     <article className="max-w-md mx-auto">
-      <h1 className="display text-3xl text-ink mb-2">Crei il Suo profilo</h1>
+      <h1 className="display text-3xl text-ink mb-2">Crea un profilo</h1>
       <p className="text-ink-soft text-sm mb-6 leading-relaxed">
         Serve per seguire gli ordini: vi troverà il codice di tracciamento
         delle spedizioni in corso e lo storico di quelli passati. Se ha già

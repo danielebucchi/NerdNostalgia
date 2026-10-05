@@ -746,7 +746,7 @@ export function PurchaseDialog({
           {/* I dati personali dopo l'indirizzo: chi compra pensa
               prima a dove vuole il pacco. */}
           <h3 className="display text-lg text-ink pt-2 border-t border-ink/10">
-            I Suoi dati
+            I miei dati
           </h3>
 
           <div className="grid sm:grid-cols-2 gap-3">
