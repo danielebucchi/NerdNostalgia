@@ -248,8 +248,7 @@ function ConsensoPromozionale() {
           className="mt-1 h-4 w-4 accent-lilac-deep"
         />
         <span className="text-ink-soft text-sm leading-snug">
-          Avvisami quando arrivano pezzi interessanti. Niente di automatico e
-          niente ogni settimana: scrivo quando c&apos;è qualcosa che vale.
+          Avvisami quando arrivano pezzi interessanti.
           {salvato && (
             <span className="text-ink font-semibold"> — salvato ✓</span>
           )}
@@ -257,7 +256,7 @@ function ConsensoPromozionale() {
       </label>
       <p className="text-ink-soft/70 text-xs mt-2">
         Le email sui tuoi ordini (conferma, spedizione, tracking) arrivano
-        comunque: servono a farti avere il pacco, non a venderti qualcosa.
+        comunque.
       </p>
       {errore && <p className="text-pink-deep text-sm mt-2">⚠ {errore}</p>}
     </section>
