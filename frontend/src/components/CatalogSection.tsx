@@ -338,7 +338,7 @@ export function CatalogSection({ initialArticles }: Props) {
           <p className="display text-xl text-ink mb-2">Nessun articolo</p>
           <p className="text-ink-soft text-sm">
             {hasAnyFilter
-              ? "Nessun match con i filtri attivi. Prova ad allargare la ricerca."
+              ? "Nessun risultato con i filtri attivi. Provi ad allargare la ricerca."
               : "Nessun articolo ancora pubblicato."}
           </p>
           {hasAnyFilter && (

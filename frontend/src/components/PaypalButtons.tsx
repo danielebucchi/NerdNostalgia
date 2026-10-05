@@ -131,7 +131,7 @@ export function PaypalButtons({
               // Annullare non e' un errore: l'ordine resta PENDING e il
               // carrello resta pieno, cosi' puo' riprovare.
               handlers.current.onError(
-                "Pagamento annullato. Il carrello è ancora pieno, puoi riprovare.",
+                "Pagamento annullato. Il carrello è rimasto invariato: può riprovare.",
               );
             },
           })
@@ -162,7 +162,7 @@ export function PaypalButtons({
   if (failed) {
     return (
       <p className="text-sm text-pink-deep text-center">
-        ⚠ Non riesco a caricare PayPal. Riprova fra poco o scrivimi.
+        ⚠ Impossibile caricare PayPal. Riprovi fra poco o ci contatti.
       </p>
     );
   }

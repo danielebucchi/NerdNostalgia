@@ -27,7 +27,7 @@ export default function PasswordDimenticataPage() {
     <div className="max-w-md mx-auto py-6">
       <h1 className="display text-3xl text-ink mb-2">Password dimenticata</h1>
       <p className="text-ink-soft mb-6 leading-snug">
-        Scrivi l&apos;email del tuo profilo: ti mando un link per sceglierne
+        Indichi l&apos;email del Suo profilo: Le invieremo un link per sceglierne
         una nuova.
       </p>
 

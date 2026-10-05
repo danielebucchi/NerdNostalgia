@@ -18,7 +18,7 @@ function ReimpostaContent() {
   async function invia(e: React.FormEvent) {
     e.preventDefault();
     if (!token) {
-      setErrore("Link incompleto: usa quello che ti ho mandato per email.");
+      setErrore("Link incompleto: utilizzi quello ricevuto via email.");
       return;
     }
     // Controllato qui e non solo al submit del browser: due campi diversi
@@ -46,7 +46,7 @@ function ReimpostaContent() {
       <>
         <h1 className="display text-3xl text-ink mb-2">Password aggiornata</h1>
         <p className="text-ink-soft mb-6">
-          Ora puoi accedere con quella nuova. Ti porto al login…
+          Può ora accedere con la nuova password. Reindirizzamento in corso…
         </p>
         <Link href="/accedi" className="btn btn-primary">
           Vai ad accedere
@@ -59,7 +59,7 @@ function ReimpostaContent() {
     <>
       <h1 className="display text-3xl text-ink mb-2">Scegli una password</h1>
       <p className="text-ink-soft mb-6 leading-snug">
-        Dev&apos;essere lunga almeno 8 caratteri. Puoi controllare cosa stai
+        Deve contenere almeno 8 caratteri. Può verificare quanto sta
         scrivendo con il pulsante 👁.
       </p>
 

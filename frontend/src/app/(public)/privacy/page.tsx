@@ -25,7 +25,7 @@ export default function PrivacyPage() {
         Ultimo aggiornamento: {LAST_UPDATE}
       </p>
 
-      <Section title="1. Chi tratta i tuoi dati">
+      <Section title="1. Chi tratta i Suoi dati">
         <p>
           Il titolare del trattamento è il gestore di <strong>{SITE_NAME}</strong>,
           contattabile all&apos;indirizzo{" "}
@@ -45,7 +45,7 @@ export default function PrivacyPage() {
 
       <Section title="2. Quali dati raccogliamo">
         <p>
-          <strong>Se ci scrivi</strong>, dal form di contatto o di richiesta
+          <strong>Se ci scrive</strong>, dal form di contatto o di richiesta
           acquisto:
         </p>
         <ul>
@@ -57,7 +57,7 @@ export default function PrivacyPage() {
         </ul>
 
         <p>
-          <strong>Se compri</strong>, per preparare il pacco e farlo arrivare:
+          <strong>Se acquista</strong>, per preparare il pacco e farlo arrivare:
         </p>
         <ul>
           <li>Nome e cognome</li>
@@ -68,7 +68,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             Indirizzo di spedizione (via, città, CAP, provincia), oppure il
-            punto di ritiro InPost che hai scelto sulla mappa
+            punto di ritiro InPost che ha scelto sulla mappa
           </li>
           <li>Articoli acquistati, importi e stato dell&apos;ordine</li>
           <li>
@@ -83,18 +83,18 @@ export default function PrivacyPage() {
         </p>
 
         <p>
-          <strong>Se ti registri</strong>, per darti un profilo con i tuoi
+          <strong>Se si registra</strong>, per fornirLe un profilo con i Suoi
           ordini:
         </p>
         <ul>
-          <li>Indirizzo email (è anche il nome con cui accedi)</li>
+          <li>Indirizzo email (è anche il nome utente con cui accede)</li>
           <li>
             Password, salvata <em>cifrata con hash</em>: nemmeno noi possiamo
             leggerla, e se la dimentichi non possiamo dirtela
           </li>
           <li>Nome (facoltativo)</li>
           <li>
-            Se hai accettato le email promozionali, e la data in cui hai fatto
+            Se ha accettato le email promozionali, e la data in cui ha fatto
             — o ritirato — quella scelta
           </li>
           <li>
@@ -104,17 +104,17 @@ export default function PrivacyPage() {
         </ul>
 
         <p>
-          <strong>Se lasci una recensione</strong>: il voto, il testo che
-          scrivi e il nome indicato nell&apos;ordine. Vedi la sezione 6.
+          <strong>Se lascia una recensione</strong>: il voto, il testo che
+          scrive e il nome indicato nell&apos;ordine. Vedi la sezione 6.
         </p>
 
         <p>
           <strong>Dati tecnici automatici</strong>, salvati esclusivamente nel
-          tuo browser tramite <em>localStorage</em>:
+          Suo browser tramite <em>localStorage</em>:
         </p>
         <ul>
           <li>
-            Lista degli articoli che hai aggiunto ai <em>Preferiti</em> (solo ID
+            Lista degli articoli da Lei aggiunti ai <em>Preferiti</em> (solo ID
             numerici, mai dati personali)
           </li>
           <li>
@@ -125,15 +125,15 @@ export default function PrivacyPage() {
             Contenuto del <em>carrello</em> (ID degli articoli e quantità)
           </li>
           <li>
-            Token di sessione (JWT) di chi ha fatto l&apos;accesso — il tuo, se
-            hai un profilo cliente, oppure quello dell&apos;area
+            Token di sessione (JWT) di chi ha fatto l&apos;accesso — il Suo, se
+            ha un profilo cliente, oppure quello dell&apos;area
             amministrativa. Serve a restare dentro fra una pagina e
             l&apos;altra; esce dal browser solo come prova d&apos;identità
             nelle chiamate al sito
           </li>
         </ul>
         <p>
-          Questi dati restano nel tuo browser e non vengono inviati ai nostri
+          Questi dati restano nel Suo browser e non vengono inviati ai nostri
           server, salvo quando esegui un&apos;azione che lo richiede
           esplicitamente (es. invio del form).
         </p>
@@ -145,7 +145,7 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="3. Perché trattiamo i tuoi dati (finalità e base giuridica)">
+      <Section title="3. Perché trattiamo i Suoi dati (finalità e base giuridica)">
         <ul>
           <li>
             <strong>Risposta a richieste di contatto / acquisto</strong> — base
@@ -155,7 +155,7 @@ export default function PrivacyPage() {
           <li>
             <strong>Gestione dell&apos;ordine</strong> (incasso, preparazione,
             spedizione, assistenza, eventuale reso) — base giuridica:
-            esecuzione del contratto che hai concluso acquistando (art. 6.1.b
+            esecuzione del contratto che ha concluso acquistando (art. 6.1.b
             GDPR). Questi dati sono necessari: senza, l&apos;ordine non si può
             evadere.
           </li>
@@ -170,14 +170,14 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Email promozionali</strong> — base giuridica:{" "}
-            <strong>il tuo consenso</strong> (art. 6.1.a GDPR), che è
+            <strong>il Suo consenso</strong> (art. 6.1.a GDPR), che è
             facoltativo, separato dalla registrazione e revocabile in
             qualsiasi momento. Vedi la sezione 7.
           </li>
           <li>
             <strong>Pubblicazione delle recensioni</strong> — base giuridica:
             il consenso che presti scegliendo di scriverne una, dato che
-            lasciarla è una tua libera scelta (art. 6.1.a GDPR).
+            lasciarla è una Sua libera scelta (art. 6.1.a GDPR).
           </li>
           <li>
             <strong>Funzionalità del sito</strong> (preferiti, navigazione,
@@ -191,7 +191,7 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p>
-          <strong>Non facciamo profilazione, non vendiamo i tuoi dati, non
+          <strong>Non facciamo profilazione, non vendiamo i Suoi dati, non
           usiamo cookie di marketing o di terze parti.</strong>
         </p>
       </Section>
@@ -206,12 +206,12 @@ export default function PrivacyPage() {
           <li>
             <strong>Dati degli ordini</strong>: 10 anni, come impone la legge
             per le scritture contabili (art. 2220 Codice Civile). È un termine
-            che non possiamo accorciare, nemmeno se lo chiedi: per quel periodo
+            che non possiamo accorciare, nemmeno su Sua richiesta: per quel periodo
             la conservazione è un obbligo, non una nostra scelta.
           </li>
           <li>
-            <strong>Account cliente</strong>: finché il profilo esiste. Puoi
-            eliminarlo da solo, in qualsiasi momento, dal tuo{" "}
+            <strong>Account cliente</strong>: finché il profilo esiste. Può
+            eliminarlo autonomamente, in qualsiasi momento, dal Suo{" "}
             <Link
               href="/profilo"
               className="text-lilac-deep font-semibold hover:underline"
@@ -226,18 +226,17 @@ export default function PrivacyPage() {
           <li>
             <strong>Scelta sulle email promozionali</strong>: teniamo traccia
             anche della revoca, e della sua data. Serve a dimostrare che
-            abbiamo smesso di scriverti quando ce l&apos;hai chiesto.
+            abbiamo smesso di scriverLe quando ce l&apos;ha chiesto.
           </li>
           <li>
-            <strong>Recensioni</strong>: finché restano pubblicate. Se chiedi
-            di toglierla, la togliamo.
+            <strong>Recensioni</strong>: finché restano pubblicate. Su Sua richiesta provvederemo a rimuoverla.
           </li>
           <li>
             <strong>Log tecnici server</strong>: massimo 30 giorni.
           </li>
           <li>
-            <strong>Dati in localStorage</strong>: restano nel tuo browser
-            finché non li cancelli tu (impostazioni browser &gt; cancella dati
+            <strong>Dati in localStorage</strong>: restano nel Suo browser
+            finché non li cancella Lei (impostazioni browser &gt; cancella dati
             sito).
           </li>
         </ul>
@@ -264,23 +263,23 @@ export default function PrivacyPage() {
             le loro informative;
           </li>
           <li>
-            <strong>InPost</strong>, se scegli il ritiro in un punto di
+            <strong>InPost</strong>, se sceglie il ritiro in un punto di
             raccolta: riceve il punto scelto e i dati necessari alla consegna.
-            La mappa dei punti è caricata da InPost e, mentre la usi, vede il
-            tuo indirizzo IP;
+            La mappa dei punti è caricata da InPost e, mentre la utilizza, vede il
+            Suo indirizzo IP;
           </li>
           <li>
             <strong>Il corriere</strong> che porta il pacco, e la piattaforma
             con cui compriamo la spedizione: ricevono nome, indirizzo,
-            telefono se l&apos;hai lasciato, ed email per gli avvisi di
+            telefono se l&apos;ha lasciato, ed email per gli avvisi di
             consegna. Senza, il pacco non parte;
           </li>
           <li>
             <strong>Geoapify</strong> (server nell&apos;Unione Europea), che
-            riceve solo quello che scrivi nel campo indirizzo del checkout, per
-            proporti i suggerimenti di completamento. Non riceve il tuo nome,
-            la tua email né l&apos;ordine: solo il testo parziale
-            dell&apos;indirizzo mentre lo digiti. Se preferisci evitarlo, puoi
+            riceve solo quello che scrive nel campo indirizzo del checkout, per
+            proporti i suggerimenti di completamento. Non riceve il Suo nome,
+            la Sua email né l&apos;ordine: solo il testo parziale
+            dell&apos;indirizzo mentre lo digita. Qualora preferisse evitarlo, può
             scrivere l&apos;indirizzo per intero senza scegliere nessun
             suggerimento.
           </li>
@@ -301,44 +300,44 @@ export default function PrivacyPage() {
           server nell&apos;Unione Europea.
         </p>
         <p>
-          <strong>Non vendiamo i tuoi dati a nessuno</strong> e non li
+          <strong>Non vendiamo i Suoi dati a nessuno</strong> e non li
           cediamo per finalità pubblicitarie di terzi.
         </p>
       </Section>
 
       <Section title="6. Recensioni pubbliche">
         <p>
-          Lasciare una recensione è facoltativo. L&apos;invito ti arriva solo
-          se hai comprato davvero e l&apos;ordine è stato completato: non si
+          Lasciare una recensione è facoltativo. L&apos;invito Le viene inviato solo
+          soltanto se ha effettivamente acquistato e l&apos;ordine è stato completato: non si
           può recensire senza aver ricevuto un pacco.
         </p>
         <p>
           Se decidi di scriverne una, vengono pubblicati sul sito{" "}
           <strong>il nome indicato nell&apos;ordine, il voto e il testo</strong>.
           Non vengono pubblicati l&apos;email, l&apos;indirizzo, il telefono,
-          né cosa hai comprato. Tienine conto quando scegli cosa scrivere: la
+          né l&apos;oggetto dell&apos;acquisto. Ne tenga conto nella scelta di cosa scrivere: la
           recensione è visibile a chiunque, e indicizzabile dai motori di
           ricerca.
         </p>
         <p>
-          Le recensioni passano da un controllo prima di comparire. Puoi
+          Le recensioni passano da un controllo prima di comparire. Può
           chiedere in qualsiasi momento di modificarla o toglierla scrivendo
           all&apos;indirizzo in fondo.
         </p>
       </Section>
 
-      <Section title="7. Email: quali ricevi e come smettere">
+      <Section title="7. Email: quali riceve e come interromperle">
         <p>
-          <strong>Email legate ai tuoi ordini</strong> — conferma,
+          <strong>Email legate ai Suoi ordini</strong> — conferma,
           spedizione, codice di tracciamento. Non sono pubblicità: servono a
           farti avere il pacco, fanno parte del contratto e arrivano anche se
-          non hai dato nessun consenso promozionale.
+          non ha prestato alcun consenso promozionale.
         </p>
         <p>
-          <strong>Email promozionali</strong> — solo se hai spuntato la
+          <strong>Email promozionali</strong> — solo se ha spuntato la
           casella apposita, che è separata dalla registrazione e parte vuota.
-          Puoi ritirare il consenso quando vuoi, senza dare spiegazioni e
-          senza che questo tocchi i tuoi ordini:
+          Può revocare il consenso in qualsiasi momento, senza dare spiegazioni e
+          senza che questo tocchi i Suoi ordini:
         </p>
         <ul>
           <li>
@@ -346,7 +345,7 @@ export default function PrivacyPage() {
             che funziona senza bisogno di accedere;
           </li>
           <li>
-            dalla spunta nel tuo{" "}
+            dalla spunta nel Suo{" "}
             <Link
               href="/profilo"
               className="text-lilac-deep font-semibold hover:underline"
@@ -355,7 +354,7 @@ export default function PrivacyPage() {
             </Link>
             ;
           </li>
-          <li>scrivendoci, e ti togliamo noi dalla lista.</li>
+          <li>scrivendoci, e provvederemo noi alla rimozione.</li>
         </ul>
         <p>
           Ritirare il consenso vale da quel momento in poi e non rende
@@ -363,32 +362,32 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="8. I tuoi diritti">
-        <p>In qualsiasi momento puoi:</p>
+      <Section title="8. I Suoi diritti">
+        <p>In qualsiasi momento può:</p>
         <ul>
-          <li>accedere ai tuoi dati (art. 15 GDPR);</li>
+          <li>accedere ai Suoi dati (art. 15 GDPR);</li>
           <li>chiederne la rettifica (art. 16);</li>
           <li>
-            chiederne la cancellazione (art. 17) — per l&apos;account puoi
+            chiederne la cancellazione (art. 17) — per l&apos;account può
             farlo da solo dal profilo, senza passare da noi;
           </li>
           <li>limitarne il trattamento (art. 18);</li>
           <li>opporti al trattamento (art. 21);</li>
           <li>ricevere i dati in formato portabile (art. 20);</li>
           <li>
-            revocare in qualsiasi momento un consenso che hai dato, con la
-            stessa facilità con cui l&apos;hai prestato (art. 7.3).
+            revocare in qualsiasi momento un consenso prestato, con la
+            stessa facilità con cui è stato dato (art. 7.3).
           </li>
         </ul>
         <p>
-          Per esercitarli scrivi a{" "}
+          Per esercitarli scriva a{" "}
           <a
             href="mailto:nerdnostalgiaita@gmail.com"
             className="text-lilac-deep font-semibold hover:underline"
           >
             nerdnostalgiaita@gmail.com
           </a>
-          . Hai inoltre diritto a presentare reclamo al{" "}
+          . Ha inoltre diritto a presentare reclamo al{" "}
           <a
             href="https://www.garanteprivacy.it"
             target="_blank"
@@ -403,8 +402,8 @@ export default function PrivacyPage() {
 
       <Section title="9. Cookie e storage locale">
         <p>
-          Per dettagli su quali dati tecnici vengono salvati nel tuo browser,
-          consulta la{" "}
+          Per dettagli su quali dati tecnici vengono salvati nel Suo browser,
+          consulti la{" "}
           <Link
             href="/cookie-policy"
             className="text-lilac-deep font-semibold hover:underline"

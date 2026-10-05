@@ -106,7 +106,7 @@ function MenuProfilo({
         onClick={() => setAperto((v) => !v)}
         aria-expanded={aperto}
         aria-haspopup="menu"
-        aria-label="Il tuo profilo"
+        aria-label="Il Suo profilo"
         className={
           variant === "mobile"
             ? "btn btn-ghost text-xs px-2.5 py-1.5 relative"
@@ -132,7 +132,7 @@ function MenuProfilo({
           role="menu"
           className="absolute right-0 top-full mt-2 z-50 w-56 rounded-2xl bg-white shadow-xl ring-1 ring-ink/10 py-2"
         >
-          <Voce onClick={() => vai("/profilo")}>👤 Il tuo profilo</Voce>
+          <Voce onClick={() => vai("/profilo")}>👤 Il Suo profilo</Voce>
           <Voce onClick={() => vai("/preferiti")}>
             ♥ Preferiti
             {hydrated && count > 0 && (

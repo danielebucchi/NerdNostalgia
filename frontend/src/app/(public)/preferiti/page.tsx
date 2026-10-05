@@ -43,18 +43,18 @@ export default function WishlistPage() {
     <div>
       <div className="flex items-end justify-between mb-6 gap-3 flex-wrap">
         <div>
-          <h1 className="display text-3xl sm:text-4xl text-ink">I tuoi preferiti</h1>
+          <h1 className="display text-3xl sm:text-4xl text-ink">I Suoi preferiti</h1>
           <p className="text-ink-soft mt-1 text-sm">
             {hydrated && count > 0
-              ? `${count} articol${count === 1 ? "o" : "i"} salvati nel tuo browser.`
-              : "Aggiungi pezzi al cuore ♥ per ritrovarli qui."}
+              ? `${count} articol${count === 1 ? "o" : "i"} salvati nel Suo browser.`
+              : "Selezioni il cuore ♥ sugli articoli per ritrovarli qui."}
           </p>
         </div>
         {hydrated && count > 0 && (
           <button
             type="button"
             onClick={() => {
-              if (confirm("Vuoi davvero svuotare la lista dei preferiti?")) {
+              if (confirm("Confermare lo svuotamento della lista dei preferiti?")) {
                 clear();
               }
             }}
@@ -73,8 +73,8 @@ export default function WishlistPage() {
         <div className="card p-10 text-center">
           <p className="display text-2xl text-ink mb-2">Lista vuota</p>
           <p className="text-ink-soft text-sm mb-6">
-            Non hai ancora salvato nessun articolo. Vai al catalogo e clicca il
-            cuore ♥ sui pezzi che ti interessano.
+            Non ha ancora salvato alcun articolo. Nel catalogo, selezioni il
+            cuore ♥ sugli articoli di Suo interesse.
           </p>
           <Link href="/" className="btn btn-primary">
             Vai al catalogo

@@ -36,12 +36,12 @@ export function DeleteAccount() {
 
   return (
     <section className="mt-10 pt-6 border-t border-ink/10">
-      <h2 className="display text-xl text-ink mb-2">Cancella il tuo profilo</h2>
+      <h2 className="display text-xl text-ink mb-2">Cancellazione del profilo</h2>
 
       {!aperto ? (
         <>
           <p className="text-ink-soft text-sm leading-snug mb-3">
-            Se non ti serve più, puoi eliminarlo quando vuoi.
+            Può eliminare il Suo profilo in qualsiasi momento.
           </p>
           <button
             type="button"
@@ -59,26 +59,26 @@ export function DeleteAccount() {
             </p>
             <p>Spariscono per sempre:</p>
             <ul className="list-disc pl-5 space-y-0.5">
-              <li>il tuo profilo e l&apos;accesso al sito</li>
+              <li>il Suo profilo e l&apos;accesso al sito</li>
               <li>gli indirizzi di spedizione salvati</li>
               <li>l&apos;iscrizione alle email promozionali</li>
-              <li>le recensioni che hai scritto</li>
+              <li>le recensioni da Lei scritte</li>
             </ul>
             <p>
-              <strong className="text-ink">Restano i dati dei tuoi ordini</strong>{" "}
+              <strong className="text-ink">Restano i dati dei Suoi ordini</strong>{" "}
               — non per nostra scelta: per le scritture contabili la legge
               impone di conservarli dieci anni. Non li vedrai più nel sito,
               perché il profilo non ci sarà più.
             </p>
             <p>
-              Puoi sempre comprare di nuovo come ospite, o rifare un profilo
-              con la stessa email.
+              Potrà comunque acquistare di nuovo come ospite, o creare un nuovo
+              profilo con lo stesso indirizzo email.
             </p>
           </div>
 
           <label className="block">
             <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
-              Scrivi la password per confermare
+              Inserisca la password per confermare
             </span>
             <PasswordInput
               required
@@ -107,7 +107,7 @@ export function DeleteAccount() {
               }}
               className="btn btn-ghost text-sm"
             >
-              Lascia stare
+              Annulla
             </button>
           </div>
         </form>

@@ -7,12 +7,12 @@ export const metadata: Metadata = {
   title: "Cerco / Compro",
   description:
     "Stiamo cercando questi pezzi nerd: videogiochi vintage, carte Pokémon, console, " +
-    "Funko Pop. Hai qualcosa che fa al caso nostro? Scrivici.",
+    "Funko Pop. Ha qualcosa che fa al caso nostro? Ci scriva.",
   alternates: { canonical: "/cerco-compro" },
   openGraph: {
     title: "Cerco / Compro — NerdNostalgia",
     description:
-      "I pezzi che stiamo cercando. Vendi i tuoi cimeli nerd in Italia: pagamento veloce.",
+      "I pezzi che stiamo cercando. Vendere cimeli nerd in Italia: pagamento veloce.",
     url: "/cerco-compro",
   },
 };
@@ -39,7 +39,7 @@ export default async function CercoCompoPage() {
             Cerco questi <span className="text-pink-deep">pezzi nerd</span>.
           </h1>
           <p className="text-ink-soft text-base sm:text-lg mt-4 max-w-xl mx-auto md:mx-0">
-            Hai una di queste cose in cantina? Scrivimi e ne parliamo. Pago in
+            Ha una di queste cose in cantina? Ci scriva e ne parliamo. Paghiamo in
             fretta, ritiro o spedizione a mio carico.
           </p>
         </div>

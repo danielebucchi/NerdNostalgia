@@ -73,7 +73,7 @@ export function Header() {
         <nav className="hidden md:flex items-center gap-2 flex-shrink-0">
           <CartNavLink variant="desktop" />
           <CustomerNav variant="desktop" />
-          <Link href="/contatti" className="btn btn-primary text-sm">Contattami</Link>
+          <Link href="/contatti" className="btn btn-primary text-sm">Contatti</Link>
         </nav>
 
         <nav className="flex md:hidden gap-1.5 flex-shrink-0">
@@ -120,7 +120,7 @@ export async function Footer() {
         <div>
           <h4 className="display text-base text-ink mb-2">Contatti</h4>
           <p className="text-sm text-ink-soft">
-            Scrivimi per qualsiasi richiesta o per propormi un acquisto.
+            Ci scriva per qualsiasi richiesta o per proporci un acquisto.
           </p>
           <a
             href="mailto:nerdnostalgiaita@gmail.com"

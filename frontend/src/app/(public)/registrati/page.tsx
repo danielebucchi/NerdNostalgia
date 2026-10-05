@@ -37,10 +37,10 @@ export default function RegistratiPage() {
 
   return (
     <article className="max-w-md mx-auto">
-      <h1 className="display text-3xl text-ink mb-2">Crea il tuo profilo</h1>
+      <h1 className="display text-3xl text-ink mb-2">Crei il Suo profilo</h1>
       <p className="text-ink-soft text-sm mb-6 leading-relaxed">
-        Ti serve per seguire gli ordini: ci trovi il codice di tracciamento
-        delle spedizioni in corso e lo storico di quelli passati. Se hai già
+        Serve per seguire gli ordini: vi troverà il codice di tracciamento
+        delle spedizioni in corso e lo storico di quelli passati. Se ha già
         comprato come ospite con questa email, quegli ordini compariranno da
         soli.
       </p>
@@ -99,8 +99,8 @@ export default function RegistratiPage() {
           <span className="text-sm leading-snug">
             Voglio ricevere le novità del sito via email
             <span className="block text-xs text-ink-soft mt-1">
-              Ti scrivo quando arrivano pezzi interessanti, e puoi
-              disiscriverti quando vuoi dal link in fondo a ogni email.
+              Le scriveremo in occasione di nuovi arrivi di particolare interesse.
+              Può revocare il consenso dal link in fondo a ogni messaggio.
             </span>
           </span>
         </label>
@@ -114,7 +114,7 @@ export default function RegistratiPage() {
         </button>
 
         <p className="text-xs text-ink-soft text-center">
-          Hai già un profilo?{" "}
+          Ha già un profilo?{" "}
           <Link href="/accedi" className="underline font-semibold">
             Accedi
           </Link>

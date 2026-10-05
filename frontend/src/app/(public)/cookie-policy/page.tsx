@@ -44,7 +44,7 @@ export default function CookiePolicyPage() {
         </p>
       </Section>
 
-      <Section title="1. Cosa salviamo nel tuo browser">
+      <Section title="1. Cosa salviamo nel Suo browser">
         <p>
           Usiamo lo storage locale del browser (<code>localStorage</code>) — non
           cookie HTTP — per memorizzare:
@@ -63,7 +63,7 @@ export default function CookiePolicyPage() {
                 <code>nn:wishlist:v1</code>
               </td>
               <td className="py-2 pr-4 align-top">
-                Elenco numerico degli articoli che hai aggiunto ai Preferiti.
+                Elenco numerico degli articoli da Lei aggiunti ai Preferiti.
               </td>
               <td className="py-2 align-top">
                 Finché non lo cancelli o non svuoti i Preferiti.
@@ -74,8 +74,8 @@ export default function CookiePolicyPage() {
                 <code>nn:cookie-notice:v1</code>
               </td>
               <td className="py-2 pr-4 align-top">
-                Memorizza che hai letto questa informativa, così non te la
-                rimostriamo.
+                Memorizza che ha letto questa informativa, così non gliela
+                riproponiamo.
               </td>
               <td className="py-2 align-top">Persistente fino a rimozione.</td>
             </tr>
@@ -120,7 +120,7 @@ export default function CookiePolicyPage() {
 
       <Section title="4. Come gestire o eliminare i dati">
         <p>
-          Puoi cancellare i dati salvati nel browser in due modi:
+          Può cancellare i dati salvati nel browser in due modi:
         </p>
         <ul>
           <li>

@@ -164,7 +164,7 @@ export function AlertBell({
                 <div className="text-4xl mb-2">✨</div>
                 <p className="display text-lg text-ink mb-1">Iscrizione fatta!</p>
                 <p className="text-sm text-ink-soft">
-                  Ti scrivo appena arriva qualcosa di nuovo. Puoi disiscriverti
+                  Le scriveremo non appena saranno disponibili nuovi articoli. Può revocare l&apos;iscrizione
                   dal link in fondo a ogni email.
                 </p>
                 <button
@@ -178,7 +178,7 @@ export function AlertBell({
             ) : (
               <form onSubmit={handleSubmit} className="space-y-3">
                 <p className="text-sm text-ink-soft">
-                  Lascia la tua email: quando pubblico un nuovo articolo ti
+                  Indichi la Sua email: alla pubblicazione di un nuovo articolo Le
                   arriva un avviso. Niente spam, solo nuovi arrivi.
                 </p>
                 {/* Honeypot nascosto */}
@@ -197,7 +197,7 @@ export function AlertBell({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="la-tua@email.it"
+                  placeholder="la-sua@email.it"
                   className="bell-input"
                   maxLength={255}
                 />

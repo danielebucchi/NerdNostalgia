@@ -72,7 +72,7 @@ export default function ProfiloPage() {
     <article>
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="display text-3xl text-ink">Il tuo profilo</h1>
+          <h1 className="display text-3xl text-ink">Il Suo profilo</h1>
           <p className="text-ink-soft text-sm mt-1">
             {user?.full_name || user?.email}
           </p>
@@ -91,12 +91,12 @@ export default function ProfiloPage() {
 
       {error && <p className="text-pink-deep text-sm mb-4">⚠ {error}</p>}
 
-      {orders === null && !error && <p className="text-ink-soft">Carico i tuoi ordini…</p>}
+      {orders === null && !error && <p className="text-ink-soft">Caricamento degli ordini in corso…</p>}
 
       {orders !== null && orders.length === 0 && (
         <div className="card p-8 text-center">
           <p className="text-ink-soft mb-4">
-            Non hai ancora ordini. Quando ne farai uno lo trovi qui, con il
+            Non risultano ordini. Il primo acquisto comparirà qui, con il
             codice per seguire la spedizione.
           </p>
           <Link href="/" className="btn btn-primary text-sm inline-flex">
@@ -285,7 +285,7 @@ function ConsensoPromozionale() {
         </span>
       </label>
       <p className="text-ink-soft/70 text-xs mt-2">
-        Le email sui tuoi ordini (conferma, spedizione, tracking) arrivano
+        Le email relative ai Suoi ordini (conferma, spedizione, tracciamento) vengono
         comunque.
       </p>
       {errore && <p className="text-pink-deep text-sm mt-2">⚠ {errore}</p>}

@@ -290,7 +290,7 @@ export function PurchaseDialog({
     }
     if (lockerMode && !point) {
       const msg =
-        "Scegli sulla mappa il locker InPost dove vuoi ritirare il pacco.";
+        "Selezioni sulla mappa il locker InPost presso cui desidera ritirare il pacco.";
       setError(msg);
       throw new Error(msg);
     }
@@ -298,7 +298,7 @@ export function PurchaseDialog({
         (!state.ship_postal_code.trim() || !state.ship_city.trim())) {
       const msg =
         "Scegli l'indirizzo dall'elenco dei suggerimenti: CAP, città e " +
-        "provincia si compilano da soli. Se il tuo indirizzo non c'è, usa " +
+        "provincia si compilano da soli. Se il Suo indirizzo non compare, utilizzi " +
         "«Il mio indirizzo non è nell'elenco».";
       setError(msg);
       throw new Error(msg);
@@ -414,8 +414,8 @@ export function PurchaseDialog({
           Conferma acquisto
         </h2>
         <p className="text-ink-soft text-sm mb-5">
-          Inserisci i tuoi dati e l&apos;indirizzo di spedizione. Dopo aver
-          confermato verrai reindirizzato a PayPal per il pagamento. Ti scriverò
+          Inserisca i Suoi dati e l&apos;indirizzo di spedizione. Dopo aver
+          confermato sarà reindirizzato a PayPal per il pagamento. Le scriveremo
           per confermare la spedizione.
         </p>
 
@@ -509,7 +509,7 @@ export function PurchaseDialog({
                 {insuranceIncluded
                   ? "Su questo ordine è compresa: un pacco di questo valore non viaggia scoperto."
                   : effectiveInsured
-                    ? "Se il pacco si perde o arriva danneggiato, ti rimborso il valore degli articoli. Senza assicurazione il corriere risponde solo di 1 € al kg."
+                    ? "Se il pacco si perde o arriva danneggiato, Le rimborsiamo il valore degli articoli. Senza assicurazione il corriere risponde solo di 1 € al kg."
                     : "Senza assicurazione, in caso di smarrimento il corriere rimborsa solo 1 € al kg (per legge). Spuntala per essere coperto sul valore reale."}
               </span>
             </span>
@@ -533,8 +533,8 @@ export function PurchaseDialog({
 
           {cliente ? (
             <p className="text-[11px] text-ink-soft leading-snug">
-              Stai comprando come <strong className="text-ink">{cliente.email}</strong>.
-              L&apos;ordine finirà nel tuo profilo.
+              Sta acquistando come <strong className="text-ink">{cliente.email}</strong>.
+              L&apos;ordine sarà associato al Suo profilo.
             </p>
           ) : (
             !clienteInCaricamento && <InvitoProfilo />
@@ -554,13 +554,13 @@ export function PurchaseDialog({
                 <span aria-hidden="true" className="text-base leading-none">📦</span>
                 <span>
                   <strong>Il pacco si ritira in un locker InPost.</strong>{" "}
-                  Scrivi la tua via e scegli il suggerimento: la mappa si
-                  sposta sulla tua zona e ti mostra i locker più vicini. Poi
-                  clicca quello che preferisci.
+                  Indichi la Sua via e selezioni il suggerimento: la mappa si
+                  sposta sulla Sua zona e mostra i locker più vicini.
+                  Selezioni poi quello che preferisce.
                 </span>
               </div>
 
-              <Field label="La tua zona (per trovare i locker vicini)">
+              <Field label="La Sua zona (per trovare i locker vicini)">
                 <AddressAutocomplete
                   placeholder="es. Via Alberto Profeti 271 Cascina"
                   value={state.ship_street}
@@ -573,7 +573,7 @@ export function PurchaseDialog({
                 <p className="text-sm text-pink-deep leading-snug">
                   ⚠ La mappa dei locker non è al momento disponibile.{" "}
                   <a href="/contatti" className="underline font-semibold">
-                    Scrivimi
+                    Ci contatti
                   </a>{" "}
                   e concordiamo la consegna.
                 </p>
@@ -602,8 +602,8 @@ export function PurchaseDialog({
               ) : (
                 !lockerUnavailable && (
                   <p className="text-[11px] text-ink-soft leading-snug">
-                    Nessun locker selezionato: clicca un punto sulla mappa per
-                    scegliere dove ritirare.
+                    Nessun locker selezionato: selezioni un punto sulla mappa per
+                    indicare dove ritirare.
                   </p>
                 )
               )}
@@ -629,7 +629,7 @@ export function PurchaseDialog({
               <div className="rounded-xl bg-lilac-deep/10 ring-1 ring-lilac-deep/35 px-3 py-2.5 text-sm leading-snug text-ink flex items-start gap-2">
                 <span aria-hidden="true" className="text-base leading-none">👆</span>
                 <span>
-                  <strong>Scrivi la via e clicca sul suggerimento</strong> che
+                  <strong>Indichi la via e selezioni il suggerimento</strong> che
                   compare: CAP, città e provincia si compilano da soli e non
                   vanno scritti a mano. Serve il nome completo della via (es.
                   «Via Alberto Profeti», non «Via Profeti»).
@@ -746,7 +746,7 @@ export function PurchaseDialog({
           {/* I dati personali dopo l'indirizzo: chi compra pensa
               prima a dove vuole il pacco. */}
           <h3 className="display text-lg text-ink pt-2 border-t border-ink/10">
-            I tuoi dati
+            I Suoi dati
           </h3>
 
           <div className="grid sm:grid-cols-2 gap-3">
@@ -790,7 +790,7 @@ export function PurchaseDialog({
                   🚚
                 </span>
                 <span>
-                  Lascia il numero di telefono così il corriere può contattarti
+                  Indichi il numero di telefono: il corriere potrà contattarLa
                   in caso di problemi con la consegna.
                 </span>
               </p>
@@ -846,7 +846,7 @@ export function PurchaseDialog({
               <p className="text-sm text-pink-deep text-center leading-snug">
                 I pagamenti online non sono al momento disponibili.{" "}
                 <a href="/contatti" className="underline font-semibold">
-                  Scrivimi
+                  Ci contatti
                 </a>{" "}
                 e concordiamo il pagamento.
               </p>
@@ -861,8 +861,8 @@ export function PurchaseDialog({
             </button>
           </div>
           <p className="text-xs text-ink-soft text-center">
-            Ti arriverà una conferma via email — se non la vedi,{" "}
-            <strong>controlla nello spam</strong>. Il pagamento si apre nella
+            Riceverà una conferma via email — se non dovesse trovarla,{" "}
+            <strong>controlli fra la posta indesiderata</strong>. Il pagamento si apre nella
             finestra sicura di {stripeEnabled ? "Stripe o PayPal" : "PayPal"}: i
             dati della carta non passano mai da questo sito.
           </p>
@@ -941,12 +941,12 @@ function InvitoProfilo() {
   return (
     <div className="rounded-2xl bg-lilac-deep/10 ring-1 ring-lilac-deep/40 p-4">
       <p className="display text-base text-ink mb-1">
-        Crea il profilo e segui il tuo ordine
+        Crei un profilo per seguire il Suo ordine
       </p>
       <p className="text-sm text-ink-soft leading-snug mb-3">
-        Ci trovi il codice di tracciamento quando spedisco e lo storico di
-        quello che hai comprato. E la prossima volta non riscrivi indirizzo
-        e telefono.
+        Vi troverà il codice di tracciamento alla spedizione e
+        lo storico dei Suoi acquisti. Al prossimo ordine non dovrà reinserire
+        indirizzo e telefono.
       </p>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <a
@@ -958,7 +958,7 @@ function InvitoProfilo() {
           Crea il profilo ↗
         </a>
         <span className="text-sm text-ink-soft">
-          Ce l&apos;hai già?{" "}
+          Ne ha già uno?{" "}
           <a
             href="/accedi"
             target="_blank"
@@ -970,8 +970,9 @@ function InvitoProfilo() {
         </span>
       </div>
       <p className="text-[11px] text-ink-soft/80 leading-snug mt-2.5">
-        Si apre in una scheda nuova: l&apos;ordine resta qui come l&apos;hai
-        lasciato. Puoi anche comprare senza profilo, da questo stesso modulo.
+        Si apre in una scheda nuova: l&apos;ordine resta qui come l&apos;ha
+        lasciato. Può comunque acquistare senza profilo, da questo stesso
+        modulo.
       </p>
     </div>
   );
