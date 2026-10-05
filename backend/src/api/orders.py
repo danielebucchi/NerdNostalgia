@@ -152,6 +152,29 @@ class OrderUpdate(BaseModel):
     tracking_url: Optional[str] = Field(None, max_length=500)
 
 
+def _link_tracciamento(valore: str) -> Optional[str]:
+    """Normalizza il link per seguire la spedizione.
+
+    Senza schema il browser lo legge come un percorso del sito: incollando
+    "brt.it/..." il cliente finiva su nerdnostalgia.store/brt.it/... invece
+    che dal corriere. Stesso effetto nell'email di spedizione.
+
+    Passano solo http e https: quel valore finisce dentro un href, e un
+    "javascript:" sarebbe codice che gira nel browser di chi ha comprato.
+    """
+    url = (valore or "").strip()
+    if not url:
+        return None
+    basso = url.lower()
+    if basso.startswith(("http://", "https://")):
+        return url
+    if "://" in url or basso.startswith(("javascript:", "data:", "vbscript:")):
+        # Uno schema c'e', ma non e' uno di quelli buoni.
+        return None
+    # Nessuno schema: e' il caso normale di chi incolla "brt.it/...".
+    return f"https://{url}"
+
+
 def _free_shipping_all(db: Session) -> bool:
     """Promozione "spedizione gratuita su tutto" dalle settings runtime.
     In caso di problemi si ripiega sul comportamento normale: meglio far
@@ -434,7 +457,7 @@ def update_order(
     if payload.tracking_code is not None:
         order.tracking_code = payload.tracking_code.strip() or None
     if payload.tracking_url is not None:
-        order.tracking_url = payload.tracking_url.strip() or None
+        order.tracking_url = _link_tracciamento(payload.tracking_url)
 
     if payload.status is not None and payload.status != order.status:
         # Senza codice di tracciamento non si marca spedito: un pacco gia'
