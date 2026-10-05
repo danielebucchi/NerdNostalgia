@@ -18,19 +18,21 @@ describe("InquiryDialog", () => {
   it("non renderizza se open=false", () => {
     const onClose = vi.fn();
     render(<InquiryDialog open={false} onClose={onClose} />);
-    expect(screen.queryByText(/Contattami|Chiedi info/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Contatti|Richiedi informazioni/),
+    ).not.toBeInTheDocument();
   });
 
-  it("renderizza titolo Contattami se senza articleTitle", () => {
+  it("renderizza titolo Contatti se senza articleTitle", () => {
     render(<InquiryDialog open={true} onClose={() => {}} />);
-    expect(screen.getByText("Contattami")).toBeInTheDocument();
+    expect(screen.getByText("Contatti")).toBeInTheDocument();
   });
 
-  it("usa titolo 'Chiedi info' con articleTitle", () => {
+  it("usa titolo 'Richiedi informazioni' con articleTitle", () => {
     render(
       <InquiryDialog open={true} onClose={() => {}} articleId={5} articleTitle="N64" />,
     );
-    expect(screen.getByText("Chiedi info")).toBeInTheDocument();
+    expect(screen.getByText("Richiedi informazioni")).toBeInTheDocument();
   });
 
   it("invia form con i campi compilati", async () => {
