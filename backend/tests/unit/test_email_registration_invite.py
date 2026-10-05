@@ -64,7 +64,7 @@ def test_ospite_riceve_invito_a_registrarsi(inviata):
 
     corpo = _corpi(inviata)
     assert "https://nerdnostalgia.store/registrati" in corpo
-    assert "Vuoi seguire la spedizione" in corpo
+    assert "Desidera seguire la spedizione" in corpo
 
 
 def test_cliente_registrato_non_riceve_invito(inviata):
