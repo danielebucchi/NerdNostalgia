@@ -133,8 +133,36 @@ export default function ProfiloPage() {
   );
 }
 
+/** Link del corriere, reso assoluto.
+ *
+ *  Il backend ora normalizza quando si salva, ma gli ordini gia' in
+ *  archivio hanno ancora il valore com'era: senza schema il browser lo
+ *  legge come un percorso del sito e porta su /brt.it/... invece che dal
+ *  corriere. Qui non si inventa niente, si aggiunge solo "https://".
+ */
+function linkEsterno(url: string | null | undefined): string | null {
+  const u = (url || "").trim();
+  if (!u) return null;
+  if (/^https?:\/\//i.test(u)) return u;
+  // Qualsiasi altro schema (javascript:, data:) non diventa un link.
+  if (u.includes("://") || /^[a-z]+:/i.test(u)) return null;
+  return `https://${u}`;
+}
+
 function OrderCard({ order: o }: { order: MyOrder }) {
   const stato = STATO[o.status];
+  // Con molti pezzi il titolo diventerebbe illeggibile: dopo i primi tre
+  // si dice quanti altri ce n'erano.
+  const tracking = linkEsterno(o.tracking_url);
+  const nomi = o.items.map((it) => it.title_snapshot);
+  const titolo =
+    nomi.length > 3
+      ? `${nomi.slice(0, 3).join(", ")} e altri ${nomi.length - 3}`
+      : nomi.join(", ") || `#${o.id}`;
+  // L'elenco sotto ha senso solo se aggiunge qualcosa al titolo: con un
+  // pezzo solo in copia unica direbbe la stessa cosa due volte.
+  const elencoUtile =
+    nomi.length > 3 || o.items.some((it) => it.quantity > 1);
   const data = new Date(o.created_at).toLocaleDateString("it-IT", {
     day: "numeric",
     month: "long",
@@ -144,8 +172,12 @@ function OrderCard({ order: o }: { order: MyOrder }) {
   return (
     <div className="card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div>
-          <span className="display text-lg text-ink">Ordine #{o.id}</span>
+        <div className="min-w-0">
+          {/* Il numero d'ordine dice qualcosa a me, non a chi ha comprato:
+              lui riconosce il suo pacco dal nome di quello che ha preso. */}
+          <span className="display text-lg text-ink">
+            Ordine — {titolo}
+          </span>
           <span className="text-xs text-ink-soft ml-2">{data}</span>
         </div>
         <div className="flex items-center gap-3">
@@ -156,23 +188,18 @@ function OrderCard({ order: o }: { order: MyOrder }) {
         </div>
       </div>
 
+      {/* Niente link alla scheda: il pezzo che ha comprato e' venduto, e
+          mandarlo su una pagina "non disponibile" non lo aiuta. */}
+      {elencoUtile && (
       <ul className="text-sm text-ink-soft space-y-0.5 mb-2">
         {o.items.map((it) => (
           <li key={it.id}>
-            {it.article_id ? (
-              <Link
-                href={`/articles/${it.article_id}`}
-                className="hover:text-pink-deep transition-colors"
-              >
-                {it.title_snapshot}
-              </Link>
-            ) : (
-              it.title_snapshot
-            )}
+            {it.title_snapshot}
             {it.quantity > 1 ? ` × ${it.quantity}` : ""}
           </li>
         ))}
       </ul>
+      )}
 
       {/* A ordine completato il pacco e' arrivato: il tracking non serve
           piu' a nessuno e i corrieri smettono comunque di aggiornarlo,
@@ -181,11 +208,11 @@ function OrderCard({ order: o }: { order: MyOrder }) {
         <div className="rounded-xl bg-sky-soft/40 ring-1 ring-sky-deep/30 px-3 py-2 text-sm leading-snug">
           📦 Spedizione{o.tracking_carrier ? ` con ${o.tracking_carrier}` : ""}:{" "}
           <strong className="text-ink">{o.tracking_code}</strong>
-          {o.tracking_url && (
+          {tracking && (
             <>
               {" — "}
               <a
-                href={o.tracking_url}
+                href={tracking}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline font-semibold text-pink-deep"
