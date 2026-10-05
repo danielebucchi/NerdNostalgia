@@ -65,6 +65,57 @@ docker-compose up --build
 docker exec -it nerdnostalgia_db psql -U user -d nerdnostalgia
 ```
 
+## Email: variabili d'ambiente
+
+| Variabile | Default | A cosa serve |
+|---|---|---|
+| `EMAIL_ENABLED` | `1` | `0` spegne ogni invio. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | Gmail | Credenziali di invio. La password e' una *App Password*, non quella dell'account. |
+| `EMAIL_FROM` / `EMAIL_TO_ADMIN` | `SMTP_USER` | Mittente e casella dell'admin. |
+| `EMAIL_GUARD` | `1` | Freno agli invii (`utils/email_guard.py`). `0` lo spegne. |
+| `EMAIL_REDIRECT_TO` | *(vuota)* | Dirotta **ogni** destinatario su questo indirizzo. |
+
+### ⚠️ `EMAIL_REDIRECT_TO` non va mai impostata in produzione
+
+Dirotta tutta la posta su un indirizzo solo: in produzione vorrebbe dire
+che le conferme d'ordine arrivano all'admin invece che ai clienti, e i
+clienti non ricevono piu' niente. Serve a una copia di prova del sito,
+per non scrivere a chi ha comprato davvero, e ai test.
+
+### Il freno agli invii
+
+`utils/email_guard.py` conta quante email partono e verso chi, dentro
+`send_email`, perche' il rate limiting degli endpoint conta gli IP e
+contro una botnet non serve a niente.
+
+Tetti: **5 l'ora e 15 al giorno** verso lo stesso indirizzo, **120
+l'ora e 350 al giorno** in totale. Il totale protegge la quota Gmail
+(~500 al giorno): esaurirla vuol dire che le conferme d'ordine smettono
+di partire in silenzio.
+
+Le email di un ordine pagato passano sempre (`critica=True`): perderne
+una costa un cliente vero, e per abusarne bisognerebbe pagare un ordine
+a ogni messaggio.
+
+Quando un tetto scatta viene scritto a livello ERROR nei log. **Da
+tenere d'occhio**: gli avvisi "nuovo arrivo" partono verso tutti gli
+iscritti in una volta, quindi con piu' di 120 iscritti una parte resta
+fuori. Oltre quel numero serve comunque un servizio di invio vero, non
+Gmail.
+
+### Vedere le email dei test
+
+```bash
+docker exec nerdnostalgia-backend sh -c 'cd /app && TEST_EMAILS=1 python -m pytest'
+```
+
+Senza quel flag la suite non spedisce niente. Con il flag spedisce
+davvero, ma dirotta tutto sulla casella dell'admin e mette il
+destinatario vero nell'oggetto (`[→ mario@example.com] ...`): in prova
+gli indirizzi sono inventati, e le email a domini inesistenti tornano
+indietro come bounce, che e' uno dei motivi per cui poi quelle vere
+finiscono nello spam.
+
 ## Setup Locale (senza Docker)
 
 ### 1. Installazione Dipendenze
