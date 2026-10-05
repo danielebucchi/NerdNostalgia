@@ -1,8 +1,11 @@
-"""Unit: l'invito a registrarsi nella conferma d'ordine.
+"""La conferma d'ordine non propone di registrarsi.
 
-L'invito e' utile solo a chi un profilo non ce l'ha: proporlo a un cliente
-gia' registrato lo farebbe sentire non riconosciuto, proprio nel messaggio
-che dovrebbe dirgli "ti ho visto, ho il tuo ordine".
+E' una comunicazione di servizio su un acquisto gia' pagato: infilarci
+una proposta commerciale la trasforma in pubblicita', e chi aspetta la
+conferma di quanto ha speso non deve leggere altro.
+
+Il test resta a presidio: l'invito esiste ancora altrove (pagina di
+ringraziamento e checkout) e sarebbe facile rimetterlo anche qui.
 """
 import types
 
@@ -45,9 +48,7 @@ def inviata(monkeypatch):
         E, "send_email", lambda **kw: (catturate.append(kw), True)[1]
     )
     monkeypatch.setattr(
-        E,
-        "_config",
-        lambda: {"enabled": True, "to_admin": "admin@example.it"},
+        E, "_config", lambda: {"enabled": True, "to_admin": "admin@example.it"}
     )
     monkeypatch.setattr(E, "_site_url", lambda: "https://nerdnostalgia.store")
     return catturate
@@ -59,16 +60,11 @@ def _corpi(catturate):
     return " ".join(v for v in kw.values() if isinstance(v, str))
 
 
-def test_ospite_riceve_invito_a_registrarsi(inviata):
-    E.send_order_confirmation(_ordine(user_id=None))
-
-    corpo = _corpi(inviata)
-    assert "https://nerdnostalgia.store/registrati" in corpo
-    assert "Desidera seguire la spedizione" in corpo
-
-
-def test_cliente_registrato_non_riceve_invito(inviata):
-    E.send_order_confirmation(_ordine(user_id=7))
+@pytest.mark.parametrize("user_id", [None, 7])
+def test_the_confirmation_never_invites_to_register(inviata, user_id):
+    """Ne' all'ospite ne' a chi ha gia' un profilo."""
+    E.send_order_confirmation(_ordine(user_id=user_id))
 
     corpo = _corpi(inviata)
     assert "/registrati" not in corpo
+    assert "Crea il profilo" not in corpo
