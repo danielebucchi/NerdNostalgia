@@ -1,9 +1,13 @@
 "use client";
 
 /**
- * FAB fisso in basso a sinistra che porta al gruppo WhatsApp NerdNostalgia.
- * Speculare a PaypalFab (bottom-right) — sempre visibile su tutte le pagine
- * pubbliche, canale di contatto + community alternativo all'email.
+ * Bottone fisso in basso a destra che porta al gruppo WhatsApp
+ * NerdNostalgia. Sempre visibile sulle pagine pubbliche: e' il canale di
+ * contatto piu' immediato, alternativo all'email.
+ *
+ * Sta a destra perche' li' c'era il bottone della donazione, ora tolto:
+ * e' l'angolo dove il pollice arriva da solo, e tenere una cosa che non
+ * serve nel punto piu' comodo della pagina era uno spreco.
  *
  * z-index 40: sopra contenuto/header (z<40), sotto il CookieBanner (z-50).
  */
@@ -18,7 +22,7 @@ export function WhatsappFab() {
       rel="noopener noreferrer"
       aria-label="Entra nel gruppo WhatsApp NerdNostalgia"
       title="Entra nel gruppo WhatsApp NerdNostalgia"
-      className="public-fab fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-40 btn btn-whatsapp shadow-hover inline-flex items-center justify-center hover:scale-105 active:scale-100 transition-transform w-14 h-14 p-0"
+      className="public-fab fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 btn btn-whatsapp shadow-hover inline-flex items-center justify-center hover:scale-105 active:scale-100 transition-transform w-14 h-14 p-0"
     >
       {/* Logo WhatsApp inline SVG (Simple Icons, CC0). Path occupa l'intera
           viewBox 0 0 24 24 senza padding interno, scalato a w-7 h-7 = 28px
