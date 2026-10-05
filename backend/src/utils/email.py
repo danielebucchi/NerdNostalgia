@@ -447,36 +447,11 @@ def send_order_confirmation(order) -> bool:
 
     saluto = _saluto(order.buyer_name)
     assicurata = bool(order.insured)
-    site = _site_url()
-    # L'invito a registrarsi ha senso solo per chi un profilo non ce l'ha:
-    # a chi e' gia' dentro suonerebbe come se non lo riconoscessimo.
-    ospite = order.user_id is None
-
     consegna_txt = (
         f"Ritiro presso il locker InPost {order.inpost_point_name or ''} "
         f"(codice {order.inpost_point_id})"
         if order.inpost_point_id
         else "Spedizione all'indirizzo indicato"
-    )
-
-    invito_txt = (
-        f"""
-Desidera seguire la spedizione in autonomia? Creando un profilo con questo
-stesso indirizzo email, l'ordine vi verra' associato automaticamente:
-{site}/registrati
-"""
-        if ospite
-        else ""
-    )
-    invito_html = (
-        f"""<p style="background:#d4c4f0; border-radius:8px; padding:12px 16px;">
-    <strong>Desidera seguire la spedizione in autonomia?</strong> Creando un
-    profilo con questo stesso indirizzo email, l'ordine vi verra' associato
-    automaticamente, insieme al codice di tracciamento.<br>
-    <a href="{site}/registrati" style="display:inline-block; margin-top:8px; background:#a890d8; color:white; padding:9px 18px; border-radius:999px; text-decoration:none; font-weight:bold;">Crea il profilo &rarr;</a>
-  </p>"""
-        if ospite
-        else ""
     )
 
     text_body = f"""{saluto}
@@ -507,8 +482,7 @@ Per qualsiasi necessità può rispondere direttamente a questo messaggio.
 
 Nota: qualora questa comunicazione fosse stata recapitata fra la posta
 indesiderata, La invitiamo a contrassegnare il mittente come attendibile,
-affinchè anche l'avviso di spedizione Le venga consegnato regolarmente.
-{invito_txt}
+affinché anche l'avviso di spedizione Le venga consegnato regolarmente.
 
 Cordiali saluti
 Nerd Nostalgia
@@ -548,7 +522,6 @@ Nerd Nostalgia
     Per qualsiasi necessita' puo' <strong>rispondere direttamente a questo
     messaggio</strong>.
   </p>
-  {invito_html}
   <p style="background:#fff4a8; border-radius:8px; padding:10px 14px; font-size:0.9em;">
     📬 <strong>Questo messaggio e&apos; finito fra la posta indesiderata?</strong>
     La invitiamo a contrassegnare il mittente come attendibile, affinche&apos;
