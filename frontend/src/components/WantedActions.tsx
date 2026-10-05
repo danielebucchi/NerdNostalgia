@@ -21,11 +21,11 @@ export function WantedActions({ wantedId, title, fulfilled }: WantedActionsProps
           onClick={() => setOpen(true)}
           disabled={fulfilled}
         >
-          {fulfilled ? "Già trovato" : "Ce l’ho! Te lo vendo"}
+          {fulfilled ? "Già trovato" : "Ce l’ho, ve lo vendo"}
         </button>
       </div>
       <p className="mt-3 text-xs text-ink-soft">
-        Apri il form: descrivi cosa hai e a quanto, ti rispondo io.
+        Apra il modulo: descriva cosa possiede e a quale prezzo, Le risponderemo.
       </p>
 
       <InquiryDialog

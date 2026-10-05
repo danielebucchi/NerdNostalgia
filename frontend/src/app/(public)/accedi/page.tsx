@@ -30,7 +30,7 @@ export default function AccediPage() {
     <article className="max-w-md mx-auto">
       <h1 className="display text-3xl text-ink mb-2">Accedi</h1>
       <p className="text-ink-soft text-sm mb-6">
-        Per vedere i tuoi ordini e seguire le spedizioni.
+        Per consultare i Suoi ordini e seguire le spedizioni.
       </p>
 
       <form onSubmit={handleSubmit} className="card p-6 space-y-4">
@@ -67,7 +67,7 @@ export default function AccediPage() {
             href="/password-dimenticata"
             className="underline hover:text-pink-deep"
           >
-            Hai dimenticato la password?
+            Ha dimenticato la password?
           </Link>
         </p>
 
@@ -80,7 +80,7 @@ export default function AccediPage() {
         </button>
 
         <p className="text-xs text-ink-soft text-center">
-          Non hai un profilo?{" "}
+          Non ha un profilo?{" "}
           <Link href="/registrati" className="underline font-semibold">
             Crealo adesso
           </Link>

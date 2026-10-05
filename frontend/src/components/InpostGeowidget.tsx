@@ -192,7 +192,7 @@ export function InpostGeowidget({ center, onSelect, onUnavailable }: Props) {
     return (
       <p className="text-sm text-pink-deep leading-snug">
         ⚠ Non riesco a caricare la mappa dei locker. Riprova fra poco oppure{" "}
-        <a href="/contatti" className="underline font-semibold">scrivimi</a> e
+        <a href="/contatti" className="underline font-semibold">ci contatti</a> e
         concordiamo la consegna.
       </p>
     );

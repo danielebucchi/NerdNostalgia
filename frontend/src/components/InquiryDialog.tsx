@@ -10,7 +10,7 @@ interface InquiryDialogProps {
   articleTitle?: string;
   /** Override del subject autogenerato (es. "Ce l'ho: <titolo>") */
   customSubject?: string;
-  /** Titolo del dialog (default: "Chiedi info" se articleTitle, sennò "Contattami") */
+  /** Titolo del dialog (default: "Richiedi informazioni" con articleTitle, sennò "Contatti") */
   dialogTitle?: string;
   /** Sottotitolo opzionale sotto al titolo */
   subtitle?: React.ReactNode;
@@ -99,7 +99,7 @@ export function InquiryDialog({
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             <h2 className="display text-2xl text-ink">
-              {dialogTitle ?? (articleTitle ? "Chiedi info" : "Contattami")}
+              {dialogTitle ?? (articleTitle ? "Richiedi informazioni" : "Contatti")}
             </h2>
             {(subtitle || articleTitle) && (
               <p className="text-sm text-ink-soft mt-1">
@@ -121,7 +121,7 @@ export function InquiryDialog({
           <div className="text-center py-6">
             <div className="text-5xl mb-3">✨</div>
             <p className="display text-xl text-ink mb-2">Richiesta inviata!</p>
-            <p className="text-ink-soft">Ti rispondo appena possibile. Grazie!</p>
+            <p className="text-ink-soft">Le risponderemo al più presto. Grazie.</p>
             <button type="button" onClick={onClose} className="btn btn-primary mt-6">
               Chiudi
             </button>
@@ -189,7 +189,7 @@ export function InquiryDialog({
                   messagePlaceholder ??
                   (articleTitle
                     ? "Sono interessato/a a questo articolo, vorrei sapere se..."
-                    : "Scrivimi cosa cerchi o cosa hai da propormi...")
+                    : "Indichi cosa sta cercando o cosa desidera proporci...")
                 }
               />
             </Field>
@@ -207,7 +207,7 @@ export function InquiryDialog({
               </button>
             </div>
             <p className="text-xs text-ink-soft pt-1">
-              I tuoi dati vengono usati solo per risponderti.
+              I Suoi dati vengono utilizzati esclusivamente per risponderLe.
             </p>
           </form>
         )}

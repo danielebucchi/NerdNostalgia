@@ -54,7 +54,7 @@ function RecensioneContent() {
 
   useEffect(() => {
     if (!orderId || !token) {
-      setError("Link non valido: usa quello che ti ho mandato via email.");
+      setError("Link non valido: utilizzi quello ricevuto via email.");
       return;
     }
     fetch(
@@ -108,12 +108,12 @@ function RecensioneContent() {
       <div className="max-w-xl mx-auto text-center py-12">
         <div className="text-5xl mb-4">⭐</div>
         <h1 className="display text-3xl text-ink mb-3">
-          {done ? "Grazie!" : "Hai già recensito questo ordine"}
+          {done ? "Grazie!" : "Recensione già inviata per questo ordine"}
         </h1>
         <p className="text-ink-soft leading-relaxed mb-8">
           {done
-            ? "La leggo e la pubblico a breve. Mi aiuta più di quanto pensi."
-            : "Una recensione per ordine: quella che hai scritto è già arrivata."}
+            ? "Sarà verificata e pubblicata a breve. La ringraziamo del tempo dedicato."
+            : "È prevista una sola recensione per ordine: la Sua è già stata registrata."}
         </p>
         <Link href="/" className="btn btn-primary">
           Torna al negozio
@@ -139,7 +139,7 @@ function RecensioneContent() {
     <article className="max-w-xl mx-auto">
       <h1 className="display text-3xl text-ink mb-2">Com&apos;è andata?</h1>
       <p className="text-ink-soft text-sm mb-6 leading-relaxed">
-        Ordine #{info.order_id}. Due righe bastano — e se non hai voglia di
+        Ordine #{info.order_id}. Sono sufficienti poche righe — e se preferisce non
         scrivere, anche solo le stelle vanno benissimo.
       </p>
 
@@ -148,14 +148,14 @@ function RecensioneContent() {
 
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-ink-soft block mb-2">
-            Il tuo voto *
+            Il Suo voto *
           </span>
           <Stelle value={rating} onChange={setRating} />
         </div>
 
         <label className="block">
           <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
-            Vuoi aggiungere qualcosa? (facoltativo)
+            Desidera aggiungere qualcosa? (facoltativo)
           </span>
           <textarea
             rows={4}
@@ -176,7 +176,7 @@ function RecensioneContent() {
         </button>
 
         <p className="text-[11px] text-ink-soft text-center leading-snug">
-          Comparirà sul sito con il tuo nome dopo che l&apos;ho letta.
+          Sarà pubblicata sul sito con il Suo nome, previa verifica.
         </p>
       </form>
     </article>

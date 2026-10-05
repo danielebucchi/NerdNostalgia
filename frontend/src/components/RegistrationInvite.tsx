@@ -19,12 +19,12 @@ export function RegistrationInvite() {
   return (
     <div className="rounded-2xl bg-lilac-deep/10 ring-1 ring-lilac-deep/35 p-5 text-left mb-8">
       <p className="display text-lg text-ink mb-1">
-        Vuoi seguire la spedizione?
+        Desidera seguire la spedizione?
       </p>
       <p className="text-sm text-ink-soft leading-snug mb-4">
-        Crea un profilo con la stessa email dell&apos;ordine: questo acquisto
-        ci finisce dentro da solo, con il codice di tracciamento appena
-        spedisco. E al prossimo ordine non riscrivi nome e indirizzo.
+        Crei un profilo con la stessa email dell&apos;ordine: questo acquisto vi
+        verrà associato automaticamente, insieme al codice di tracciamento.
+        Al prossimo ordine non dovrà reinserire nome e indirizzo.
       </p>
       <Link href="/registrati" className="btn btn-primary text-sm">
         Crea il profilo →

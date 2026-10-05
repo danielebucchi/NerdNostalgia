@@ -34,10 +34,10 @@ export default function CartPage() {
           </h1>
           <p className="text-ink-soft mb-6">
             Gli acquisti dal sito sono temporaneamente disabilitati. Per il
-            momento contattami direttamente per qualsiasi articolo.
+            momento può contattarci direttamente per qualsiasi articolo.
           </p>
           <Link href="/contatti" className="btn btn-primary text-sm inline-flex">
-            Scrivimi
+            Contattaci
           </Link>
         </div>
       </article>
@@ -127,7 +127,7 @@ function CartContent() {
       </Link>
 
       <h1 className="display text-3xl sm:text-4xl text-ink mb-6">
-        🛒 Il tuo carrello
+        🛒 Il Suo carrello
       </h1>
 
       {!hydrated || loading ? (
@@ -303,7 +303,7 @@ function CartContent() {
               ) : (
                 <div className="mt-4 rounded-xl bg-mint-deep/15 ring-1 ring-mint-deep/40 px-3 py-2.5 text-sm leading-snug">
                   🎉 <strong className="text-mint-deep">Spedizione gratuita</strong>{" "}
-                  — hai superato i € {FREE_SHIPPING_FROM.toFixed(2)}.
+                  — ha superato i € {FREE_SHIPPING_FROM.toFixed(2)}.
                 </div>
               )}
 

@@ -161,14 +161,14 @@ export function AddressBook() {
 
       {lista.length >= MAX_INDIRIZZI && modifica === null && (
         <p className="text-ink-soft text-sm mb-3">
-          Hai raggiunto il massimo di {MAX_INDIRIZZI} indirizzi. Per
+          Ha raggiunto il massimo di {MAX_INDIRIZZI} indirizzi. Per
           aggiungerne un altro, elimina prima uno di questi.
         </p>
       )}
 
       {lista.length === 0 && modifica === null && (
         <p className="text-ink-soft text-sm">
-          Non hai ancora indirizzi salvati. Il primo si salva da solo al
+          Non risultano indirizzi salvati. Il primo viene salvato automaticamente al
           prossimo acquisto, oppure aggiungilo qui.
         </p>
       )}

@@ -39,7 +39,7 @@ function DisiscrivitiContent() {
     if (!token) {
       setStato({
         fase: "errore",
-        messaggio: "Link incompleto: usa quello che trovi in fondo all'email.",
+        messaggio: "Link incompleto: utilizzi quello in fondo all'email.",
       });
       return;
     }
@@ -81,14 +81,14 @@ function DisiscrivitiContent() {
         </h1>
         <p className="text-ink-soft mb-6">{stato.messaggio}</p>
         <p className="text-ink-soft text-sm mb-8">
-          Scrivimi a{" "}
+          Ci scriva a{" "}
           <a
             href="mailto:nerdnostalgiaita@gmail.com"
             className="text-lilac-deep font-semibold hover:underline"
           >
             nerdnostalgiaita@gmail.com
           </a>{" "}
-          e ti tolgo io dalla lista.
+          e provvederemo noi alla rimozione.
         </p>
         <Link href="/" className="btn btn-primary">
           Torna al negozio
@@ -120,14 +120,14 @@ function DisiscrivitiContent() {
   return (
     <>
       <h1 className="display text-2xl sm:text-3xl text-ink mb-3">
-        Fatto, non ti scrivo più
+        Iscrizione revocata
       </h1>
       <p className="text-ink-soft mb-6">
         Ho tolto <strong>{email}</strong> dalle email promozionali. Non devi
         fare altro.
       </p>
       <p className="text-ink-soft text-sm mb-8">
-        Continuerai a ricevere solo le email legate ai tuoi ordini — conferma,
+        Continuerà a ricevere soltanto le email relative ai Suoi ordini — conferma,
         spedizione, tracking — perché quelle servono a farti arrivare il
         pacco, non a venderti qualcosa.
       </p>
@@ -142,7 +142,7 @@ function DisiscrivitiContent() {
           disabled={busy}
           className="btn btn-ghost text-sm disabled:opacity-50"
         >
-          {busy ? "Un attimo…" : "Era un errore, riscrivimi"}
+          {busy ? "Un attimo…" : "È stato un errore, riattiva l'iscrizione"}
         </button>
       </div>
     </>

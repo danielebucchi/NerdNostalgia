@@ -71,7 +71,7 @@ export function BuyControls({ article }: Props) {
             href={waUrl}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Scrivimi su WhatsApp per questo articolo"
+            aria-label="Contattaci su WhatsApp per questo articolo"
             className="btn text-sm font-bold px-4 py-2.5 inline-flex items-center gap-2 bg-[#25D366] text-white hover:brightness-105"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}

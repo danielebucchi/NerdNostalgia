@@ -45,7 +45,7 @@ export function CookieBanner() {
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <p className="text-sm text-ink-soft leading-relaxed flex-1">
             <span className="text-ink font-semibold">Una nota veloce.</span>{" "}
-            Salviamo nel tuo browser solo dati tecnici (preferiti, sessione
+            Salviamo nel Suo browser solo dati tecnici (preferiti, sessione
             admin) — niente cookie di profilazione né terze parti. Dettagli
             nella{" "}
             <Link

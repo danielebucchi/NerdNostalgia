@@ -50,7 +50,7 @@ export function StickyCtaBar({ article }: { article: Article }) {
             target="_blank"
             rel="noopener noreferrer"
             className="btn text-sm font-bold px-4 py-2.5 inline-flex items-center gap-1.5 bg-[#25D366] text-white"
-            aria-label="Scrivimi su WhatsApp per questo articolo"
+            aria-label="Contattaci su WhatsApp per questo articolo"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/whatsapp.png" alt="" width={16} height={16} />

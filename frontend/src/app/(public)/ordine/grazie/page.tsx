@@ -3,7 +3,7 @@ import { OrderPaidCartCleanup } from "@/components/OrderPaidCartCleanup";
 import { RegistrationInvite } from "@/components/RegistrationInvite";
 
 export const metadata = {
-  title: "Grazie per il tuo ordine — Nerd.Nostalgia",
+  title: "Conferma dell'ordine — Nerd.Nostalgia",
 };
 
 export default async function OrderThankYouPage({
@@ -18,7 +18,7 @@ export default async function OrderThankYouPage({
       <div className="text-5xl mb-4">🎉</div>
       <h1 className="display text-3xl sm:text-4xl text-ink mb-3">Grazie!</h1>
       <p className="text-ink-soft leading-relaxed mb-2">
-        Il pagamento è andato a buon fine e il tuo ordine
+        Il pagamento è andato a buon fine e il Suo ordine
         {order ? (
           <>
             {" "}
@@ -28,7 +28,7 @@ export default async function OrderThankYouPage({
         è confermato.
       </p>
       <p className="text-ink-soft leading-relaxed mb-4">
-        Ti ho mandato una email di riepilogo e ti scriverò appena spedisco.
+        Le abbiamo inviato un&apos;email di riepilogo e Le scriveremo al momento della spedizione.
       </p>
       <p className="text-sm bg-star/40 ring-1 ring-ink/10 rounded-xl px-4 py-3 mb-8 leading-snug">
         📬 <strong>Non vedi l&apos;email?</strong> Controlla nella cartella
