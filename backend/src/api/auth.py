@@ -375,3 +375,80 @@ def reset_password(
     return MessageResponse(
         detail="Password aggiornata. Ora puoi accedere con quella nuova.",
     )
+
+
+# ---------------------------------------------------------------------------
+# Cancellazione dell'account
+#
+# Quello che se ne va: profilo, indirizzi salvati, iscrizione agli avvisi,
+# recensioni scritte. Le recensioni vanno tolte a mano: il vincolo mette a
+# NULL il collegamento all'utente ma il nome dell'autore resta scritto
+# dentro, e quello e' pubblicato sul sito.
+#
+# Quello che resta: gli ORDINI. Non e' una scelta nostra — per le scritture
+# contabili la legge impone dieci anni (art. 2220 c.c.), e in quel periodo
+# conservarle e' un obbligo, non una facolta'. Si staccano dal profilo (il
+# vincolo li mette a user_id NULL) ma i dati della vendita restano.
+#
+# Va detto in chiaro prima di cancellare, non scoperto dopo.
+# ---------------------------------------------------------------------------
+
+
+class DeleteAccountRequest(BaseModel):
+    # La password e' l'unica prova che a chiedere la cancellazione sia il
+    # titolare dell'account e non chi gli ha trovato il telefono sbloccato.
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+@router.delete("/me", response_model=MessageResponse)
+@limiter.limit("5/hour")
+def delete_me(
+    payload: DeleteAccountRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cancella il profilo di chi lo chiede."""
+    if not verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Password non corretta.",
+        )
+
+    # Un admin che si cancella da qui si chiude fuori dal suo stesso
+    # negozio, e questa pagina non e' il posto per farlo.
+    if current_user.role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Gli account amministratore non si cancellano da qui.",
+        )
+
+    from models.db import CategoryAlert, Review
+
+    email = current_user.email
+    uid = current_user.id
+
+    recensioni = (
+        db.query(Review)
+        .filter(Review.user_id == uid)
+        .delete(synchronize_session=False)
+    )
+    avvisi = (
+        db.query(CategoryAlert)
+        .filter(CategoryAlert.email == email)
+        .delete(synchronize_session=False)
+    )
+
+    # Gli indirizzi se ne vanno col vincolo CASCADE, gli ordini restano
+    # staccandosi dal profilo (user_id -> NULL).
+    db.delete(current_user)
+    db.commit()
+
+    LOGGER.info(
+        "Account %s cancellato su richiesta: %s recensioni, %s avvisi",
+        uid, recensioni, avvisi,
+    )
+    return MessageResponse(
+        detail="Account cancellato. I dati degli ordini restano conservati "
+               "per gli obblighi fiscali di legge.",
+    )

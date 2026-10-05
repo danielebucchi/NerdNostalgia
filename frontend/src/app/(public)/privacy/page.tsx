@@ -210,9 +210,18 @@ export default function PrivacyPage() {
             la conservazione è un obbligo, non una nostra scelta.
           </li>
           <li>
-            <strong>Account cliente</strong>: finché il profilo esiste. Se
-            chiedi di cancellarlo lo eliminiamo, ma i dati dell&apos;ordine
-            restano per il termine qui sopra.
+            <strong>Account cliente</strong>: finché il profilo esiste. Puoi
+            eliminarlo da solo, in qualsiasi momento, dal tuo{" "}
+            <Link
+              href="/profilo"
+              className="text-lilac-deep font-semibold hover:underline"
+            >
+              profilo
+            </Link>
+            : spariscono profilo, indirizzi salvati, iscrizione alle email
+            promozionali e recensioni scritte. I dati degli ordini restano
+            per il termine qui sopra, perché su quelli la conservazione è un
+            obbligo di legge.
           </li>
           <li>
             <strong>Scelta sulle email promozionali</strong>: teniamo traccia
@@ -359,7 +368,10 @@ export default function PrivacyPage() {
         <ul>
           <li>accedere ai tuoi dati (art. 15 GDPR);</li>
           <li>chiederne la rettifica (art. 16);</li>
-          <li>chiederne la cancellazione (art. 17);</li>
+          <li>
+            chiederne la cancellazione (art. 17) — per l&apos;account puoi
+            farlo da solo dal profilo, senza passare da noi;
+          </li>
           <li>limitarne il trattamento (art. 18);</li>
           <li>opporti al trattamento (art. 21);</li>
           <li>ricevere i dati in formato portabile (art. 20);</li>

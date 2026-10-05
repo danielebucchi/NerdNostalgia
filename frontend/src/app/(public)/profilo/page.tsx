@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AddressBook } from "@/components/AddressBook";
+import { DeleteAccount } from "@/components/DeleteAccount";
 import {
   customerFetch,
   getMarketingConsent,
@@ -129,6 +130,8 @@ export default function ProfiloPage() {
       <AddressBook />
 
       <ConsensoPromozionale />
+
+      <DeleteAccount />
     </article>
   );
 }
