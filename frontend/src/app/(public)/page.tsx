@@ -52,7 +52,7 @@ export default async function HomePage() {
               ★ nuovi arrivi ogni settimana
             </span>
             <h1 className="display text-3xl sm:text-4xl text-ink leading-[1.1] mb-3">
-              Le Sue <span className="text-pink-deep">nerderie</span>,
+              Le tue <span className="text-pink-deep">nerderie</span>,
               <br className="hidden sm:inline" />{" "}
               casa dolce casa.
             </h1>
@@ -70,9 +70,6 @@ export default async function HomePage() {
             <div className="mt-5 flex flex-wrap gap-3 justify-center md:justify-start">
               <Link href="#catalogo" className="btn btn-primary">
                 Sfoglia il catalogo →
-              </Link>
-              <Link href="/cerco-compro" className="btn btn-ghost">
-                Vendere con noi
               </Link>
             </div>
           </div>
@@ -94,9 +91,6 @@ export default async function HomePage() {
       <section id="catalogo">
         <div className="mb-6">
           <h2 className="display text-2xl sm:text-3xl text-ink">Catalogo</h2>
-          <p className="text-ink-soft">
-            Tutto quello che ho in inventario in questo momento.
-          </p>
         </div>
 
         {error ? (
