@@ -19,6 +19,7 @@ from api.alerts import router as alerts_router
 from api.articles import router as articles_router
 from api.auth import router as auth_router
 from api.card_purchases import router as card_purchases_router
+from api.bulk_cards import router as bulk_cards_router
 from api.cardtrader import router as cardtrader_router
 from api.consignment_sales import router as consignment_sales_router
 from api.expenses import router as expenses_router
@@ -100,6 +101,7 @@ app.include_router(alerts_router)
 app.include_router(address_router)
 app.include_router(addresses_router)
 app.include_router(cardtrader_router)
+app.include_router(bulk_cards_router)
 app.include_router(ebay_router)
 app.include_router(vinted_pro_router)
 app.include_router(stripe_router)
