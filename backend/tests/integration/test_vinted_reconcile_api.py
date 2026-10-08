@@ -214,3 +214,83 @@ def test_articolo_archiviato_sparisce_dal_catalogo_pubblico(
     titoli = [a["title"] for a in r.json()["items"]]
     assert "Game Boy #111" in titoli
     assert "Game Boy #222" not in titoli
+
+
+# --------------------------- venduti ---------------------------
+def test_reconcile_marca_sold_invece_di_archiviare(
+    auth_client, db_session, seed_catalog,
+):
+    """Un annuncio venduto esce dal catalogo come SOLD, non come ARCHIVED:
+    la pagina su Vinted e' ancora viva, l'articolo e' stato venduto davvero
+    e deve restare nello storico vendite."""
+    db_session.add(VintedSyncLog(
+        started_at=datetime(2026, 9, 10),
+        finished_at=datetime(2026, 9, 10),
+        triggered_by="remote",
+        items_fetched=40,
+    ))
+    db_session.commit()
+
+    r = auth_client.post("/api/vinted/reconcile", json={
+        "missing_item_ids": [111],
+        "sold_item_ids": [222],
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["items_archived"] == 1
+    assert body["items_updated"] == 1
+
+    db_session.expire_all()
+    rimosso = db_session.query(Article).filter_by(vinted_item_id=111).one()
+    venduto = db_session.query(Article).filter_by(vinted_item_id=222).one()
+    assert rimosso.status == ArticleStatus.ARCHIVED
+    assert rimosso.vinted_status == VintedStatus.NOT_LISTED
+    assert venduto.status == ArticleStatus.SOLD
+    assert venduto.vinted_status == VintedStatus.SOLD
+    assert venduto.sold_at is not None
+
+
+def test_venduto_sparisce_dalla_vetrina(auth_client, seed_catalog):
+    auth_client.post("/api/vinted/reconcile", json={
+        "missing_item_ids": [], "sold_item_ids": [222],
+    })
+    r = auth_client.get("/api/articles/?status=PUBLISHED&limit=50")
+    titoli = [a["title"] for a in r.json()["items"]]
+    assert "Game Boy #222" not in titoli
+    assert "Game Boy #111" in titoli
+
+
+def test_id_in_entrambe_le_liste_vince_missing(auth_client, db_session, seed_catalog):
+    """Difesa da un client incoerente: in caso di conflitto si sceglie
+    l'esito che non inventa una vendita."""
+    r = auth_client.post("/api/vinted/reconcile", json={
+        "missing_item_ids": [222], "sold_item_ids": [222],
+    })
+    assert r.status_code == 200
+    assert r.json()["items_archived"] == 1
+    assert r.json()["items_updated"] == 0
+    db_session.expire_all()
+    a = db_session.query(Article).filter_by(vinted_item_id=222).one()
+    assert a.status == ArticleStatus.ARCHIVED
+
+
+def test_sold_rispetta_il_gate_server_side(auth_client, db_session, admin_user):
+    """Il gate vale anche per i venduti: un articolo toccato dall'ultimo
+    import non si marca SOLD su richiesta del client."""
+    inizio = datetime(2026, 9, 10, 3, 0)
+    db_session.add(VintedSyncLog(
+        started_at=inizio, finished_at=inizio + timedelta(minutes=5),
+        triggered_by="remote", items_fetched=40,
+    ))
+    db_session.add(_article(admin_user, 888, synced_at=inizio + timedelta(minutes=2)))
+    db_session.commit()
+
+    r = auth_client.post("/api/vinted/reconcile", json={
+        "missing_item_ids": [], "sold_item_ids": [888],
+    })
+    assert r.json()["items_updated"] == 0
+    assert r.json()["items_skipped"] == 1
+    db_session.expire_all()
+    assert db_session.query(Article).filter_by(vinted_item_id=888).one().status == (
+        ArticleStatus.PUBLISHED
+    )

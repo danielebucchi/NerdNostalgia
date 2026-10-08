@@ -46,8 +46,8 @@ try:
     import requests
     from utils.vinted_client import (
         VintedClientError,
+        classify_items,
         fetch_user_items,
-        verify_items_missing,
     )
 except ImportError as exc:
     sys.stderr.write(
@@ -152,35 +152,49 @@ def push(
 
 
 def reconcile(api_url: str, token: str, candidate_ids: list[int]) -> None:
-    """Verifica i candidati e archivia quelli davvero spariti da Vinted.
+    """Controlla i candidati e toglie dal catalogo quelli non piu' in vendita.
+
+    Due esiti distinti: annuncio rimosso (404) → ARCHIVED, annuncio ancora
+    online ma venduto → SOLD. Il venduto sparisce dal guardaroba, quindi
+    l'import non lo rivede mai e senza questo passaggio resterebbe
+    PUBLISHED a vita.
 
     Best-effort: qualunque intoppo qui non deve far fallire la sync, che a
-    quel punto e' gia' andata a buon fine. `verify_items_missing` e' gia'
-    conservativo di suo — su errore di rete NON marca l'item come mancante.
+    quel punto e' gia' andata a buon fine. `classify_items` e' gia'
+    conservativo di suo — tutto cio' che non e' certo finisce in "unknown"
+    e non viene toccato.
     """
-    LOGGER.info("Riconciliazione: verifico %d candidati su Vinted…", len(candidate_ids))
+    LOGGER.info("Riconciliazione: controllo %d candidati su Vinted…", len(candidate_ids))
     try:
-        missing = sorted(verify_items_missing(candidate_ids))
+        stato = classify_items(candidate_ids)
     except Exception as exc:  # noqa: BLE001
-        LOGGER.warning("Verifica candidati fallita, non archivio nulla: %s", exc)
+        LOGGER.warning("Controllo candidati fallito, non tocco nulla: %s", exc)
         return
 
-    alive = len(candidate_ids) - len(missing)
+    missing = sorted(i for i, v in stato.items() if v == "missing")
+    sold = sorted(i for i, v in stato.items() if v == "sold")
+    live = sum(1 for v in stato.values() if v == "live")
+    unknown = sum(1 for v in stato.values() if v == "unknown")
     LOGGER.info(
-        "Riconciliazione: %d confermati spariti, %d ancora vivi su Vinted",
-        len(missing), alive,
+        "Riconciliazione: %d rimossi, %d venduti, %d ancora in vendita, "
+        "%d non classificabili (lasciati stare)",
+        len(missing), len(sold), live, unknown,
     )
-    if not missing:
+    if not missing and not sold:
         return
 
     if os.getenv("DRY_RUN") == "1":
-        LOGGER.info("DRY_RUN=1, non archivio: %s", missing)
+        LOGGER.info("DRY_RUN=1, non tocco: rimossi=%s venduti=%s", missing, sold)
         return
 
     try:
         r = requests.post(
             f"{api_url}/api/vinted/reconcile",
-            json={"missing_item_ids": missing, "triggered_by": "reconcile"},
+            json={
+                "missing_item_ids": missing,
+                "sold_item_ids": sold,
+                "triggered_by": "reconcile",
+            },
             headers={"Authorization": f"Bearer {token}"},
             timeout=(30, 300),
         )
@@ -194,8 +208,9 @@ def reconcile(api_url: str, token: str, candidate_ids: list[int]) -> None:
 
     log = r.json()
     LOGGER.info(
-        "Reconcile: archiviati=%s rifiutati=%s error=%s",
+        "Reconcile: archiviati=%s venduti=%s rifiutati=%s error=%s",
         log.get("items_archived"),
+        log.get("items_updated"),
         log.get("items_skipped"),
         log.get("error_message"),
     )
