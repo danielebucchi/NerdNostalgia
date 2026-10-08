@@ -642,14 +642,24 @@ def archive_missing_items(
     db: Session,
     missing_item_ids: Iterable[int],
     triggered_by: str = "reconcile",
+    sold_item_ids: Optional[Iterable[int]] = None,
 ) -> VintedSyncLog:
-    """Archivia gli articoli i cui item sono stati confermati spariti.
+    """Toglie dal catalogo gli articoli che su Vinted non sono piu' in vendita.
 
-    Non cancella: `status = ARCHIVED` li toglie dal catalogo pubblico (la
-    vetrina interroga status=PUBLISHED) e dagli ordinabili, ma preserva
-    foto, storico e i riferimenti da order_items.
+    Due esiti distinti, perche' le due cose non si equivalgono:
+      - `missing_item_ids` → ARCHIVED (annuncio rimosso: 404 su Vinted)
+      - `sold_item_ids`    → SOLD     (annuncio ancora online, venduto)
 
-    Gate server-side: si archivia solo se `vinted_synced_at` e' anteriore
+    Il venduto e' il caso che sfuggiva: sparisce dal guardaroba, quindi
+    l'import non lo rivede e non puo' marcarlo, ma la sua pagina resta
+    viva, quindi per un controllo basato solo sul 404 "non e' sparito".
+    Risultato: restava PUBLISHED per sempre.
+
+    Non cancella niente: entrambi gli stati tolgono l'articolo dalla
+    vetrina (che interroga status=PUBLISHED) e dagli ordinabili, ma
+    preservano foto, storico e i riferimenti da order_items.
+
+    Gate server-side: si agisce solo se `vinted_synced_at` e' anteriore
     all'inizio dell'ultimo import. Se l'import appena concluso ha toccato
     l'articolo, l'item e' vivo su Vinted e la richiesta viene rifiutata,
     qualunque cosa dica il client.
@@ -663,10 +673,19 @@ def archive_missing_items(
     db.refresh(log)
 
     archived: List[int] = []
+    sold: List[int] = []
     rejected: List[int] = []
 
     try:
-        ids = sorted({int(i) for i in missing_item_ids})
+        # item_id → stato da applicare. Se un id arriva in entrambe le
+        # liste vince "missing": e' il piu' conservativo dei due, toglie
+        # l'articolo senza inventare una vendita che non sappiamo esserci.
+        piano: dict[int, str] = {}
+        for i in (sold_item_ids or []):
+            piano[int(i)] = "sold"
+        for i in missing_item_ids:
+            piano[int(i)] = "missing"
+        ids = sorted(piano)
         last_import = (
             db.query(VintedSyncLog)
             .filter(VintedSyncLog.id != log.id)
@@ -696,14 +715,26 @@ def archive_missing_items(
                 rejected.append(item_id)
                 continue
 
-            article.status = ArticleStatus.ARCHIVED
-            article.vinted_status = VintedStatus.NOT_LISTED
-            db.commit()
-            archived.append(item_id)
-            LOGGER.info(
-                "Archiviato articolo %s (Vinted item %s): non piu' su Vinted",
-                article.id, item_id,
-            )
+            if piano[item_id] == "sold":
+                article.status = ArticleStatus.SOLD
+                article.vinted_status = VintedStatus.SOLD
+                if not article.sold_at:
+                    article.sold_at = datetime.now(_dt.UTC)
+                db.commit()
+                sold.append(item_id)
+                LOGGER.info(
+                    "Articolo %s (Vinted item %s) marcato SOLD: venduto su Vinted",
+                    article.id, item_id,
+                )
+            else:
+                article.status = ArticleStatus.ARCHIVED
+                article.vinted_status = VintedStatus.NOT_LISTED
+                db.commit()
+                archived.append(item_id)
+                LOGGER.info(
+                    "Archiviato articolo %s (Vinted item %s): annuncio rimosso",
+                    article.id, item_id,
+                )
 
         if rejected:
             log.error_message = (
@@ -716,6 +747,9 @@ def archive_missing_items(
     finally:
         log.finished_at = datetime.now(_dt.UTC)
         log.items_archived = len(archived)
+        # I venduti finiscono in items_updated: non sono archiviati, ma
+        # nemmeno "saltati". Il log distingue cosi' le due colonne.
+        log.items_updated = len(sold)
         log.items_skipped = len(rejected)
         db.commit()
         db.refresh(log)

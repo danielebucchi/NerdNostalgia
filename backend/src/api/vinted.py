@@ -100,7 +100,15 @@ class VintedReconcileRequest(BaseModel):
         ...,
         description=(
             "item_id verificati come spariti (404/410 su /items/{id}) dal "
-            "client, che deve girare su IP residenziale."
+            "client, che deve girare su IP residenziale. → ARCHIVED"
+        ),
+    )
+    sold_item_ids: List[int] = Field(
+        default_factory=list,
+        description=(
+            "item_id la cui pagina e' ancora online ma risulta venduta. "
+            "→ SOLD. Spariscono dal guardaroba, quindi l'import non li "
+            "rivede e non puo' marcarli da solo."
         ),
     )
     triggered_by: str = Field(default="reconcile", max_length=20)
@@ -230,14 +238,20 @@ def reconcile(
     """Archivia gli articoli i cui item sono spariti da Vinted.
 
     Secondo tempo del giro avviato da `POST /api/vinted/import`: il client
-    riceve `reconcile_candidates`, li verifica uno a uno con
-    `verify_items_missing()` (404/410 su /items/{id}) e rimanda qui solo
-    quelli confermati.
+    riceve `reconcile_candidates`, li controlla uno a uno con
+    `classify_items()` e rimanda qui quelli classificati con certezza,
+    divisi per esito:
 
-    Gli articoli passano a `ARCHIVED`: spariscono dal catalogo pubblico e
-    dagli ordinabili, ma foto e storico restano. Il server rivalida ogni ID
+        missing_item_ids → ARCHIVED (annuncio rimosso da Vinted)
+        sold_item_ids    → SOLD     (pagina viva, annuncio venduto)
+
+    In entrambi i casi l'articolo esce dal catalogo pubblico e dagli
+    ordinabili, ma foto e storico restano. Il server rivalida ogni ID
     contro l'ultimo import e rifiuta quelli toccati di recente.
     """
     return archive_missing_items(
-        db, payload.missing_item_ids, triggered_by=payload.triggered_by,
+        db,
+        payload.missing_item_ids,
+        triggered_by=payload.triggered_by,
+        sold_item_ids=payload.sold_item_ids,
     )
