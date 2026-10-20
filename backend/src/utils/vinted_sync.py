@@ -76,6 +76,9 @@ NN_KEYWORDS = (
     "collezionism", "funko", "bitty pop", "action figure", "figurine",
     "modellini", "lego", "playmobil", "kinder", "sorpresa", "stickers",
     "spilla", "spille", "poster",
+    "gormiti", "bakugan", "beyblade", "gogo's", "gogos", "crazy bones",
+    "tamagotchi", "micro machines", "polly pocket", "giocattolo",
+    "giocattoli",
     # Brand/franchise nerd
     "mario", "zelda", "link", "metroid", "kirby", "sonic", "tetris",
     "stranger things", "marvel", "harry potter", "disney", "studio ghibli",
@@ -166,7 +169,14 @@ CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
         "cosplay", "cover", "pirografat",
     )),
 
-    # ─── PRIORITA' 2: Funko Pop / Action Figure / Modellini (form fisica)
+    # ─── PRIORITA' 2: Giocattoli / Funko Pop / Action Figure / Modellini
+    # Giocattoli prima di action-figure: "Gormiti action figure" e' un
+    # giocattolo, non un pezzo da collezione.
+    ("gormiti",          ("gormiti",)),
+    ("bakugan",          ("bakugan",)),
+    ("beyblade",         ("beyblade",)),
+    ("altri-giocattoli", ("gogo's", "gogos", "crazy bones", "tamagotchi",
+                          "micro machines", "polly pocket")),
     ("funko-pop",     ("funko", "bitty pop")),
     ("action-figure", ("action figure", "warhammer", "neca",
                        "mafex", "shf ", "s.h.figuarts")),
@@ -224,6 +234,7 @@ CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("videogiochi", ("videogioco", "videogame", "videogiochi",
                      "nintendo", "console", "gaming")),
     ("carte",       (" carta ", " carte ", " card ")),
+    ("giocattoli",  ("giocattolo", "giocattoli")),
     ("nerdate",     ("nerd", "vintage", "retro")),
 ]
 
