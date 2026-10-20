@@ -17,6 +17,21 @@ def test_toys_go_to_giocattoli(title, slug):
     assert _detect_category_slug(title) == slug
 
 
+@pytest.mark.parametrize("title", [
+    "Bakugan rise of resistance nintendo ds",
+    "Gormiti Gli Eroi Della Natura Wii",
+    "Beyblade Metal Fusion DS",
+])
+def test_toy_videogames_go_to_giochi(title):
+    assert _detect_category_slug(title) == "giochi"
+
+
+def test_console_only_in_description_keeps_toy():
+    assert _detect_category_slug(
+        "Gormiti lotto 5 personaggi", "vendo anche giochi per nintendo ds",
+    ) == "gormiti"
+
+
 def test_toy_merch_stays_gadget():
     assert _detect_category_slug("Portachiavi Gormiti") == "gadget"
 

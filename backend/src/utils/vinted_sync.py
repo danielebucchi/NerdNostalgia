@@ -171,7 +171,8 @@ CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
 
     # ─── PRIORITA' 2: Giocattoli / Funko Pop / Action Figure / Modellini
     # Giocattoli prima di action-figure: "Gormiti action figure" e' un
-    # giocattolo, non un pezzo da collezione.
+    # giocattolo, non un pezzo da collezione. Il videogioco della serie
+    # ("Bakugan Nintendo DS") lo dirotta _detect_category_slug su giochi.
     ("gormiti",          ("gormiti",)),
     ("bakugan",          ("bakugan",)),
     ("beyblade",         ("beyblade",)),
@@ -239,6 +240,17 @@ CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 
+# Sottocategorie di Giocattoli: le serie hanno anche i loro videogiochi.
+TOY_SLUGS = frozenset({"gormiti", "bakugan", "beyblade", "altri-giocattoli"})
+
+# Console nel titolo di un giocattolo → e' il videogioco, non il giocattolo.
+CONSOLE_KEYWORDS = (
+    "nintendo", "ds", "nds", "3ds", "wii", "switch", "gameboy", "game boy",
+    "gba", "psp", "ps vita", "psvita", "ps1", "ps2", "ps3", "ps4", "ps5",
+    "playstation", "xbox", "videogioco", "videogame",
+)
+
+
 def _detect_category_slug(*texts: Optional[str]) -> Optional[str]:
     """Ritorna lo slug della categoria piu' specifica che matcha. None se
     nessuna regola matcha.
@@ -246,11 +258,19 @@ def _detect_category_slug(*texts: Optional[str]) -> Optional[str]:
     Usa word-boundary matching cosi' 'card' non matcha 'cardine' e
     'pes ' non sbatte su 'pesante'. Le regole con trailing space dei vecchi
     pattern (es. 'pes ', 'tcg ') vengono normalizzate.
+
+    Il primo testo e' il titolo: solo li' si cerca la console che trasforma
+    un giocattolo nel suo videogioco (la descrizione cita troppe cose).
     """
     combined = " ".join(t.lower() for t in texts if t)
+    title = (texts[0] or "").lower() if texts else ""
     for slug, keywords in CATEGORY_RULES:
         for kw in keywords:
             if _word_match(kw.strip(), combined):
+                if slug in TOY_SLUGS and any(
+                    _word_match(c, title) for c in CONSOLE_KEYWORDS
+                ):
+                    return "giochi"
                 return slug
     return None
 
