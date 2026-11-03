@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertBell } from "@/components/AlertBell";
 import { WishlistNavLink } from "@/components/WishlistNavLink";
+import { useIsAdmin } from "@/lib/auth-store";
 import { useCustomer } from "@/lib/customer-auth";
 import { useWishlist } from "@/lib/useWishlist";
 
@@ -70,6 +71,7 @@ function MenuProfilo({
   const router = useRouter();
   const { logout } = useCustomer();
   const { count, hydrated } = useWishlist();
+  const isAdmin = useIsAdmin();
   const [aperto, setAperto] = useState(false);
   const [campanella, setCampanella] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -132,6 +134,7 @@ function MenuProfilo({
           role="menu"
           className="absolute right-0 top-full mt-2 z-50 w-56 rounded-2xl bg-white shadow-xl ring-1 ring-ink/10 py-2"
         >
+          {isAdmin && <Voce onClick={() => vai("/admin")}>🔐 Pannello admin</Voce>}
           <Voce onClick={() => vai("/profilo")}>👤 Il mio profilo</Voce>
           <Voce onClick={() => vai("/preferiti")}>
             ♥ Preferiti

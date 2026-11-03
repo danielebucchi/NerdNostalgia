@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PUBLIC_API_BASE } from "@/lib/api";
+import { clearToken, setStoredUser, setToken, type AdminUser } from "@/lib/auth-store";
 
 /* Sessione del CLIENTE, tenuta separata da quella dell'admin.
  *
@@ -33,6 +34,9 @@ export function setCustomerSession(token: string, user: CustomerUser): void {
 }
 
 export function clearCustomerSession(): void {
+  // Chi era entrato da /accedi come admin esce anche dagli strumenti admin:
+  // "Esci" deve lasciare il sito come lo vede un visitatore qualsiasi.
+  if (readUser()?.role === "ADMIN") clearToken();
   window.localStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(USER_KEY);
   window.dispatchEvent(new Event(EVENT));
@@ -122,7 +126,8 @@ export async function loginCustomer(
   email: string,
   password: string,
 ): Promise<CustomerUser> {
-  // Il login usa il form OAuth2: username = email
+  // Il login usa il form OAuth2: per i clienti username = email, l'admin
+  // entra con il suo username.
   const body = new URLSearchParams({ username: email, password });
   const res = await fetch(`${PUBLIC_API_BASE}/api/auth/login`, {
     method: "POST",
@@ -137,6 +142,12 @@ export async function loginCustomer(
   }
   const { access_token } = await res.json();
   const user = await loadProfile(access_token);
+  // L'admin sul sito pubblico: stesso token anche come sessione admin, cosi'
+  // le pagine articolo gli mostrano "Modifica" senza passare dal pannello.
+  if (user.role === "ADMIN") {
+    setToken(access_token);
+    setStoredUser(user as AdminUser);
+  }
   setCustomerSession(access_token, user);
   return user;
 }

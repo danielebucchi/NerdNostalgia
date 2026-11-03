@@ -45,7 +45,11 @@ async function request<T>(
 
   if (res.status === 401 && options.auth !== false) {
     clearToken();
-    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/admin/login")) {
+    // Solo dentro il pannello: sul sito pubblico (modifica al volo
+    // dell'articolo) una sessione scaduta toglie gli strumenti admin, ma il
+    // visitatore resta sulla pagina che stava guardando.
+    const path = typeof window !== "undefined" ? window.location.pathname : "";
+    if (path.startsWith("/admin") && !path.startsWith("/admin/login")) {
       window.location.href = "/admin/login";
     }
   }

@@ -18,8 +18,9 @@ export default function AccediPage() {
     setBusy(true);
     setError(null);
     try {
-      await loginCustomer(email.trim(), password);
-      router.push("/profilo");
+      const user = await loginCustomer(email.trim(), password);
+      // L'admin entra per sistemare il catalogo, non per vedere ordini suoi.
+      router.push(user.role === "ADMIN" ? "/" : "/profilo");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);
@@ -40,10 +41,13 @@ export default function AccediPage() {
           <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
             Email
           </span>
+          {/* text e non email: l'admin entra con lo username */}
           <input
-            type="email"
+            type="text"
+            inputMode="email"
+            autoCapitalize="none"
             required
-            autoComplete="email"
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="input mt-1"

@@ -68,6 +68,8 @@ function makePending(file: File): PendingFile {
 interface Props {
   initial?: Article;
   onSaved?: (saved: Article) => void;
+  /** Default: torna alla lista articoli del pannello. */
+  onCancel?: () => void;
 }
 
 interface FormState {
@@ -157,7 +159,7 @@ function toForm(article: Article): FormState {
   };
 }
 
-export function ArticleForm({ initial, onSaved }: Props) {
+export function ArticleForm({ initial, onSaved, onCancel }: Props) {
   const router = useRouter();
   const [state, setState] = useState<FormState>(initial ? toForm(initial) : empty);
   const [submitting, setSubmitting] = useState(false);
@@ -776,7 +778,7 @@ export function ArticleForm({ initial, onSaved }: Props) {
         <button
           type="button"
           className="btn btn-ghost"
-          onClick={() => router.push("/admin/articles")}
+          onClick={() => (onCancel ? onCancel() : router.push("/admin/articles"))}
         >
           Annulla
         </button>

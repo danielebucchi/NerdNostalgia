@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatPrice, getArticle, getPublicSettings, listArticles } from "@/lib/api";
 import type { Article } from "@/lib/types";
+import { AdminArticleEditor } from "@/components/AdminArticleEditor";
 import { ArticleActions } from "@/components/ArticleActions";
 import { ArticleCard } from "@/components/ArticleCard";
 import { ArticleGallery } from "@/components/ArticleGallery";
@@ -260,6 +261,7 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           che la barra copra il fondo pagina */}
       <div className="sm:hidden h-20" aria-hidden="true" />
       <StickyCtaBar article={article} />
+      <AdminArticleEditor articleId={article.id} />
     </article>
   );
 }
