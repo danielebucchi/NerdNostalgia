@@ -38,3 +38,13 @@ def test_toy_merch_stays_gadget():
 
 def test_plain_action_figure_unchanged():
     assert _detect_category_slug("Action figure Goku NECA") == "action-figure"
+
+
+@pytest.mark.parametrize("title", [
+    "Ripristinavita psichico csoc-it041 crossroad of caos yu gi oh",
+    "Alieno cucciolo crms-it084 cerimonia crisi yugioh",
+    "Arcidemone drago rosso tiranno tdil-it050 the dark illusion yu-gi-oh",
+])
+def test_yugioh_spellings_pass_filter(title):
+    assert _matches_nn_keywords(title)
+    assert _detect_category_slug(title) == "yu-gi-oh"

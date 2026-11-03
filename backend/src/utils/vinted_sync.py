@@ -70,7 +70,7 @@ NN_KEYWORDS = (
     "elettronica",
     # Carte
     "pokemon", "pokémon", "carte", "carta", "card", "tcg", "lorcana",
-    "magic", "mtg", "yu-gi-oh", "yugioh", "one piece", "dragon ball",
+    "magic", "mtg", "yu-gi-oh", "yugioh", "yu gi oh", "one piece", "dragon ball",
     "dragonball",
     # Collezionismo / nerdate
     "collezionism", "funko", "bitty pop", "action figure", "figurine",

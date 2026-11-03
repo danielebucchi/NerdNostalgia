@@ -18,6 +18,7 @@ import re
 import time
 from dataclasses import dataclass
 from typing import Iterator, List, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 from playwright.sync_api import (
@@ -42,6 +43,50 @@ LOAD_MORE_WAIT_MS = 5_000
 ITEMS_URL_PATTERN = re.compile(
     r"/api/v2/(?:users|wardrobe)/\d+/items|/api/v2/catalog/items"
 )
+WARDROBE_URL_PATTERN = re.compile(r"/api/v2/(?:users|wardrobe)/\d+/items")
+
+
+# Header della XHR del guardaroba che il browser gestisce da se' e che una
+# fetch() lato pagina non puo' (o non deve) reimpostare.
+_REPLAY_SKIP_HEADERS = ("cookie", "referer", "user-agent", "priority")
+
+
+def _first_page_url(xhr_url: str) -> str:
+    """URL della XHR del guardaroba riportato a page=1, stessi altri parametri."""
+    parts = urlsplit(xhr_url)
+    query = dict(parse_qsl(parts.query))
+    query["page"] = "1"
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+def _replay_headers(headers: dict) -> dict:
+    """Header da riusare per rifare la XHR: servono x-csrf-token e
+    x-anon-id, senza Vinted risponde 403."""
+    return {
+        k: v for k, v in headers.items()
+        if not k.startswith((":", "sec-")) and k.lower() not in _REPLAY_SKIP_HEADERS
+    }
+
+
+def _prepend_items(collected: List[dict], seen: set, items: List[dict]) -> int:
+    """Mette `items` in testa a `collected` (sono i piu' recenti), togliendo
+    eventuali doppioni gia' raccolti. Ritorna quanti erano nuovi."""
+    front: List[dict] = []
+    front_ids: set = set()
+    for raw in items:
+        try:
+            item_id = int(raw["id"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if item_id in front_ids:
+            continue
+        front_ids.add(item_id)
+        front.append(raw)
+    added = len(front_ids - seen)
+    rest = [raw for raw in collected if raw.get("id") is None or int(raw["id"]) not in front_ids]
+    collected[:] = front + rest
+    seen.update(front_ids)
+    return added
 
 
 class VintedClientError(Exception):
@@ -268,9 +313,9 @@ def fetch_item_descriptions(item_ids: List[int], *, headless: bool = True) -> di
 def fetch_user_items(
     vinted_user_id: int,
     *,
-    max_items: int = 200,
+    max_items: int = 500,
     headless: bool = True,
-    scroll_attempts: int = 20,
+    scroll_attempts: int = 30,
     enrich_with_details: bool = True,
 ) -> Iterator[VintedItem]:
     """Itera tutti gli annunci di un profilo Vinted usando Chromium headless.
@@ -291,6 +336,16 @@ def fetch_user_items(
     # dava la colpa al captcha anche quando il profilo era semplicemente
     # senza annunci.
     api_stats: dict = {"seen": False, "total_entries": None}
+    # La prima pagina del guardaroba (i 20 annunci piu' recenti) Vinted la
+    # mette gia' nell'HTML: non passa da nessuna XHR e l'intercept non la
+    # vede. Tengo la prima XHR vista per rifarla a mano con page=1.
+    wardrobe_xhr: dict = {}
+
+    def on_request(request) -> None:
+        if wardrobe_xhr or not WARDROBE_URL_PATTERN.search(request.url):
+            return
+        wardrobe_xhr["url"] = request.url
+        wardrobe_xhr["headers"] = dict(request.headers)
 
     def on_response(response: PWResponse) -> None:
         if not ITEMS_URL_PATTERN.search(response.url):
@@ -337,6 +392,7 @@ def fetch_user_items(
             )
             page = context.new_page()
             page.on("response", on_response)
+            page.on("request", on_request)
 
             profile_url = f"{BASE_HOST}/member/{vinted_user_id}"
             try:
@@ -408,6 +464,44 @@ def fetch_user_items(
             except Exception:  # noqa: BLE001
                 pass
             time.sleep(2.0)
+
+            # Prima pagina: rifaccio la XHR con gli header del sito.
+            if wardrobe_xhr:
+                first_url = _first_page_url(wardrobe_xhr["url"])
+                try:
+                    res = page.evaluate(
+                        """async ([u, h]) => {
+                            const r = await fetch(u, {headers: h, credentials: 'include'});
+                            const j = await r.json().catch(() => null);
+                            return {status: r.status, items: (j && j.items) || []};
+                        }""",
+                        [first_url, _replay_headers(wardrobe_xhr["headers"])],
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    res = {"status": None, "items": [], "error": str(exc)}
+                if res.get("status") == 200:
+                    api_stats["seen"] = True
+                    added = _prepend_items(collected_raw, seen_ids, res["items"])
+                    LOGGER.info("Prima pagina del guardaroba: %d items (+%d)",
+                                len(res["items"]), added)
+                else:
+                    LOGGER.warning(
+                        "Prima pagina del guardaroba non letta (status=%s %s): "
+                        "mancano gli annunci piu' recenti",
+                        res.get("status"), res.get("error", ""),
+                    )
+            elif collected_raw:
+                LOGGER.warning(
+                    "Nessuna XHR del guardaroba vista: la prima pagina "
+                    "(annunci piu' recenti) non e' stata letta"
+                )
+
+            total = api_stats["total_entries"]
+            if total and len(collected_raw) < min(total, max_items):
+                LOGGER.warning(
+                    "Profilo %d: raccolti %d items su %d dichiarati da Vinted",
+                    vinted_user_id, len(collected_raw), total,
+                )
             LOGGER.info(
                 "Profilo %d: %d items intercettati totali",
                 vinted_user_id, len(collected_raw),
@@ -456,7 +550,7 @@ def fetch_user_items(
 
                 stats = {"api": 0, "og": 0, "fail": 0}
 
-                for idx, item_id in enumerate(ids[:200]):
+                for idx, item_id in enumerate(ids):
                     if idx > 0 and idx % 8 == 0:
                         browser.close()
                         time.sleep(2.0)
