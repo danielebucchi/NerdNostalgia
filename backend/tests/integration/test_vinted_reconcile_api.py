@@ -294,3 +294,21 @@ def test_sold_rispetta_il_gate_server_side(auth_client, db_session, admin_user):
     assert db_session.query(Article).filter_by(vinted_item_id=888).one().status == (
         ArticleStatus.PUBLISHED
     )
+
+
+# --------------------------- import senza filtro ---------------------------
+def test_import_porta_sul_sito_tutto_il_profilo(auth_client, db_session, monkeypatch):
+    # Niente download foto in test.
+    monkeypatch.setattr("utils.vinted_sync.download_photo", lambda url: b"")
+    items = [
+        {"item_id": 10312549335, "title": "Dragonite v astro swsh236 swsh black star promos",
+         "url": "https://www.vinted.it/items/10312549335", "price": 3, "brand": "Pokémon"},
+        {"item_id": 10444176301, "title": "Glenn cooper la biblioteca dei morti",
+         "url": "https://www.vinted.it/items/10444176301", "price": 5},
+    ]
+    r = _import(auth_client, seen=[i["item_id"] for i in items], items=items)
+    assert r.status_code == 200
+    assert r.json()["items_imported"] == 2
+    rows = {a.vinted_item_id: a for a in db_session.query(Article).all()}
+    assert rows[10312549335].status == ArticleStatus.PUBLISHED
+    assert rows[10444176301].status == ArticleStatus.PUBLISHED

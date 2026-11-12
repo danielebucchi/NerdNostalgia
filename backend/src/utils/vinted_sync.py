@@ -4,11 +4,13 @@ Sync service Vinted → NerdNostalgia.
 Pipeline:
   1) Legge vinted_settings (user_id, enabled)
   2) Fetcha gli items del profilo (utils.vinted_client, Playwright headless)
-  3) Filtra per keyword NerdNostalgia (NN_KEYWORDS)
-  4) Auto-detect categoria via CATEGORY_RULES (titolo + descrizione)
-  5) Crea Article PUBLISHED (o aggiorna esistente)
-  6) Scarica foto in WebP + thumbnail locale
-  7) Scrive vinted_sync_logs con counters
+  3) Auto-detect categoria via CATEGORY_RULES (titolo + descrizione + brand)
+  4) Crea Article PUBLISHED (o aggiorna esistente)
+  5) Scarica foto in WebP + thumbnail locale
+  6) Scrive vinted_sync_logs con counters
+
+Nessun filtro per keyword: il profilo sincronizzato e' dedicato al negozio,
+tutto quello che c'e' sopra va sul sito.
 
 La rimozione degli articoli spariti da Vinted NON fa parte di questo giro:
 e' un secondo passaggio esplicito (reconcile_candidates + archive_missing_items,
@@ -56,67 +58,6 @@ from utils.vinted_client import (
 
 LOGGER = logging.getLogger("vinted_sync")
 
-# Keyword di interesse NerdNostalgia. Cerco nel branch_title (se Vinted lo
-# espone) E nel titolo/descrizione (Vinted spesso nel listing del profilo
-# NON include catalog_id, solo titolo+prezzo+foto).
-NN_KEYWORDS = (
-    # Console / piattaforme
-    "gameboy", "game boy", "gba", "nds", "3ds", "switch", "ps1", "ps2", "ps3",
-    "ps4", "ps5", "psp", "psvita", "ps vita", "playstation", "xbox",
-    "nintendo", "sega", "dreamcast", "saturn", "n64", "snes", "wii",
-    "atari", "megadrive", "mega drive",
-    # Categorie generiche videogiochi/elettronica
-    "videogioco", "videogiochi", "videogame", "console", "joypad", "controller",
-    "elettronica",
-    # Carte
-    "pokemon", "pokémon", "carte", "carta", "card", "tcg", "lorcana",
-    "magic", "mtg", "yu-gi-oh", "yugioh", "yu gi oh", "one piece", "dragon ball",
-    "dragonball",
-    # Collezionismo / nerdate
-    "collezionism", "funko", "bitty pop", "action figure", "figurine",
-    "modellini", "lego", "playmobil", "kinder", "sorpresa", "stickers",
-    "spilla", "spille", "poster",
-    "gormiti", "bakugan", "beyblade", "gogo's", "gogos", "crazy bones",
-    "tamagotchi", "micro machines", "polly pocket", "giocattolo",
-    "giocattoli",
-    # Brand/franchise nerd
-    "mario", "zelda", "link", "metroid", "kirby", "sonic", "tetris",
-    "stranger things", "marvel", "harry potter", "disney", "studio ghibli",
-    "naruto", "dragonball", "anime", "manga", "fumetto", "fumetti",
-    "lucca comics", "comicon",
-    # Termini specifici
-    "console retro", "vintage", "console portatile",
-)
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# Exclusion list: se una di queste parole compare nel TITOLO l'articolo
-# viene rifiutato senza nemmeno guardare le keyword positive.
-# Pensata per cose chiaramente non-nerd che potrebbero passare il filtro
-# generico per via di parole comuni nella description (es. "gift card"
-# che fa matchare "card", o "vintage" usato come buzzword).
-# ─────────────────────────────────────────────────────────────────────────
-NN_EXCLUDE_KEYWORDS = (
-    # Moda / abbigliamento
-    "borsa", "borse", "borsetta", "zaino non", "pochette", "clutch",
-    "vestito", "vestiti", "gonna", "pantalone", "pantaloni",
-    "camicia", "camicetta", "blazer", "giacca", "cappotto", "cardigan",
-    "tuta", "leggings", "calza", "calze", "intimo", "boxer", "mutand",
-    "costume da bagno", "bikini",
-    # Calzature
-    "scarpa", "scarpe", "sneakers", "stivale", "stivali", "stivaletto",
-    "sandalo", "sandali", "ciabatte", "infradito", "decollete",
-    # Beauty / cura
-    "profumo", "profumi", "trucco", "make up", "makeup", "rossetto",
-    "mascara", "fondotinta", "ombretto", "smalto", "shampoo",
-    # Gioielli moda (non collezionismo nerd)
-    "anello", "anelli", "bracciale", "braccialetto", "collana",
-    # Bambini / puericultura (a meno che non sia gioco)
-    "passeggino", "seggiolino auto", "lettino", "fasciatoio",
-    # Casa / arredo
-    "cuscino", "tovaglia", "lenzuola", "asciugamano",
-)
-
 
 def _word_match(pattern: str, text: str) -> bool:
     """Match con word-boundary: il pattern e' una parola/locuzione,
@@ -125,24 +66,6 @@ def _word_match(pattern: str, text: str) -> bool:
     Multi-word ('mario kart') funziona perche' lo spazio e' un confine.
     """
     return re.search(rf"\b{re.escape(pattern)}\b", text) is not None
-
-
-def _matches_nn_keywords(*texts: Optional[str]) -> bool:
-    """True se uno dei testi contiene una keyword NerdNostalgia in modo
-    word-boundary safe (no substring match)."""
-    combined = " ".join(t.lower() for t in texts if t)
-    return any(_word_match(kw, combined) for kw in NN_KEYWORDS)
-
-
-def _has_exclude_keyword(title: Optional[str]) -> bool:
-    """True se il titolo contiene una keyword di esclusione (moda, beauty,
-    casa, ecc). Controlla SOLO il titolo perche' la description tende ad
-    aggiungere troppi falsi positivi (es. 'borsa di plastica per spedizione').
-    """
-    if not title:
-        return False
-    t = title.lower()
-    return any(_word_match(kw, t) for kw in NN_EXCLUDE_KEYWORDS)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -216,14 +139,14 @@ CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("magic-the-gathering", ("magic the gathering", " mtg",)),
     ("yu-gi-oh",            ("yu-gi-oh", "yugioh", "yu gi oh")),
     ("dragon-ball",         ("dragon ball", "dragonball")),
-    ("one-piece",           ("one piece",)),
+    ("one-piece",           ("one piece", "onepiece")),
     ("carte",               ("lorcana", "tcg ", "carte da gioco",
                              "trading card", "keyforge",
                              "treasure box", "anthology")),
 
     # ─── PRIORITA' 6: Gadget franchise (Disney/Marvel/HP senza forma)
     ("gadget", (
-        "marvel", "harry potter", "stranger things",
+        "marvel", "spiderman", "spider-man", "harry potter", "stranger things",
         "studio ghibli", "ghibli", "disney", "topolino",
         "stitch", "groot", "iron man", "spidey",
         "minions", "duracel", "kinder", "sorpresa", "uovo kinder",
@@ -326,22 +249,6 @@ def _save_photo(photo_bytes: bytes, article_id: int) -> Optional[str]:
         return None
 
 
-def _item_passes_filter(item: VintedItem) -> bool:
-    """Decide se l'item e' pertinente a NerdNostalgia.
-
-    Due gate:
-      1) Exclusion list sul titolo: se contiene parole chiaramente non-nerd
-         (borsa, scarpe, profumo, ...) → reject. Cattura falsi positivi
-         come 'Borsa Valentino' la cui description ha 'card' o 'vintage'.
-      2) NN_KEYWORDS in word-boundary su titolo/descrizione/branch.
-    """
-    if _has_exclude_keyword(item.title):
-        return False
-    return _matches_nn_keywords(
-        item.title, item.description, item.catalog_branch_title,
-    )
-
-
 def _apply_item_to_article(
     db: Session,
     item: VintedItem,
@@ -357,7 +264,7 @@ def _apply_item_to_article(
     # Auto-detect categoria via keyword nel titolo/descrizione/branch
     target_category_id: Optional[int] = None
     detected_slug = _detect_category_slug(
-        item.title, item.description, item.catalog_branch_title,
+        item.title, item.description, item.catalog_branch_title, item.brand,
     )
     if detected_slug:
         target_category_id = _resolve_category_id(db, detected_slug)
@@ -483,9 +390,6 @@ def persist_items(
         owner_user_id = _admin_user_id(db)
         for item in items:
             fetched += 1
-            if not _item_passes_filter(item):
-                skipped += 1
-                continue
             try:
                 _, op = _apply_item_to_article(db, item, owner_user_id)
             except Exception:  # noqa: BLE001

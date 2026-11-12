@@ -108,6 +108,7 @@ def serialize_items(items) -> list[dict]:
             "catalog_id": it.catalog_id,
             "catalog_branch_title": it.catalog_branch_title,
             "status": it.status,
+            "brand": it.brand,
         })
     return out
 

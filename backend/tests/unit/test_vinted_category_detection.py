@@ -1,7 +1,7 @@
 """Unit: riconoscimento categoria dal titolo degli annunci Vinted."""
 import pytest
 
-from utils.vinted_sync import _detect_category_slug, _matches_nn_keywords
+from utils.vinted_sync import _detect_category_slug
 
 
 @pytest.mark.parametrize("title, slug", [
@@ -13,7 +13,6 @@ from utils.vinted_sync import _detect_category_slug, _matches_nn_keywords
     ("Lotto giocattoli anni 2000", "giocattoli"),
 ])
 def test_toys_go_to_giocattoli(title, slug):
-    assert _matches_nn_keywords(title)
     assert _detect_category_slug(title) == slug
 
 
@@ -45,6 +44,29 @@ def test_plain_action_figure_unchanged():
     "Alieno cucciolo crms-it084 cerimonia crisi yugioh",
     "Arcidemone drago rosso tiranno tdil-it050 the dark illusion yu-gi-oh",
 ])
-def test_yugioh_spellings_pass_filter(title):
-    assert _matches_nn_keywords(title)
+def test_yugioh_spellings_go_to_yugioh(title):
     assert _detect_category_slug(title) == "yu-gi-oh"
+
+
+def test_brand_alone_picks_the_category():
+    # Titolo e descrizione dicono solo nome e set: il franchise e' nel brand.
+    from utils.vinted_client import _parse_item
+    item = _parse_item({
+        "id": 10312549335,
+        "title": "Dragonite v astro swsh236 swsh black star promos",
+        "brand": "Pokémon",
+    })
+    assert item.brand == "Pokémon"
+    assert _detect_category_slug(item.title, item.description, None, item.brand) == "pokemon"
+
+
+@pytest.mark.parametrize("raw, brand", [
+    ({"brand": "Yu-Gi-Oh!"}, "Yu-Gi-Oh!"),
+    ({"brand_title": "OnePiece"}, "OnePiece"),
+    ({"brand": {"title": "Spiderman"}}, "Spiderman"),
+    ({"brand": "  "}, None),
+    ({}, None),
+])
+def test_brand_title_shapes(raw, brand):
+    from utils.vinted_client import _brand_title
+    assert _brand_title(raw) == brand

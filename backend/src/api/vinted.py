@@ -74,6 +74,7 @@ class VintedItemPayload(BaseModel):
     catalog_id: Optional[int] = None
     catalog_branch_title: Optional[str] = None
     status: Optional[str] = None
+    brand: Optional[str] = None
 
 
 class VintedImportRequest(BaseModel):
@@ -207,6 +208,7 @@ def import_items(
             catalog_id=p.catalog_id,
             catalog_branch_title=p.catalog_branch_title,
             status=p.status,
+            brand=p.brand,
             raw={},  # non trasportato dal client per ridurre payload
         )
         for p in payload.items

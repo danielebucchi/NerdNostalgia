@@ -107,6 +107,19 @@ class VintedItem:
     catalog_branch_title: Optional[str]
     status: Optional[str]
     raw: dict
+    # Brand scelto dal venditore ("Pokémon", "Yu-Gi-Oh!"): spesso e' l'unico
+    # posto dove compare il franchise, il titolo di una carta dice solo
+    # nome e numero.
+    brand: Optional[str] = None
+
+
+def _brand_title(item: dict) -> Optional[str]:
+    """Il listing del guardaroba ha `brand` come stringa, il dettaglio
+    item `brand_title` o un oggetto `brand`."""
+    brand = item.get("brand_title") or item.get("brand")
+    if isinstance(brand, dict):
+        brand = brand.get("title")
+    return brand.strip() or None if isinstance(brand, str) else None
 
 
 def _parse_item(item: dict) -> VintedItem:
@@ -148,6 +161,7 @@ def _parse_item(item: dict) -> VintedItem:
         catalog_branch_title=branch_title,
         status=item.get("status"),
         raw=item,
+        brand=_brand_title(item),
     )
 
 
