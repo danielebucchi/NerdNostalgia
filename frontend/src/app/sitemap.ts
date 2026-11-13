@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { listArticles, listWantedItems } from "@/lib/api";
+import { listAllArticles, listWantedItems } from "@/lib/api";
 import { SITE_URL } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -42,8 +42,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const articleEntries: MetadataRoute.Sitemap = [];
   try {
-    const data = await listArticles({ status: "PUBLISHED", limit: 100 });
-    for (const a of data.items) {
+    for (const a of await listAllArticles({ status: "PUBLISHED" })) {
       articleEntries.push({
         url: `${SITE_URL}/articles/${a.id}`,
         lastModified: a.updated_at ? new Date(a.updated_at) : now,

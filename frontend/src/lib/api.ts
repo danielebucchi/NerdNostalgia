@@ -52,6 +52,31 @@ export async function listArticles(params: ListArticlesParams = {}): Promise<Art
   return res.json();
 }
 
+/** Pagina massima che il backend concede (`limit` le=100 in api/articles.py). */
+const MAX_PAGE = 100;
+
+/** Tutti gli articoli che soddisfano i filtri, pagina dopo pagina: il
+ *  backend ne restituisce al massimo 100 per volta. Serve dove la lista
+ *  deve essere completa (catalogo filtrato nel browser, sitemap): con un
+ *  solo giro restavano fuori gli articoli piu' vecchi. */
+export async function listAllArticles(
+  params: Omit<ListArticlesParams, "skip" | "limit"> = {},
+): Promise<Article[]> {
+  const first = await listArticles({ ...params, skip: 0, limit: MAX_PAGE });
+  const pages: Promise<ArticleListResponse>[] = [];
+  for (let skip = MAX_PAGE; skip < first.total; skip += MAX_PAGE) {
+    pages.push(listArticles({ ...params, skip, limit: MAX_PAGE }));
+  }
+  const rest = await Promise.all(pages);
+  // Un articolo pubblicato mentre si sfoglia sposta le pagine di uno: senza
+  // dedup comparirebbe due volte.
+  const byId = new Map<number, Article>();
+  for (const a of [first, ...rest].flatMap((page) => page.items)) {
+    if (!byId.has(a.id)) byId.set(a.id, a);
+  }
+  return [...byId.values()];
+}
+
 /** Settings pubbliche runtime (usabile anche server-side nei RSC). */
 export async function getPublicSettings(): Promise<Record<string, string>> {
   try {

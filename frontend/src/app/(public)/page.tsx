@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getPublicSettings, listArticles } from "@/lib/api";
+import { getPublicSettings, listAllArticles } from "@/lib/api";
 import { CatalogSection } from "@/components/CatalogSection";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { LogoImage } from "@/components/LogoImage";
@@ -10,14 +10,14 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  let articles: Awaited<ReturnType<typeof listArticles>>["items"] = [];
+  let articles: Awaited<ReturnType<typeof listAllArticles>> = [];
   let error: string | null = null;
 
   try {
-    // Carichiamo il catalogo per i filtri client-side (limit 100 = cap backend).
-    // Per scalare oltre serviranno paginazione + facet count API lato server.
-    const data = await listArticles({ status: "PUBLISHED", limit: 100 });
-    articles = data.items;
+    // Tutto il catalogo: ricerca, filtri e conteggi girano nel browser e
+    // devono vedere ogni articolo, non solo i 100 piu' recenti. Quando
+    // diventera' pesante servira' la ricerca lato server.
+    articles = await listAllArticles({ status: "PUBLISHED" });
   } catch (err) {
     error = err instanceof Error ? err.message : "Errore sconosciuto";
   }
