@@ -62,6 +62,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     if (pathname === "/admin/lotti") {
       return { label: "Nuovo lotto", icon: "＋", href: "/admin/lotti/new" };
     }
+    if (pathname === "/admin/scanner-carte") {
+      // La pagina scanner apre la fotocamera per fotografare le carte
+      return { label: "Fotografa carte", icon: "📷", action: "event" };
+    }
     if (/^\/admin\/lotti\/\d+$/.test(pathname)) {
       // La pagina lotto ascolta l'evento e porta al form "aggiungi item"
       return { label: "Aggiungi item", icon: "＋", action: "event" };

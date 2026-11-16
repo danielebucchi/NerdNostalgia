@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { ExpansionCombobox } from "@/components/admin/ExpansionCombobox";
 import {
   type Blueprint,
@@ -75,6 +76,7 @@ export default function CaricoCartePage() {
   const falliti = esiti.filter((e) => !e.ok);
 
   return (
+    <AdminShell>
     <div className="space-y-6">
       <div>
         <h1 className="display text-2xl sm:text-3xl text-ink">Carico rapido carte</h1>
@@ -207,6 +209,7 @@ export default function CaricoCartePage() {
         )}
       </section>
     </div>
+    </AdminShell>
   );
 }
 

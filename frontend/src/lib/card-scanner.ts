@@ -20,6 +20,8 @@ export interface Candidato {
   number_match?: boolean;
   image_similarity?: number | null;
   variant_of_top?: boolean;
+  /** Somiglianza con un tuo scan gia' confermato di questa carta */
+  seen_before?: number | null;
 }
 
 /** Una misura dello scan: value null = "non so" (zona grigia). */
@@ -27,6 +29,8 @@ export interface Misura {
   value: boolean | null;
   score?: number;
   reason?: string;
+  /** true = soglia tarata sulle tue conferme */
+  calibrated?: boolean;
 }
 
 export interface Analisi {
@@ -91,6 +95,12 @@ export interface StatoScanner {
   index: StatoIndice[];
   pending_scans: number;
   session: { game_id: number | null; expansion_id: number | null };
+  learning?: {
+    references: number;
+    corrections: number;
+    examples: { foil?: Record<string, number>; timbro?: number; usura?: number };
+    calibrated: { reverse: string[]; first_edition: boolean; condition: boolean };
+  };
 }
 
 export interface Valutazione {

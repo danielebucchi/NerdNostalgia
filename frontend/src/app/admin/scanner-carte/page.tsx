@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AdminShell } from "@/components/admin/AdminShell";
+import { CameraCapture, supportsInAppCamera } from "@/components/admin/CameraCapture";
 import { ExpansionCombobox } from "@/components/admin/ExpansionCombobox";
 import { thumbUrlFor } from "@/lib/images";
 import type { PersonalCard } from "@/lib/types";
 import {
   type Analisi,
   type Candidato,
+  type Misura,
   GIOCHI,
   type Scan,
   type StatoScanner,
@@ -175,6 +178,7 @@ export default function ScannerCartePage() {
   }
 
   return (
+    <AdminShell>
     <div className="space-y-6">
       <div>
         <h1 className="display text-2xl sm:text-3xl text-ink">Scanner carte</h1>
@@ -216,6 +220,7 @@ export default function ScannerCartePage() {
 
       <Collezione carte={carte} setCarte={setCarte} onCerca={ricaricaCarte} st={st} />
     </div>
+    </AdminShell>
   );
 }
 
@@ -271,8 +276,26 @@ function ImpostazioniScan({
   }
 
   const etichetta = "block text-xs font-bold uppercase tracking-wide text-ink-soft mb-1";
+  // Su telefono le impostazioni stanno chiuse: si scelgono una volta per
+  // scatola, e aperte spingerebbero la coda fuori dallo schermo.
+  const [aperte, setAperte] = useState(false);
+  const riassunto = [
+    GIOCHI.find((g) => g.id === imp.gameId)?.label,
+    espansione || "tutte le espansioni",
+    imp.condizione || "condizione stimata",
+    LINGUE.find((l) => l.code === imp.lingua)?.label.toLowerCase(),
+  ].filter(Boolean).join(" · ");
   return (
     <section className="card p-4 space-y-4">
+      <button type="button" className="md:hidden w-full flex items-center justify-between gap-2 text-left"
+        onClick={() => setAperte((v) => !v)} aria-expanded={aperte}>
+        <span className="min-w-0">
+          <span className="block text-xs font-bold uppercase tracking-wide text-ink-soft">Impostazioni scansione</span>
+          <span className="block text-sm text-ink truncate">{riassunto}</span>
+        </span>
+        <span className="text-ink-soft text-lg">{aperte ? "▴" : "▾"}</span>
+      </button>
+      <div className={(aperte ? "" : "hidden ") + "md:block space-y-4"}>
       <div className="grid sm:grid-cols-4 gap-3">
         <label className="block">
           <span className={etichetta}>Gioco</span>
@@ -293,7 +316,7 @@ function ImpostazioniScan({
         </label>
         <label className="block sm:col-span-3">
           <span className={etichetta}>Espansione (facoltativa: se la scatola è di un set solo)</span>
-          <div className="flex gap-2">
+          <div className="flex gap-2 [&>div]:flex-1">
             <ExpansionCombobox
               key={imp.gameId}
               gameId={imp.gameId}
@@ -305,7 +328,7 @@ function ImpostazioniScan({
               onSelect={(e) => setImp((i) => ({ ...i, expansionId: e.id }))}
               placeholder="tutte — riconosce da numero, sigla e immagine"
               ariaLabel="Espansione fissa"
-              className="flex-1"
+              className="input"
             />
             {imp.expansionId && (
               <button
@@ -391,6 +414,7 @@ function ImpostazioniScan({
           </>
         )}
         {esitoIndice && <span className="text-pink-deep">{esitoIndice}</span>}
+        {st?.learning && <Apprendimento l={st.learning} />}
         {!indice?.blueprints && !build?.running && (
           <span className="basis-full text-xs">
             Serve per riconoscere le carte senza sigla stampata (es. Pokémon vecchi): qualche
@@ -398,7 +422,29 @@ function ImpostazioniScan({
           </span>
         )}
       </div>
+      </div>
     </section>
+  );
+}
+
+/* Cosa ha imparato lo scanner dalle tue conferme. */
+function Apprendimento({ l }: { l: NonNullable<StatoScanner["learning"]> }) {
+  const tarate = [
+    ...l.calibrated.reverse.map((g) => `reverse (${g})`),
+    l.calibrated.first_edition && "prima edizione",
+    l.calibrated.condition && "condizione",
+  ].filter(Boolean);
+  const esempiUsura = l.examples.usura ?? 0;
+  return (
+    <span className="basis-full text-xs">
+      Imparato finora: <strong className="text-ink">{l.references}</strong> carte memorizzate dai tuoi scan ·{" "}
+      <strong className="text-ink">{l.corrections}</strong> correzioni dell&apos;OCR · soglie{" "}
+      {tarate.length ? (
+        <>tarate sui tuoi scan per {tarate.join(", ")}</>
+      ) : (
+        <>ancora di partenza (servono almeno 5 esempi per tipo; condizione: {esempiUsura} finora)</>
+      )}
+    </span>
   );
 }
 
@@ -419,62 +465,91 @@ function Caricamento({
   onAggiornata: (s: Scan) => void;
   disabilitato: boolean;
 }) {
-  const [busy, setBusy] = useState(false);
+  const [inCorso, setInCorso] = useState(false);
   const [fatti, setFatti] = useState(0);
   const [totale, setTotale] = useState(0);
-  const [errori, setErrori] = useState<{ item: File; error: string }[]>([]);
+  const [errori, setErrori] = useState<{ nome: string; error: string }[]>([]);
   const [sopra, setSopra] = useState(false);
+  const [camera, setCamera] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const scatto = useRef<HTMLInputElement>(null);
 
-  async function carica(files: File[]) {
-    const immagini = files.filter((f) => f.type.startsWith("image/"));
-    if (!immagini.length || busy) return;
-    const fronti = immagini.filter((f) => nomeDelFronte(f.name) === null);
-    const retri = immagini.filter((f) => nomeDelFronte(f.name) !== null);
-    const base = (nome: string) => nome.replace(/\.[^.]+$/, "");
-    // Fronti gia' in coda (caricati prima) + quelli di questo giro
-    const perNome = new Map<string, number>();
-    coda.forEach((s) => s.original_filename && perNome.set(base(s.original_filename), s.id));
+  // Una fila sola per tutto quello che arriva (file scelti, trascinati,
+  // scatti in raffica): si continua a scattare mentre si leggono i
+  // precedenti, e i retro aspettano il loro fronte.
+  const fila = useRef<File[]>([]);
+  const lavora = useRef(false);
+  const perNome = useRef(new Map<string, number>());
+  const impRef = useRef(imp);
+  impRef.current = imp;
+  const base = (nome: string) => nome.replace(/\.[^.]+$/, "");
 
-    setBusy(true);
-    setFatti(0);
-    setTotale(immagini.length);
-    setErrori([]);
-    const r1 = await inFila(
-      fronti,
-      async (f) => {
-        const s = await caricaScan(f, imp.gameId, imp.expansionId);
-        perNome.set(base(f.name), s.id);
-        onScan(s);
-        return s;
-      },
-      (n, e) => {
-        setFatti(n);
-        setErrori(e);
-      },
-    );
-    await inFila(
-      retri,
-      async (f) => {
-        const id = perNome.get(nomeDelFronte(f.name)!);
-        if (!id) throw new Error("nessun fronte con questo nome");
-        const s = await caricaRetro(id, f);
-        onAggiornata(s);
-        return s;
-      },
-      (n, e) => {
-        setFatti(fronti.length + n);
-        setErrori([...r1.errori, ...e]);
-      },
-    );
-    setBusy(false);
-    if (input.current) input.current.value = "";
+  useEffect(() => {
+    coda.forEach((s) => s.original_filename && perNome.current.set(base(s.original_filename), s.id));
+  }, [coda]);
+
+  async function svuotaFila() {
+    if (lavora.current) return;
+    lavora.current = true;
+    setInCorso(true);
+    while (fila.current.length) {
+      // Prima i fronti: un retro ha bisogno del suo fronte gia' caricato.
+      const i = fila.current.findIndex((f) => nomeDelFronte(f.name) === null);
+      const f = fila.current.splice(i >= 0 ? i : 0, 1)[0];
+      try {
+        const fronte = nomeDelFronte(f.name);
+        if (fronte === null) {
+          const s = await caricaScan(f, impRef.current.gameId, impRef.current.expansionId);
+          perNome.current.set(base(f.name), s.id);
+          onScan(s);
+        } else {
+          const id = perNome.current.get(fronte);
+          if (!id) throw new Error("nessun fronte con questo nome");
+          onAggiornata(await caricaRetro(id, f));
+        }
+      } catch (e) {
+        setErrori((x) => [...x, { nome: f.name, error: msg(e) }]);
+      }
+      setFatti((n) => n + 1);
+    }
+    lavora.current = false;
+    setInCorso(false);
   }
 
+  function aggiungi(files: File[]) {
+    const immagini = files.filter((f) => f.type.startsWith("image/"));
+    if (!immagini.length) return;
+    if (!lavora.current) {
+      setFatti(0);
+      setTotale(0);
+      setErrori([]);
+    }
+    fila.current.push(...immagini);
+    setTotale((t) => t + immagini.length);
+    svuotaFila();
+  }
+
+  // Il pulsante tondo in basso a destra (telefono) apre la fotocamera.
+  useEffect(() => {
+    const apri = () => apriFotocamera();
+    window.addEventListener("nn:admin-fab", apri);
+    return () => window.removeEventListener("nn:admin-fab", apri);
+  });
+
+  function apriFotocamera() {
+    if (disabilitato) return;
+    // Fotocamera dentro la pagina se il browser la offre (si scatta in
+    // raffica e su Android la pagina non viene chiusa); altrimenti
+    // quella del telefono, uno scatto alla volta.
+    if (supportsInAppCamera()) setCamera(true);
+    else scatto.current?.click();
+  }
+
+  const pulsante = "btn text-base py-3 disabled:opacity-50 flex-1 sm:flex-none";
   return (
     <section
       className={
-        "card p-6 text-center border-2 border-dashed transition-colors " +
+        "card p-4 sm:p-6 text-center sm:border-2 sm:border-dashed transition-colors " +
         (sopra ? "border-lilac-deep bg-lilac/10" : "border-ink/15")
       }
       onDragOver={(e) => {
@@ -485,50 +560,51 @@ function Caricamento({
       onDrop={(e) => {
         e.preventDefault();
         setSopra(false);
-        carica(Array.from(e.dataTransfer.files));
+        aggiungi(Array.from(e.dataTransfer.files));
       }}
     >
-      <p className="text-ink">
-        Trascina qui gli scan, oppure{" "}
-        <button
-          type="button"
-          className="underline text-lilac-deep disabled:opacity-50"
-          disabled={busy || disabilitato}
-          onClick={() => input.current?.click()}
-        >
-          scegli i file
+      <div className="flex gap-2 justify-center">
+        <button type="button" className={pulsante + " btn-primary"} disabled={disabilitato} onClick={apriFotocamera}>
+          📷 Fotografa
         </button>
+        <button type="button" className={pulsante + " btn-ghost"} disabled={disabilitato} onClick={() => input.current?.click()}>
+          🖼 <span className="sm:hidden">Galleria</span><span className="hidden sm:inline">Scegli i file</span>
+        </button>
+      </div>
+      <p className="hidden sm:block text-ink-soft text-sm mt-3">…oppure trascina qui gli scan.</p>
+      <p className="text-xs text-ink-soft mt-3 text-left sm:text-center">
+        Una carta per foto o per file, inquadrata dritta e intera, senza riflessi. Dallo scanner:
+        JPEG o PNG a 300–600 dpi; il retro (facoltativo, migliora la stima della condizione) si
+        chiama come il fronte con «_retro» in fondo. Per farli arrivare da soli usa la cartella
+        osservata (scripts/scanner_watch.py).
       </p>
-      <p className="text-xs text-ink-soft mt-1">
-        Una carta per file, JPEG o PNG (il TIFF lo apre solo Safari), 300–600 dpi. Il retro è
-        facoltativo ma migliora la stima della condizione: chiamalo come il fronte con
-        «_retro» in fondo (carta12.jpg → carta12_retro.jpg). Per farli arrivare da soli appena
-        scansionati usa la cartella osservata (scripts/scanner_watch.py).
-      </p>
-      <input
-        ref={input}
-        type="file"
-        accept="image/*"
-        multiple
-        hidden
-        onChange={(e) => carica(Array.from(e.target.files ?? []))}
-      />
-      {busy && (
+      <input ref={input} type="file" accept="image/*" multiple hidden
+        onChange={(e) => {
+          aggiungi(Array.from(e.target.files ?? []));
+          e.target.value = "";
+        }} />
+      <input ref={scatto} type="file" accept="image/*" capture="environment" hidden
+        onChange={(e) => {
+          aggiungi(Array.from(e.target.files ?? []));
+          e.target.value = "";
+        }} />
+      <CameraCapture open={camera} onClose={() => setCamera(false)} onCapture={(f) => aggiungi([f])} />
+      {inCorso && (
         <p className="text-sm text-ink mt-3">
-          Leggo {fatti}/{totale}…
+          Leggo {fatti + 1}/{totale}…
         </p>
       )}
-      {!busy && totale > 0 && (
+      {!inCorso && totale > 0 && (
         <p className="text-sm text-ink-soft mt-3">
-          {totale - errori.length} scan letti
+          {totale - errori.length} lett{totale - errori.length === 1 ? "o" : "i"}
           {errori.length > 0 && <span className="text-pink-deep"> · {errori.length} non caricati</span>}
         </p>
       )}
       {errori.length > 0 && (
         <ul className="mt-2 text-xs text-pink-deep text-left max-w-xl mx-auto">
-          {errori.map((e) => (
-            <li key={e.item.name}>
-              {e.item.name}: {e.error}
+          {errori.map((e, i) => (
+            <li key={i}>
+              {e.nome}: {e.error}
             </li>
           ))}
         </ul>
@@ -629,13 +705,14 @@ function dallAnalisi(a: Analisi | undefined, imp: Impostazioni) {
   };
 }
 
-function Indizio({ etichetta, m, attivo }: { etichetta: string; m?: { value: boolean | null; score?: number }; attivo: boolean }) {
+function Indizio({ etichetta, m, attivo }: { etichetta: string; m?: Misura; attivo: boolean }) {
   if (!attivo || !m) return null;
   const testo = m.value === true ? "sì" : m.value === false ? "no" : "incerto";
   const colore = m.value === true ? "bg-mint-soft" : m.value === null ? "bg-star" : "bg-ink/5";
   return (
     <span className={"px-2 py-0.5 rounded text-xs " + colore} title={m.score != null ? `misura ${m.score}` : undefined}>
       {etichetta}: {testo}
+      {m.calibrated && <span className="opacity-60"> · tarata</span>}
     </span>
   );
 }
@@ -784,10 +861,19 @@ function RigaScan({
 
   return (
     <li className="border border-ink/10 rounded-lg p-3 flex flex-col md:flex-row gap-4">
-      <div className="shrink-0 w-32">
-        <a href={scan.image_url} target="_blank" rel="noreferrer">
-          <img src={thumbUrlFor(scan.image_url)} alt="scan" className="w-32 rounded shadow" />
+      <div className="shrink-0 md:w-32 flex md:block gap-3 items-start">
+        <a href={scan.image_url} target="_blank" rel="noreferrer" className="block w-28 md:w-32 shrink-0">
+          <img src={thumbUrlFor(scan.image_url)} alt="scan" className="w-full rounded shadow" />
         </a>
+        {/* Telefono: la carta scelta accanto allo scan, per confrontarle
+            senza scorrere la fila dei candidati. */}
+        {scelto?.image_url && (
+          <figure className="md:hidden w-28 shrink-0">
+            <img src={scelto.image_url} alt="" className="w-full rounded shadow" />
+            <figcaption className="text-[10px] text-ink-soft mt-0.5 leading-tight">scelta: {scelto.expansion_name}</figcaption>
+          </figure>
+        )}
+        <div className="min-w-0 md:contents">
         <p className="text-[11px] text-ink-soft mt-1 break-all">{scan.original_filename}</p>
         {scan.back_image_url ? (
           <a href={scan.back_image_url} target="_blank" rel="noreferrer" className="block mt-2">
@@ -800,6 +886,7 @@ function RigaScan({
           </button>
         )}
         <input ref={retro} type="file" accept="image/*" hidden onChange={(e) => aggiungiRetro(e.target.files?.[0])} />
+        </div>
       </div>
 
       <div className="flex-1 min-w-0 space-y-3">
@@ -838,14 +925,14 @@ function RigaScan({
         )}
 
         {candidati.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto pb-1 snap-x -mx-3 px-3 md:mx-0 md:px-0">
             {candidati.map((c) => (
               <button
                 key={c.blueprint_id}
                 type="button"
                 onClick={() => setScelto(c)}
                 className={
-                  "shrink-0 w-28 text-left rounded p-1 border-2 transition-colors " +
+                  "shrink-0 snap-start w-28 text-left rounded p-1 border-2 transition-colors " +
                   (scelto?.blueprint_id === c.blueprint_id ? "border-lilac-deep bg-lilac/10" : "border-transparent hover:border-ink/20")
                 }
               >
@@ -856,6 +943,11 @@ function RigaScan({
                   {c.version ? ` · ${c.version}` : ""}
                 </span>
                 {c.variant_of_top && <span className="block text-[10px] font-bold text-pink-deep">altra versione</span>}
+                {c.seen_before != null && (
+                  <span className="block text-[10px] font-bold text-ink" title={`somiglianza ${c.seen_before}`}>
+                    ✓ già vista nei tuoi scan
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -922,7 +1014,7 @@ function RigaScan({
             <input
               type="number"
               min={1}
-              className="input py-1 w-16"
+              className="input py-1 !w-16"
               value={qty}
               onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
             />
@@ -941,7 +1033,7 @@ function RigaScan({
           )}
           <button
             type="button"
-            className="btn btn-primary text-sm disabled:opacity-50"
+            className="btn btn-primary text-sm disabled:opacity-50 w-full sm:w-auto py-3 sm:py-2 truncate"
             disabled={busy || !scelto}
             onClick={confermaScelto}
           >
@@ -959,8 +1051,27 @@ function RigaScan({
 
 /* ── Collezione ───────────────────────────────────────────────── */
 
+/* Dove e' in vendita una carta: sito, CardTrader, eBay. */
+function canali(c: PersonalCard): string[] {
+  return [
+    c.site_status === "PUBLISHED" && "Sito",
+    c.cardtrader_product_id && "CardTrader",
+    c.ebay_listing_id && "eBay",
+  ].filter(Boolean) as string[];
+}
+
+type Vista = "da_caricare" | "in_vendita" | "vendute" | "tutte";
+
+const VISTE: { id: Vista; label: string; filtro: (c: PersonalCard) => boolean }[] = [
+  { id: "da_caricare", label: "Da mettere in vendita",
+    filtro: (c) => c.status !== "SOLD" && c.status !== "ARCHIVED" && canali(c).length === 0 },
+  { id: "in_vendita", label: "In vendita", filtro: (c) => c.status !== "SOLD" && canali(c).length > 0 },
+  { id: "vendute", label: "Vendute", filtro: (c) => c.status === "SOLD" },
+  { id: "tutte", label: "Tutte", filtro: () => true },
+];
+
 function Collezione({
-  carte,
+  carte: tutte,
   setCarte,
   onCerca,
   st,
@@ -972,6 +1083,21 @@ function Collezione({
 }) {
   const [selezione, setSelezione] = useState<Set<number>>(new Set());
   const [cerca, setCerca] = useState("");
+  // La vista resta quella dell'ultima volta: di solito si torna per
+  // mettere in vendita le carte appena confermate.
+  const [vista, setVistaStato] = useState<Vista>("da_caricare");
+  useEffect(() => {
+    const v = window.localStorage.getItem("nn_scanner_vista") as Vista | null;
+    if (v && VISTE.some((x) => x.id === v)) setVistaStato(v);
+  }, []);
+  function setVista(v: Vista) {
+    setVistaStato(v);
+    // Cambiando vista si azzera la selezione: le azioni in blocco non
+    // devono toccare carte che non si vedono.
+    setSelezione(new Set());
+    window.localStorage.setItem("nn_scanner_vista", v);
+  }
+  const carte = tutte.filter(VISTE.find((x) => x.id === vista)!.filtro);
   const [busy, setBusy] = useState(false);
   const [avanzamento, setAvanzamento] = useState<string | null>(null);
   const [esito, setEsito] = useState<string | null>(null);
@@ -1002,7 +1128,23 @@ function Collezione({
     onCerca(cerca);
   }
 
-  const valoreTotale = carte
+  const mobile = useMobile();
+  const propsRiga = (c: PersonalCard) => ({
+    carta: c,
+    scelta: selezione.has(c.id),
+    onScelta: (v: boolean) =>
+      setSelezione((s) => {
+        const n = new Set(s);
+        if (v) n.add(c.id);
+        else n.delete(c.id);
+        return n;
+      }),
+    onCambiata: sostituisci,
+    onRicarica: () => onCerca(cerca),
+    st,
+  });
+
+  const valoreTotale = tutte
     .filter((c) => c.status === "IN_STOCK")
     .reduce((t, c) => t + Number(c.list_price ?? c.estimated_value ?? 0) * (c.quantity || 1), 0);
 
@@ -1010,12 +1152,12 @@ function Collezione({
     <section className="card p-4">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <h2 className="display text-lg text-ink">
-          Collezione ({carte.length})
+          Collezione ({tutte.length})
           <span className="text-sm text-ink-soft font-normal"> · valore in magazzino {eur(valoreTotale)}</span>
         </h2>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <input
-            className="input py-1 text-sm w-48"
+            className="input py-1 text-sm !w-full sm:!w-48"
             placeholder="cerca nome, set, numero"
             value={cerca}
             onChange={(e) => setCerca(e.target.value)}
@@ -1026,8 +1168,34 @@ function Collezione({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
-        <span className="text-ink-soft">{selezione.size} selezionate:</span>
+      <div className="flex gap-1 mb-3 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 whitespace-nowrap" role="tablist">
+        {VISTE.map((v) => {
+          const n = tutte.filter(v.filtro).length;
+          const attiva = v.id === vista;
+          return (
+            <button key={v.id} type="button" role="tab" aria-selected={attiva}
+              onClick={() => setVista(v.id)}
+              className={"px-3 py-2 rounded-full text-sm font-semibold transition-colors " +
+                (attiva ? "bg-lilac-deep text-white" : "bg-ink/5 text-ink-soft hover:bg-ink/10")}>
+              {v.label} <span className={attiva ? "opacity-80" : "opacity-60"}>{n}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Su telefono la barra resta in vista sotto l'intestazione mentre si
+          scorre la lista, e i pulsanti scorrono di lato invece di andare a capo. */}
+      <div className={
+        "flex items-center gap-2 mb-3 text-sm " +
+        (selezione.size > 0
+          ? "sticky top-14 md:static z-20 -mx-4 px-4 py-2 md:m-0 md:p-0 bg-white/95 md:bg-transparent backdrop-blur overflow-x-auto md:flex-wrap md:overflow-visible whitespace-nowrap"
+          : "flex-wrap")
+      }>
+        <span className="text-ink-soft md:hidden">
+          {selezione.size ? `${selezione.size} selezionate:` : "Seleziona le carte per valutarle o caricarle in blocco"}
+        </span>
+        <span className="text-ink-soft hidden md:inline">{selezione.size} selezionate:</span>
+        <div className={(selezione.size ? "flex" : "hidden md:flex") + " items-center gap-2 md:flex-wrap"}>
         <button type="button" className="btn btn-ghost text-xs" disabled={busy || !selezione.size}
           onClick={() => inBlocco("Valuto", async (c) => sostituisci((await valuta(c.id)).card))}>
           💶 Valuta
@@ -1059,12 +1227,38 @@ function Collezione({
           }}>
           🗑 Elimina
         </button>
+        </div>
         {avanzamento && <span className="text-ink">{avanzamento}</span>}
       </div>
       {esito && <p className="text-xs text-ink-soft mb-3">{esito}</p>}
 
       {carte.length === 0 ? (
-        <p className="text-ink-soft text-sm">Nessuna carta: conferma qualche scan.</p>
+        <p className="text-ink-soft text-sm">
+          {tutte.length === 0
+            ? "Nessuna carta: conferma qualche scan."
+            : vista === "da_caricare"
+              ? "Tutte le carte sono gia' in vendita da qualche parte. 🎉"
+              : vista === "in_vendita"
+                ? "Nessuna carta in vendita: mettile in vendita da «Da mettere in vendita»."
+                : "Nessuna carta qui."}
+        </p>
+      ) : mobile ? (
+        <>
+          <label className="flex items-center gap-2 text-sm text-ink-soft mb-2">
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-lilac-deep"
+              checked={selezione.size === carte.length && carte.length > 0}
+              onChange={(e) => setSelezione(e.target.checked ? new Set(carte.map((c) => c.id)) : new Set())}
+            />
+            Seleziona tutte
+          </label>
+          <ul className="space-y-3">
+            {carte.map((c) => (
+              <RigaCarta key={c.id} layout="scheda" {...propsRiga(c)} />
+            ))}
+          </ul>
+        </>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1089,22 +1283,7 @@ function Collezione({
             </thead>
             <tbody>
               {carte.map((c) => (
-                <RigaCarta
-                  key={c.id}
-                  carta={c}
-                  scelta={selezione.has(c.id)}
-                  onScelta={(v) =>
-                    setSelezione((s) => {
-                      const n = new Set(s);
-                      if (v) n.add(c.id);
-                      else n.delete(c.id);
-                      return n;
-                    })
-                  }
-                  onCambiata={sostituisci}
-                  onRicarica={() => onCerca(cerca)}
-                  st={st}
-                />
+                <RigaCarta key={c.id} layout="riga" {...propsRiga(c)} />
               ))}
             </tbody>
           </table>
@@ -1114,7 +1293,24 @@ function Collezione({
   );
 }
 
+/** true sotto i 768px (il "md" di Tailwind): telefono. Una sola resa
+ * alla volta, invece di tabella e schede nascoste via CSS: ogni riga ha il
+ * suo stato (prezzo in modifica, venduti a mano) e doppiarla lo
+ * sdoppierebbe. */
+function useMobile(): boolean {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const aggiorna = () => setMobile(mq.matches);
+    aggiorna();
+    mq.addEventListener("change", aggiorna);
+    return () => mq.removeEventListener("change", aggiorna);
+  }, []);
+  return mobile;
+}
+
 function RigaCarta({
+  layout,
   carta: c,
   scelta,
   onScelta,
@@ -1122,6 +1318,7 @@ function RigaCarta({
   onRicarica,
   st,
 }: {
+  layout: "riga" | "scheda";
   carta: PersonalCard;
   scelta: boolean;
   onScelta: (v: boolean) => void;
@@ -1163,100 +1360,101 @@ function RigaCarta({
   }
 
   const scan = c.images?.[0];
-  return (
-    <tr className="border-b border-ink/5 align-top">
-      <td className="py-2 pr-2">
-        <input type="checkbox" className="accent-lilac-deep" checked={scelta} onChange={(e) => onScelta(e.target.checked)} />
-      </td>
-      <td className="py-2 pr-2 w-12">
-        {scan && (
-          <a href={scan} target="_blank" rel="noreferrer">
-            <img src={thumbUrlFor(scan)} alt="" className="w-10 rounded" loading="lazy" />
-          </a>
-        )}
-      </td>
-      <td className="py-2 pr-2 min-w-[12rem]">
-        <strong className="text-ink">{c.name}</strong>
-        <span className="block text-xs text-ink-soft">
-          {c.collection} · {c.printed_code || c.card_number}
+
+  const dettagli = (
+    <>
+      <span className="block text-xs text-ink-soft">
+        {c.collection} · {c.printed_code || c.card_number}
+      </span>
+      <span className="block text-xs text-ink-soft">
+        {(c.language || "").toUpperCase()} · {c.condition}
+        {c.reverse && " · reverse"}
+        {c.first_edition && " · 1ª ed."}
+        {c.quantity > 1 && ` · ×${c.quantity}`}
+        {c.status !== "IN_STOCK" && ` · ${c.status}`}
+      </span>
+      {canali(c).length > 0 && c.status !== "SOLD" && (
+        <span className="block text-xs text-ink mt-0.5">🟢 in vendita su {canali(c).join(" · ")}</span>
+      )}
+      {c.status === "SOLD" && (
+        <span className="block text-xs text-ink mt-0.5">
+          💰 venduta{c.sold_platform ? ` su ${c.sold_platform}` : ""}{c.sale_price ? ` a ${eur(c.sale_price)}` : ""}
         </span>
-        <span className="block text-xs text-ink-soft">
-          {(c.language || "").toUpperCase()} · {c.condition}
-          {c.reverse && " · reverse"}
-          {c.first_edition && " · 1ª ed."}
-          {c.quantity > 1 && ` · ×${c.quantity}`}
-          {c.status !== "IN_STOCK" && ` · ${c.status}`}
-        </span>
-        {nota && <span className="block text-xs text-pink-deep">{nota}</span>}
-      </td>
-      <td className="py-2 pr-2 text-right whitespace-nowrap">
-        {eur(c.cardtrader_price)}
-        {c.cardtrader_offers != null && <span className="block text-[11px] text-ink-soft">{c.cardtrader_offers} in vendita</span>}
-      </td>
-      <td className="py-2 pr-2 text-right whitespace-nowrap">
-        {eur(c.ebay_sold_avg)}
-        <span className="block text-[11px] text-ink-soft">
-          {c.ebay_sold_count ? `media di ${c.ebay_sold_count}` : "nessuno"}
-          {c.ebay_sold_source === "manuale" && " · a mano"}
-        </span>
-        <button type="button" className="text-[11px] underline text-lilac-deep" onClick={() => apriVenduti().catch((e) => setNota(msg(e)))}>
-          venduti ↗
-        </button>
-        {aMano && (
-          <div className="mt-1 flex gap-1 justify-end">
-            <input
-              className="input py-0.5 text-xs w-32"
-              placeholder="12,50 9,90 15…"
-              value={prezziEbay}
-              onChange={(e) => setPrezziEbay(e.target.value)}
-              aria-label="Prezzi venduti eBay"
-            />
-            <button
-              type="button"
-              className="btn btn-ghost text-[11px] px-2"
-              disabled={busy}
-              onClick={() =>
-                azione(async () => {
-                  onCambiata((await vendutiAMano(c.id, prezziEbay)).card);
-                  setAMano(false);
-                  setPrezziEbay("");
-                })
-              }
-            >
-              OK
-            </button>
-          </div>
-        )}
-      </td>
-      <td className="py-2 pr-2 text-right whitespace-nowrap">
-        <strong className="text-ink">{eur(c.estimated_value)}</strong>
-        <button
-          type="button"
-          className="block ml-auto text-[11px] underline text-lilac-deep disabled:opacity-50"
-          disabled={busy}
-          onClick={() =>
-            azione(async () => {
-              const v = await valuta(c.id);
-              onCambiata(v.card);
-              const avvisi = Object.values(v.warnings);
-              if (avvisi.length) setNota(avvisi.join(" · "));
-            })
-          }
-        >
-          {busy ? "…" : "rivaluta"}
-        </button>
-      </td>
-      <td className="py-2 pr-2 text-right">
-        <input
-          className="input py-1 text-sm w-20 text-right"
-          value={prezzo}
-          onChange={(e) => setPrezzo(e.target.value)}
-          onBlur={salvaPrezzo}
-          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-          aria-label="Prezzo di vendita"
-        />
-      </td>
-      <td className="py-2 whitespace-nowrap space-y-1">
+      )}
+      {nota && <span className="block text-xs text-pink-deep">{nota}</span>}
+    </>
+  );
+
+  const venduti = (
+    <>
+      <span className="block text-[11px] text-ink-soft">
+        {c.ebay_sold_count ? `media di ${c.ebay_sold_count}` : "nessuno"}
+        {c.ebay_sold_source === "manuale" && " · a mano"}
+      </span>
+      <button type="button" className="text-[11px] underline text-lilac-deep py-1" onClick={() => apriVenduti().catch((e) => setNota(msg(e)))}>
+        venduti ↗
+      </button>
+      {aMano && (
+        <div className="mt-1 flex gap-1 justify-end">
+          <input
+            className="input py-0.5 text-xs !w-32"
+            placeholder="12,50 9,90 15…"
+            inputMode="decimal"
+            value={prezziEbay}
+            onChange={(e) => setPrezziEbay(e.target.value)}
+            aria-label="Prezzi venduti eBay"
+          />
+          <button
+            type="button"
+            className="btn btn-ghost text-[11px] px-2"
+            disabled={busy}
+            onClick={() =>
+              azione(async () => {
+                onCambiata((await vendutiAMano(c.id, prezziEbay)).card);
+                setAMano(false);
+                setPrezziEbay("");
+              })
+            }
+          >
+            OK
+          </button>
+        </div>
+      )}
+    </>
+  );
+
+  const rivaluta = (
+    <button
+      type="button"
+      className="text-[11px] underline text-lilac-deep disabled:opacity-50 py-1"
+      disabled={busy}
+      onClick={() =>
+        azione(async () => {
+          const v = await valuta(c.id);
+          onCambiata(v.card);
+          const avvisi = Object.values(v.warnings);
+          if (avvisi.length) setNota(avvisi.join(" · "));
+        })
+      }
+    >
+      {busy ? "…" : "rivaluta"}
+    </button>
+  );
+
+  const campoPrezzo = (
+    <input
+      className="input py-1 text-sm !w-24 text-right"
+      inputMode="decimal"
+      value={prezzo}
+      onChange={(e) => setPrezzo(e.target.value)}
+      onBlur={salvaPrezzo}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+      aria-label="Prezzo di vendita"
+    />
+  );
+
+  const inVendita = (
+    <>
         <div>
           {c.site_status === "PUBLISHED" ? (
             <span className="text-xs text-ink-soft">
@@ -1314,7 +1512,83 @@ function RigaCarta({
             🗑 elimina
           </button>
         </div>
+</>
+  );
+
+  if (layout === "scheda") {
+    return (
+      <li className={"border rounded-xl p-3 " + (scelta ? "border-lilac-deep bg-lilac/10" : "border-ink/10")}>
+        <div className="flex gap-3">
+          <input type="checkbox" className="h-5 w-5 mt-1 shrink-0 accent-lilac-deep" checked={scelta}
+            onChange={(e) => onScelta(e.target.checked)} aria-label={`Seleziona ${c.name}`} />
+          {scan && (
+            <a href={scan} target="_blank" rel="noreferrer" className="shrink-0">
+              <img src={thumbUrlFor(scan)} alt="" className="w-16 rounded" loading="lazy" />
+            </a>
+          )}
+          <div className="min-w-0 flex-1">
+            <strong className="text-ink block leading-tight">{c.name}</strong>
+            {dettagli}
+          </div>
+        </div>
+        <dl className="grid grid-cols-3 gap-2 mt-3 text-center text-sm">
+          <div className="rounded-lg bg-ink/5 py-1.5">
+            <dt className="text-[10px] uppercase tracking-wide text-ink-soft">CardTrader</dt>
+            <dd>{eur(c.cardtrader_price)}</dd>
+          </div>
+          <div className="rounded-lg bg-ink/5 py-1.5">
+            <dt className="text-[10px] uppercase tracking-wide text-ink-soft">eBay</dt>
+            <dd>{eur(c.ebay_sold_avg)}</dd>
+          </div>
+          <div className="rounded-lg bg-ink/5 py-1.5">
+            <dt className="text-[10px] uppercase tracking-wide text-ink-soft">Suggerito</dt>
+            <dd className="font-bold text-ink">{eur(c.estimated_value)}</dd>
+          </div>
+        </dl>
+        <div className="flex items-start justify-between gap-2 mt-1 text-right">
+          <div className="text-left">{rivaluta}</div>
+          <div>{venduti}</div>
+        </div>
+        <label className="flex items-center justify-between gap-3 mt-2 text-sm text-ink-soft">
+          Prezzo di vendita {campoPrezzo}
+        </label>
+        <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 pt-3 border-t border-ink/10 [&>div]:min-h-[2.25rem] [&>div]:flex [&>div]:items-center">
+          {inVendita}
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <tr className="border-b border-ink/5 align-top">
+      <td className="py-2 pr-2">
+        <input type="checkbox" className="accent-lilac-deep" checked={scelta} onChange={(e) => onScelta(e.target.checked)} />
       </td>
+      <td className="py-2 pr-2 w-12">
+        {scan && (
+          <a href={scan} target="_blank" rel="noreferrer">
+            <img src={thumbUrlFor(scan)} alt="" className="w-10 rounded" loading="lazy" />
+          </a>
+        )}
+      </td>
+      <td className="py-2 pr-2 min-w-[12rem]">
+        <strong className="text-ink">{c.name}</strong>
+        {dettagli}
+      </td>
+      <td className="py-2 pr-2 text-right whitespace-nowrap">
+        {eur(c.cardtrader_price)}
+        {c.cardtrader_offers != null && <span className="block text-[11px] text-ink-soft">{c.cardtrader_offers} in vendita</span>}
+      </td>
+      <td className="py-2 pr-2 text-right whitespace-nowrap">
+        {eur(c.ebay_sold_avg)}
+        {venduti}
+      </td>
+      <td className="py-2 pr-2 text-right whitespace-nowrap">
+        <strong className="text-ink">{eur(c.estimated_value)}</strong>
+        <div>{rivaluta}</div>
+      </td>
+      <td className="py-2 pr-2 text-right">{campoPrezzo}</td>
+      <td className="py-2 whitespace-nowrap space-y-1">{inVendita}</td>
     </tr>
   );
 }
