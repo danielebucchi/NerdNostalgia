@@ -2,7 +2,7 @@
 Entities Pydantic per PersonalCard (carte sciolte, no flipping).
 Comprate al kg, vendute singolarmente.
 """
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Literal, Optional
 
@@ -109,8 +109,10 @@ class PersonalCardResponse(BaseModel):
     net_revenue: Optional[Decimal] = None
     profit: Optional[Decimal] = None
 
-    created_at: str
-    updated_at: str
+    # datetime, non str: dal DB arrivano datetime e con str la validazione
+    # falliva — ogni lettura della collezione andava in 500.
+    created_at: datetime
+    updated_at: datetime
 
 
 class PersonalCardListResponse(BaseModel):
