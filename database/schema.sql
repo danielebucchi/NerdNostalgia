@@ -438,14 +438,79 @@ CREATE TABLE IF NOT EXISTS personal_cards (
     shipping_cost NUMERIC(10,2),
     images JSON NOT NULL DEFAULT '[]',
     notes TEXT,
+    game_id INTEGER,
+    printed_code VARCHAR(50),
+    cardtrader_blueprint_id BIGINT,
+    cardtrader_expansion_id INTEGER,
+    reverse BOOLEAN NOT NULL DEFAULT 0,
+    first_edition BOOLEAN NOT NULL DEFAULT 0,
+    cardtrader_price NUMERIC(10,2),
+    cardtrader_offers INTEGER,
+    ebay_sold_avg NUMERIC(10,2),
+    ebay_sold_count INTEGER,
+    ebay_sold JSON,
+    ebay_sold_source VARCHAR(20),
+    prices_updated_at TIMESTAMP,
+    list_price NUMERIC(10,2),
+    cardtrader_product_id BIGINT,
+    cardtrader_synced_at TIMESTAMP,
+    ebay_sku VARCHAR(50),
+    ebay_offer_id VARCHAR(30),
+    ebay_listing_id VARCHAR(30),
+    ebay_synced_at TIMESTAMP,
+    article_id INTEGER REFERENCES articles(id) ON DELETE SET NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_personal_cards_article ON personal_cards(article_id);
+CREATE INDEX IF NOT EXISTS idx_personal_cards_blueprint ON personal_cards(cardtrader_blueprint_id);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_collection ON personal_cards(collection);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_owned_by ON personal_cards(owned_by);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_purchase_date ON personal_cards(purchase_date DESC);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_status ON personal_cards(status);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_sold_date ON personal_cards(sold_date DESC);
+
+-- ============================================================
+-- card_scans + card_blueprints (scanner carte)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS card_scans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    image_url VARCHAR(500) NOT NULL,
+    original_filename VARCHAR(255),
+    game_id INTEGER,
+    expansion_id INTEGER,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+        CHECK (status IN ('PENDING','CONFIRMED','DISCARDED')),
+    ocr JSON NOT NULL DEFAULT '{}',
+    candidates JSON NOT NULL DEFAULT '[]',
+    confidence VARCHAR(10),
+    back_image_url VARCHAR(500),
+    features JSON NOT NULL DEFAULT '{}',
+    error TEXT,
+    personal_card_id INTEGER REFERENCES personal_cards(id) ON DELETE SET NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_card_scans_status ON card_scans(status);
+
+CREATE TABLE IF NOT EXISTS card_blueprints (
+    id BIGINT PRIMARY KEY,
+    game_id INTEGER NOT NULL,
+    expansion_id INTEGER NOT NULL,
+    expansion_code VARCHAR(30),
+    expansion_name VARCHAR(200),
+    name VARCHAR(255) NOT NULL,
+    version VARCHAR(255),
+    collector_number VARCHAR(50),
+    number_norm VARCHAR(50),
+    image_url VARCHAR(500),
+    dhash VARCHAR(64),
+    editable VARCHAR(255),
+    indexed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_card_blueprints_game_number ON card_blueprints(game_id, number_norm);
+CREATE INDEX IF NOT EXISTS idx_card_blueprints_expansion ON card_blueprints(expansion_id);
+CREATE INDEX IF NOT EXISTS idx_card_blueprints_code ON card_blueprints(expansion_code);
 
 -- ============================================================
 -- expenses

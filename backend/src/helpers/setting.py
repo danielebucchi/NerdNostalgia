@@ -113,6 +113,27 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "help": "Categoria eBay di fallback quando non ne troviamo una migliore "
                 "(es. carte collezionabili). Da /api/ebay/category-suggestions.",
     },
+    "ebay_card_category_id": {
+        "default": "183454",
+        "public": False,
+        "label": "eBay — Categoria carte singole (ID)",
+        "help": "Categoria in cui lo scanner carte pubblica le carte "
+                "(carte collezionabili singole). Verifica l'ID per il tuo "
+                "mercato con /api/ebay/category-suggestions.",
+    },
+    "card_scanner_game_id": {
+        "default": "",
+        "public": False,
+        "label": "Scanner carte — gioco della sessione",
+        "help": "Lo imposta la pagina Scanner carte: vale per gli scan che "
+                "arrivano dalla cartella osservata. Vuoto = gioco predefinito.",
+    },
+    "card_scanner_expansion_id": {
+        "default": "",
+        "public": False,
+        "label": "Scanner carte — espansione fissa della sessione",
+        "help": "Lo imposta la pagina Scanner carte. Vuoto = tutte.",
+    },
     "cardtrader_footer": {
         "default": "Ask For Photos\nMore product on www.nerdnostalgia.store",
         "public": False,

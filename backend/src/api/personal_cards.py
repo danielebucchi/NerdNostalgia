@@ -39,6 +39,8 @@ def _to_response(card: PersonalCard) -> PersonalCardResponse:
     resp = PersonalCardResponse.model_validate(card)
     resp.net_revenue = _net_revenue(card)
     resp.profit = _profit(card)
+    if card.article is not None:
+        resp.site_status = card.article.status.value
     return resp
 
 

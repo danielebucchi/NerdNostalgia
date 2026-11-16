@@ -139,6 +139,12 @@ def blueprint_editable_properties(blueprint_id: int) -> List[dict]:
     return _cached(f"editprops:{blueprint_id}", 3600, _load)
 
 
+def is_foil_property(name: object) -> bool:
+    """Reverse/foil ha un nome diverso per gioco: pokemon_reverse,
+    mtg_foil, ... E' lo stesso concetto: la carta lucida."""
+    return isinstance(name, str) and (name.endswith("_reverse") or name.endswith("_foil"))
+
+
 def build_product_properties(
     blueprint_id: int,
     *,
@@ -159,7 +165,7 @@ def build_product_properties(
     lang_name = next((n for n in names if isinstance(n, str) and n.endswith("_language")), None)
     if lang_name and language:
         props[lang_name] = language
-    rev_name = next((n for n in names if isinstance(n, str) and n.endswith("_reverse")), None)
+    rev_name = next((n for n in names if is_foil_property(n)), None)
     if rev_name and reverse:
         props[rev_name] = True
     if "first_edition" in names and first_edition:
@@ -187,7 +193,7 @@ def _match_filters(
         if not lang_key or str(props.get(lang_key, "")).lower() != language.lower():
             return False
     if reverse is not None:
-        rev_key = next((k for k in props if isinstance(k, str) and k.endswith("_reverse")), None)
+        rev_key = next((k for k in props if is_foil_property(k)), None)
         if bool(props.get(rev_key)) != bool(reverse):
             return False
     if first_edition is not None:

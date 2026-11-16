@@ -301,6 +301,11 @@ def auto_publish_if_card(
             return {"status": "skipped", "reason": "CardTrader non configurato"}
         if not is_card_article(article):
             return {"status": "skipped", "reason": "non è una carta"}
+        # Carta della collezione (scanner): ha gia' la sua inserzione
+        # CardTrader, gestita dalla collezione. Un'altra sarebbe un doppione.
+        from utils.card_listing import is_collection_article
+        if is_collection_article(db, article):
+            return {"status": "skipped", "reason": "carta della collezione: inserzione gestita dallo scanner"}
         if not article.cardtrader_blueprint_id:
             bp = None
             if expansion_id:
@@ -351,3 +356,11 @@ def auto_unpublish_on_sold(db, article: Article) -> None:
             LOGGER.info("Auto-unpublish CardTrader su vendita: articolo %s", article.id)
     except Exception as exc:  # noqa: BLE001
         LOGGER.warning("Auto-unpublish CardTrader fallito per articolo %s: %s", article.id, exc)
+    # Carta della collezione venduta sul sito: venduta anche li', e via
+    # dalle sue inserzioni CardTrader/eBay.
+    try:
+        from utils.card_listing import on_article_sold
+        on_article_sold(db, article)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        LOGGER.warning("Carta della collezione non aggiornata per articolo %s: %s", article.id, exc)

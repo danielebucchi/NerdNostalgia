@@ -12,6 +12,7 @@ from .articles import (
     VintedStatus,
 )
 from .card_purchases import CardPurchase
+from .card_scan import CardBlueprint, CardScan, CardScanStatus
 from .category_alert import CategoryAlert
 from .consignment_sale import ConsignmentSale
 from .expense import Expense
@@ -41,6 +42,9 @@ __all__ = [
     "VintedStatus",
     "EbayStatus",
     "CardPurchase",
+    "CardBlueprint",
+    "CardScan",
+    "CardScanStatus",
     "CategoryAlert",
     "ConsignmentSale",
     "Expense",

@@ -75,3 +75,9 @@ def mark_sold(db: Session, order: Order) -> None:
             article.reserved_at = None
     db.commit()
     LOGGER.info("Articoli dell'ordine %s marcati VENDUTI", order.id)
+    # Venduti col pagamento online: le stesse pulizie della vendita a mano
+    # (via da CardTrader; carte della collezione vendute e ritirate).
+    from utils import cardtrader_sync as cts
+    for article in _articles_of(db, order):
+        if article.status == ArticleStatus.SOLD:
+            cts.auto_unpublish_on_sold(db, article)

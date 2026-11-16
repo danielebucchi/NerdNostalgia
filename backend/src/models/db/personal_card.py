@@ -7,15 +7,21 @@ strutturato: ogni carta vive a se' stante, con costo eventualmente
 medio rispetto al bulk_source e con i propri campi vendita.
 """
 from sqlalchemy import (
+    BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
     Date,
+    DateTime,
+    ForeignKey,
     Integer,
     JSON,
     Numeric,
     String,
     Text,
 )
+
+from sqlalchemy.orm import relationship
 
 from .base import BaseModel
 
@@ -68,6 +74,40 @@ class PersonalCard(BaseModel):
 
     images = Column(JSON, nullable=False, default=list)
     notes = Column(Text)
+
+    # ── Scanner: la carta abbinata al catalogo CardTrader ──
+    game_id = Column(Integer)
+    # Il codice cosi' com'e' stampato ("025/165", "LOB-EN001"): e' quello
+    # che i compratori cercano su eBay, e serve nel CSV.
+    printed_code = Column(String(50))
+    cardtrader_blueprint_id = Column(BigInteger, index=True)
+    cardtrader_expansion_id = Column(Integer)
+    reverse = Column(Boolean, nullable=False, default=False)
+    first_edition = Column(Boolean, nullable=False, default=False)
+
+    # Prezzi di mercato (ultima valutazione) e prezzo a cui la si mette in
+    # vendita. estimated_value tiene il SUGGERITO; list_price e' la scelta.
+    cardtrader_price = Column(Numeric(10, 2))
+    cardtrader_offers = Column(Integer)
+    ebay_sold_avg = Column(Numeric(10, 2))
+    ebay_sold_count = Column(Integer)
+    ebay_sold = Column(JSON)  # [{title, price, date, url}] le vendite usate per la media
+    ebay_sold_source = Column(String(20))  # api / manuale
+    prices_updated_at = Column(DateTime)
+    list_price = Column(Numeric(10, 2))
+
+    # Inserzioni
+    cardtrader_product_id = Column(BigInteger)
+    cardtrader_synced_at = Column(DateTime)
+    ebay_sku = Column(String(50))
+    ebay_offer_id = Column(String(30))
+    ebay_listing_id = Column(String(30))
+    ebay_synced_at = Column(DateTime)
+    # Articolo del sito (vetrina) con cui la carta e' in vendita anche li'.
+    # Gli ordini passano dagli articoli: la carta ne ha uno solo, che si
+    # ripubblica invece di duplicarlo.
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="SET NULL"), index=True)
+    article = relationship("Article", foreign_keys=[article_id])
 
     def __repr__(self):
         return (

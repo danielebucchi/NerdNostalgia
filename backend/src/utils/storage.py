@@ -14,6 +14,7 @@ APP_TMP_DIR = os.getenv("APP_TMP_DIR", "/tmp/nerdnostalgia")
 UPLOADS_DIR = Path(APP_TMP_DIR) / "uploads"
 ARTICLES_UPLOADS_DIR = UPLOADS_DIR / "articles"
 INVENTORY_UPLOADS_DIR = UPLOADS_DIR / "inventory"
+SCANS_UPLOADS_DIR = UPLOADS_DIR / "scans"
 
 # Scope validi per il naming delle sottocartelle. Corrispondono anche al
 # segmento di URL /static/<scope>/<id>/<uuid>.webp. Aggiungere qui una voce
@@ -21,6 +22,7 @@ INVENTORY_UPLOADS_DIR = UPLOADS_DIR / "inventory"
 _SCOPES = {
     "articles": ARTICLES_UPLOADS_DIR,
     "inventory": INVENTORY_UPLOADS_DIR,
+    "scans": SCANS_UPLOADS_DIR,
 }
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:7373")

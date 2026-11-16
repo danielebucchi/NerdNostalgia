@@ -295,6 +295,27 @@ export interface PersonalCard {
   profit: string | null;
   images: string[];
   notes: string | null;
+  // Scanner: abbinamento CardTrader, prezzi di mercato, inserzioni
+  game_id?: number | null;
+  printed_code?: string | null;
+  cardtrader_blueprint_id?: number | null;
+  cardtrader_expansion_id?: number | null;
+  reverse?: boolean;
+  first_edition?: boolean;
+  cardtrader_price?: string | null;
+  cardtrader_offers?: number | null;
+  ebay_sold_avg?: string | null;
+  ebay_sold_count?: number | null;
+  ebay_sold?: { title: string | null; price: number; date: string | null; url: string | null }[] | null;
+  ebay_sold_source?: "api" | "manuale" | null;
+  prices_updated_at?: string | null;
+  list_price?: string | null;
+  cardtrader_product_id?: number | null;
+  cardtrader_synced_at?: string | null;
+  ebay_listing_id?: string | null;
+  ebay_synced_at?: string | null;
+  article_id?: number | null;
+  site_status?: "DRAFT" | "PUBLISHED" | "SOLD" | "ARCHIVED" | null;
   created_at: string;
   updated_at: string;
 }

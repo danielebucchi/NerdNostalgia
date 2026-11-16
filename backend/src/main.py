@@ -19,6 +19,7 @@ from api.alerts import router as alerts_router
 from api.articles import router as articles_router
 from api.auth import router as auth_router
 from api.card_purchases import router as card_purchases_router
+from api.card_scanner import router as card_scanner_router
 from api.bulk_cards import router as bulk_cards_router
 from api.cardtrader import router as cardtrader_router
 from api.consignment_sales import router as consignment_sales_router
@@ -87,6 +88,7 @@ app.include_router(wanted_router)
 app.include_router(marketplace_fees_router)
 app.include_router(platforms_router)
 app.include_router(card_purchases_router)
+app.include_router(card_scanner_router)
 app.include_router(consignment_sales_router)
 app.include_router(expenses_router)
 app.include_router(misc_sales_router)

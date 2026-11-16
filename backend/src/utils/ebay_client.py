@@ -268,3 +268,74 @@ def withdraw_offer(offer_id: str) -> Any:
 
 def delete_offer(offer_id: str) -> Any:
     return _request("DELETE", f"/sell/inventory/v1/offer/{offer_id}")
+
+
+# ── Venduti (Marketplace Insights) ─────────────────────────────────
+#
+# L'unica fonte ufficiale dei prezzi di vendita conclusi. E' un'API ad
+# accesso limitato: va chiesta a eBay per l'app (Application Growth
+# Check), finche' non e' abilitata risponde 403. Usa un token
+# APPLICAZIONE (client credentials), non quello del venditore: i venduti
+# altrui non c'entrano col consenso del tuo account.
+
+INSIGHTS_SCOPE = "https://api.ebay.com/oauth/api_scope/buy.marketplace.insights"
+
+_APP_TOKENS: Dict[str, Dict[str, Any]] = {}
+
+
+def has_app_credentials() -> bool:
+    return bool(_client_id() and _client_secret())
+
+
+def _app_token(scope: str) -> str:
+    if not has_app_credentials():
+        raise EbayError("eBay non configurato: mancano EBAY_CLIENT_ID/EBAY_CLIENT_SECRET")
+    now = time.time()
+    cached = _APP_TOKENS.get(scope)
+    if cached and now < cached["exp"] - 60:
+        return cached["value"]
+    resp = requests.post(
+        _token_url(),
+        headers={"Authorization": _basic_auth(), "Content-Type": "application/x-www-form-urlencoded"},
+        data={"grant_type": "client_credentials", "scope": scope},
+        timeout=TIMEOUT,
+    )
+    if resp.status_code >= 400:
+        raise EbayError(f"Token applicazione eBay negato ({resp.status_code})",
+                        resp.status_code, _safe_body(resp))
+    data = resp.json()
+    _APP_TOKENS[scope] = {"value": data["access_token"],
+                          "exp": now + int(data.get("expires_in", 7200))}
+    return data["access_token"]
+
+
+def sold_items_search(query: str, limit: int = 50, category_id: Optional[str] = None) -> List[dict]:
+    """Vendite concluse negli ultimi 90 giorni che corrispondono alla
+    ricerca. Ogni voce: title, lastSoldPrice{value,currency},
+    lastSoldDate, itemWebUrl, totalSoldQuantity."""
+    params: Dict[str, Any] = {"q": query, "limit": limit}
+    if category_id:
+        params["category_ids"] = category_id
+    url = f"{_api_base()}/buy/marketplace_insights/v1_beta/item_sales/search"
+    try:
+        resp = requests.get(
+            url,
+            headers={
+                "Authorization": f"Bearer {_app_token(INSIGHTS_SCOPE)}",
+                "X-EBAY-C-MARKETPLACE-ID": marketplace_id(),
+                "Accept": "application/json",
+            },
+            params=params,
+            timeout=TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        raise EbayError(f"Rete/timeout verso eBay: {exc}") from exc
+    if resp.status_code == 403:
+        raise EbayError(
+            "Marketplace Insights non abilitata per questa app eBay: va richiesta "
+            "a eBay. Nel frattempo inserisci i venduti a mano.",
+            403, _safe_body(resp),
+        )
+    if resp.status_code >= 400:
+        raise EbayError(f"eBay {resp.status_code} sui venduti", resp.status_code, _safe_body(resp))
+    return (resp.json() or {}).get("itemSales") or []

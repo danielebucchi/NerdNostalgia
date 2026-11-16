@@ -70,6 +70,13 @@ class PersonalCardUpdate(BaseModel):
     shipping_cost: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
     images: Optional[List[str]] = None
     notes: Optional[str] = None
+    game_id: Optional[int] = None
+    printed_code: Optional[str] = Field(None, max_length=50)
+    cardtrader_blueprint_id: Optional[int] = None
+    cardtrader_expansion_id: Optional[int] = None
+    reverse: Optional[bool] = None
+    first_edition: Optional[bool] = None
+    list_price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
 
 
 class PersonalCardResponse(BaseModel):
@@ -104,6 +111,29 @@ class PersonalCardResponse(BaseModel):
 
     images: List[str] = Field(default_factory=list)
     notes: Optional[str]
+
+    # Scanner: abbinamento, prezzi di mercato, inserzioni
+    game_id: Optional[int] = None
+    printed_code: Optional[str] = None
+    cardtrader_blueprint_id: Optional[int] = None
+    cardtrader_expansion_id: Optional[int] = None
+    reverse: bool = False
+    first_edition: bool = False
+    cardtrader_price: Optional[Decimal] = None
+    cardtrader_offers: Optional[int] = None
+    ebay_sold_avg: Optional[Decimal] = None
+    ebay_sold_count: Optional[int] = None
+    ebay_sold: Optional[List[dict]] = None
+    ebay_sold_source: Optional[str] = None
+    prices_updated_at: Optional[datetime] = None
+    list_price: Optional[Decimal] = None
+    cardtrader_product_id: Optional[int] = None
+    cardtrader_synced_at: Optional[datetime] = None
+    ebay_listing_id: Optional[str] = None
+    ebay_synced_at: Optional[datetime] = None
+    article_id: Optional[int] = None
+    # Stato dell'articolo sul sito: PUBLISHED / SOLD / ARCHIVED / DRAFT
+    site_status: Optional[str] = None
 
     # Derived
     net_revenue: Optional[Decimal] = None

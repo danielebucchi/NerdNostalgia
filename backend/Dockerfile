@@ -4,6 +4,8 @@ FROM python:3.14
 RUN apt-get update && apt-get install -y --no-install-recommends \
     sqlite3 \
     curl \
+    # OCR dello scanner carte (numero e sigla stampati sulla carta)
+    tesseract-ocr \
     # Chromium runtime deps (minimal set)
     libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
     libcups2 libdrm2 libxkbcommon0 libatspi2.0-0 \

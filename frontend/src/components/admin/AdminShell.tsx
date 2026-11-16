@@ -12,6 +12,7 @@ const ALL_NAV_ITEMS = [
   { href: "/admin/articles", label: "Articoli", icon: "🎮" },
   { href: "/admin/lotti", label: "Lotti (interno)", icon: "📦" },
   { href: "/admin/carico-carte", label: "Carico carte", icon: "🎴" },
+  { href: "/admin/scanner-carte", label: "Scanner carte", icon: "🔍" },
   { href: "/admin/vendite", label: "Vendite", icon: "💰" },
   { href: "/admin/spese", label: "Spese", icon: "💰" },
   { href: "/admin/ordini", label: "Ordini", icon: "📥", requiresPayments: true },
