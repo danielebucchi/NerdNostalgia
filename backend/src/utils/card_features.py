@@ -104,7 +104,16 @@ def download_reference(url: Optional[str]) -> Optional[Image.Image]:
 
 # ── Reverse / foil ────────────────────────────────────────────────
 
-def foil(scan: Image.Image, ref: Optional[Image.Image], gioco: str) -> Dict[str, Any]:
+def _binarie(tarate: Optional[dict], si: str, no: str) -> Tuple[float, float, bool]:
+    """Soglie si'/no: quelle tarate sui tuoi scan se ci sono (vedi
+    card_learning.calibrate), altrimenti quelle di partenza."""
+    if tarate and "si" in tarate and "no" in tarate:
+        return tarate["si"], tarate["no"], True
+    return SOGLIE[si], SOGLIE[no], False
+
+
+def foil(scan: Image.Image, ref: Optional[Image.Image], gioco: str,
+         tarate: Optional[dict] = None) -> Dict[str, Any]:
     zone = ZONE.get(gioco)
     if not zone or ref is None:
         return {"value": None, "reason": "nessun riferimento"}
@@ -125,13 +134,14 @@ def foil(scan: Image.Image, ref: Optional[Image.Image], gioco: str) -> Dict[str,
         # Foil Magic & co.: lucida dappertutto, il rapporto fra zone non
         # cambia. Si guarda la grana del riquadro di testo e basta.
         misura = grana(_zona(s, zone["testo"])) / max(grana(_zona(r, zone["testo"])), 0.5)
-    if misura >= SOGLIE["foil_si"]:
+    si, no, sui_tuoi = _binarie((tarate or {}).get("foil", {}).get(gioco), "foil_si", "foil_no")
+    if misura >= si:
         valore = True
-    elif misura <= SOGLIE["foil_no"]:
+    elif misura <= no:
         valore = False
     else:
         valore = None
-    return {"value": valore, "score": round(misura, 2)}
+    return {"value": valore, "score": round(misura, 2), "calibrated": sui_tuoi}
 
 
 # ── Prima edizione ────────────────────────────────────────────────
@@ -144,6 +154,7 @@ def _quota_scura(img: Image.Image) -> float:
 
 def first_edition(
     scan: Image.Image, ref: Optional[Image.Image], gioco: str, testo_ocr: str,
+    tarate: Optional[dict] = None,
 ) -> Dict[str, Any]:
     if gioco == "yugioh":
         trovato = bool(RE_PRIMA_EDIZIONE.search(testo_ocr or ""))
@@ -155,13 +166,14 @@ def first_edition(
             return {"value": None, "reason": "nessun riferimento"}
         zona = ZONE["pokemon"]["timbro"]
         diff = _quota_scura(_zona(_norm(scan), zona)) - _quota_scura(_zona(_norm(ref), zona))
-        if diff >= SOGLIE["timbro_si"]:
+        si, no, sui_tuoi = _binarie((tarate or {}).get("timbro"), "timbro_si", "timbro_no")
+        if diff >= si:
             valore = True
-        elif diff <= SOGLIE["timbro_no"]:
+        elif diff <= no:
             valore = False
         else:
             valore = None
-        return {"value": valore, "score": round(diff, 3)}
+        return {"value": valore, "score": round(diff, 3), "calibrated": sui_tuoi}
     return {"value": None, "reason": "non prevista per questo gioco"}
 
 
@@ -287,7 +299,24 @@ def usura(img: Image.Image) -> Optional[float]:
     return bianchi / max(tot, 1)
 
 
-def condition(fronte: Image.Image, retro: Optional[Image.Image] = None) -> Dict[str, Any]:
+def _limiti_usura(tarate: Optional[dict]) -> Tuple[list, bool]:
+    """Limiti fra le condizioni: quelli tarati dove ci sono abbastanza
+    esempi, gli altri di partenza. I limiti devono crescere: uno tarato
+    che scavalca il successivo si scarta."""
+    calcolati = (tarate or {}).get("usura") or []
+    limiti, prima, tarato = [], 0.0, False
+    for k, (limite, cond) in enumerate(SOGLIE["usura"]):
+        nuovo = calcolati[k][0] if k < len(calcolati) and calcolati[k][0] is not None else None
+        if nuovo is not None and nuovo > prima:
+            limite, tarato = nuovo, True
+        limite = max(limite, prima)
+        limiti.append((limite, cond))
+        prima = limite
+    return limiti, tarato
+
+
+def condition(fronte: Image.Image, retro: Optional[Image.Image] = None,
+              tarate: Optional[dict] = None) -> Dict[str, Any]:
     """Stima della condizione CardTrader dall'usura dei bordi. Mai "Mint":
     da uno scan non lo si puo' garantire."""
     u_fronte = usura(fronte)
@@ -303,7 +332,8 @@ def condition(fronte: Image.Image, retro: Optional[Image.Image] = None) -> Dict[
         out["reason"] = "bordo bianco o senza bordo (arte fino al taglio): usura non misurabile"
         return out
     peggiore = max(misure)
-    out["value"] = next((c for limite, c in SOGLIE["usura"] if peggiore < limite), "Poor")
+    limiti, out["calibrated"] = _limiti_usura(tarate)
+    out["value"] = next((c for limite, c in limiti if peggiore < limite), "Poor")
     if retro is None:
         out["reason"] = "solo fronte: col retro la stima e' piu' affidabile"
     return out
@@ -318,6 +348,7 @@ def analyze(
     reference_url: Optional[str],
     testo_ocr: str = "",
     retro: Optional[Image.Image] = None,
+    tarate: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """Analisi completa per la carta scelta. `editable` = attributi che
     CardTrader ammette per lei: se non ammette il reverse, non lo si
@@ -329,11 +360,11 @@ def analyze(
 
     out: Dict[str, Any] = {
         "supports": {"reverse": ha_foil, "first_edition": ha_prima},
-        "condition": condition(scan, retro),
+        "condition": condition(scan, retro, tarate),
     }
-    out["reverse"] = foil(scan, ref, gioco or "") if ha_foil else {"value": False, "reason": "non prevista"}
+    out["reverse"] = foil(scan, ref, gioco or "", tarate) if ha_foil else {"value": False, "reason": "non prevista"}
     out["first_edition"] = (
-        first_edition(scan, ref, gioco or "", testo_ocr) if ha_prima
+        first_edition(scan, ref, gioco or "", testo_ocr, tarate) if ha_prima
         else {"value": False, "reason": "non prevista"}
     )
     return out

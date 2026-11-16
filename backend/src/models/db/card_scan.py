@@ -57,6 +57,9 @@ class CardScan(BaseModel):
     back_image_url = Column(String(500))
     # Analisi della carta scelta: reverse, prima edizione, condizione
     features = Column(JSON, nullable=False, default=dict)
+    # dHash della carta ritagliata: alla conferma diventa un riferimento
+    # (vedi CardReference), cosi' la stessa carta si riconosce dai tuoi scan.
+    dhash = Column(String(64))
     error = Column(Text)
     personal_card_id = Column(Integer, ForeignKey("personal_cards.id", ondelete="SET NULL"))
 
@@ -83,3 +86,29 @@ class CardBlueprint(Base):
     # la prima edizione o il reverse sullo scan.
     editable = Column(String(255))
     indexed_at = Column(DateTime, nullable=False, default=_utc_now)
+
+
+class CardReference(BaseModel):
+    """Uno scan confermato: "questa immagine e' questa carta".
+
+    Le immagini CardTrader sono foto ufficiali, diverse dai tuoi scan per
+    colori, luce e nitidezza: la somiglianza si ferma a 0.75-0.85. Un tuo
+    scan della stessa carta, fatto con lo stesso scanner, somiglia molto
+    di piu': ricordarli rende il riconoscimento sempre piu' sicuro."""
+    __tablename__ = "card_references"
+
+    blueprint_id = Column(BigInteger, nullable=False, index=True)
+    game_id = Column(Integer, nullable=False, index=True)
+    dhash = Column(String(64), nullable=False)
+    scan_id = Column(Integer)
+
+
+class OcrCorrection(BaseModel):
+    """Cosa ha letto l'OCR e cosa c'era davvero (dalla carta confermata).
+    Da qui si imparano le confusioni del tuo scanner: "la S e' un 8"."""
+    __tablename__ = "ocr_corrections"
+
+    game_id = Column(Integer, index=True)
+    kind = Column(String(10), nullable=False)  # number / set
+    read_text = Column(String(50), nullable=False)
+    true_text = Column(String(50), nullable=False)

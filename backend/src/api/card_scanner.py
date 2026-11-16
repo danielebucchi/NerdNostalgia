@@ -31,6 +31,7 @@ from models.db.card_scan import CardBlueprint
 from models.entities.personal_card import PersonalCardResponse
 from utils import card_features as cf
 from utils import card_index as ci
+from utils import card_learning as learn
 from utils import card_listing as cl
 from utils import card_ocr
 from utils import card_pricing as cp
@@ -117,6 +118,7 @@ def scanner_status(db: Session = Depends(get_db), _admin: User = Depends(require
         "default_language": _default_language(db),
         "session": _sessione(db),
         "index": ci.build_status(db),
+        "learning": learn.status(db),
         "pending_scans": db.query(CardScan).filter(CardScan.status == CardScanStatus.PENDING).count(),
     }
 
@@ -172,7 +174,10 @@ def _riconosci(db: Session, scan: CardScan, card_img, lettura) -> None:
     """Abbina e salva l'esito sullo scan. Un errore qui non perde lo scan:
     resta in coda con l'errore, e si riprova o si cerca a mano."""
     try:
-        esito = ci.match(db, scan.game_id, lettura, ci.dhash(card_img), scan.expansion_id)
+        impronta = ci.dhash(card_img)
+        scan.dhash = scan.dhash or impronta
+        esito = ci.match(db, scan.game_id, lettura, impronta, scan.expansion_id,
+                         appreso=learn.confusions(db, scan.game_id))
         scan.candidates = esito["candidates"]
         scan.confidence = esito["confidence"]
         scan.ocr = {**lettura.as_dict(), "variant_note": esito.get("note")}
@@ -214,6 +219,7 @@ def _analizza(db: Session, scan: CardScan, blueprint_id: int, card_img=None) -> 
             bp.image_url,
             testo_ocr=(scan.ocr or {}).get("full_text", ""),
             retro=_immagine_salvata(scan.back_image_url),
+            tarate=learn.load_thresholds(db),
         )
         scan.features = {"blueprint_id": bp.id, **analisi}
     except Exception as exc:  # noqa: BLE001
@@ -246,7 +252,8 @@ def upload_scan(
 
     try:
         raw = storage._read_with_limit(file.file)
-        card_img, lettura = card_ocr.read_card(raw, ci.GAME_HINTS.get(game_id))
+        card_img, lettura = card_ocr.read_card(raw, ci.GAME_HINTS.get(game_id),
+                                               learn.confusions(db, game_id))
     except storage.UploadValidationError as exc:
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
@@ -359,6 +366,12 @@ def upload_back(
     if scan.back_image_url:
         storage.delete_file_for_url(scan.back_image_url)
     scan.back_image_url, _ = storage.save_upload("scans", scan.id, buf, "image/jpeg")
+    # Retro arrivato dopo la conferma (lo script giornaliero, un giorno
+    # dopo il fronte): va anche fra le foto della carta.
+    if scan.personal_card_id:
+        card = db.query(PersonalCard).filter(PersonalCard.id == scan.personal_card_id).first()
+        if card is not None:
+            card.images = [u for u in (card.images or []) if u] + [scan.back_image_url]
     db.commit()
     bp_id = (scan.features or {}).get("blueprint_id") or (
         scan.candidates[0]["blueprint_id"] if scan.candidates else None)
@@ -441,6 +454,13 @@ def confirm_scan(
     scan.personal_card_id = card.id
     db.commit()
 
+    # Quello che la conferma insegna: lo scan diventa un riferimento della
+    # carta, gli errori dell'OCR si contano, le soglie si ritarano.
+    if not scan.dhash:
+        img = _immagine_salvata(scan.image_url)
+        scan.dhash = ci.dhash(img) if img is not None else None
+    learn.learn_from_confirmation(db, scan, card, bp.expansion_code or "")
+
     if payload.price_now:
         try:
             cp.price_card(card)
@@ -450,6 +470,47 @@ def confirm_scan(
             LOGGER.warning("Valutazione carta %s fallita: %s", card.id, exc)
     db.refresh(card)
     return _to_response(card)
+
+
+class AutoConfirmResponse(BaseModel):
+    confirmed: bool
+    reason: Optional[str] = None
+    card: Optional[PersonalCardResponse] = None
+    scan: ScanResponse
+
+
+@router.post("/scans/{scan_id}/auto-confirm", response_model=AutoConfirmResponse)
+def auto_confirm_scan(
+    scan_id: int,
+    price_now: bool = Query(True),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Conferma da sola, senza una persona, SOLO se il riconoscimento e'
+    sicuro: confidenza alta e nessuna altra versione quasi identiche.
+    Tutto il resto resta in coda per la pagina: una carta sbagliata in
+    collezione costa piu' di una conferma a mano. Lo usa lo script che
+    carica la cartella dello scanner una volta al giorno."""
+    scan = _scan_or_404(db, scan_id)
+    if scan.status != CardScanStatus.PENDING:
+        return AutoConfirmResponse(confirmed=False, reason="gia' confermato o scartato",
+                                   scan=_scan_response(scan))
+    if not scan.candidates:
+        motivo = "nessun candidato"
+    elif scan.confidence != "alta":
+        motivo = f"confidenza {scan.confidence or 'bassa'}"
+    elif (scan.ocr or {}).get("variant_note"):
+        motivo = "altre versioni quasi identiche"
+    else:
+        motivo = None
+    if motivo:
+        return AutoConfirmResponse(confirmed=False, reason=motivo, scan=_scan_response(scan))
+    carta = confirm_scan(
+        scan_id,
+        ConfirmRequest(blueprint_id=scan.candidates[0]["blueprint_id"], price_now=price_now),
+        db=db, _admin=_admin,
+    )
+    return AutoConfirmResponse(confirmed=True, card=carta, scan=_scan_response(scan))
 
 
 @router.delete("/scans/{scan_id}", status_code=status.HTTP_204_NO_CONTENT)

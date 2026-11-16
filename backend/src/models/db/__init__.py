@@ -12,7 +12,7 @@ from .articles import (
     VintedStatus,
 )
 from .card_purchases import CardPurchase
-from .card_scan import CardBlueprint, CardScan, CardScanStatus
+from .card_scan import CardBlueprint, CardReference, CardScan, CardScanStatus, OcrCorrection
 from .category_alert import CategoryAlert
 from .consignment_sale import ConsignmentSale
 from .expense import Expense
@@ -45,6 +45,8 @@ __all__ = [
     "CardBlueprint",
     "CardScan",
     "CardScanStatus",
+    "CardReference",
+    "OcrCorrection",
     "CategoryAlert",
     "ConsignmentSale",
     "Expense",

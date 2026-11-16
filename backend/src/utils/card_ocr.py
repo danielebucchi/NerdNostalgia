@@ -63,6 +63,10 @@ class LetturaCarta:
     # Altre letture possibili del numero quando l'OCR e' ambiguo
     # ("OPOS-O76" → OP05-076 o OP08-076): le valuta il confronto d'immagine.
     alt_numbers: List[str] = field(default_factory=list)
+    # Il numero e la sigla COSI' COME LETTI, prima di ogni correzione: alla
+    # conferma si confrontano col vero e se ne imparano gli errori.
+    raw_number: Optional[str] = None
+    raw_set: Optional[str] = None
     total: Optional[str] = None         # Pokemon/Magic: il "/165"
     set_code: Optional[str] = None      # sigla espansione: "SSP", "LOB", "DMU"
     # Sigle possibili lette (anche sbagliate): le valida chi conosce le
@@ -214,18 +218,42 @@ def ocr_card(card: Image.Image) -> dict:
 RE_ONEPIECE = re.compile(r"\b((?:OP|ST|EB|PRB)\d{2}|P)\s?-\s?(\d{3})\b")
 # Lo stesso, tollerando le lettere che Tesseract mette al posto delle cifre
 # (il codice One Piece e' bianco su colore, e lo legge spesso "OPOS-O76").
-RE_ONEPIECE_SPORCO = re.compile(r"\b(OP|ST|EB|PRB)\s?([0-9OQDSBIZLG]{2})\s?-\s?([0-9OQDSBIZLGT]{3})")
 CIFRE_SIMILI = {
     "O": "0", "Q": "0", "D": "0", "I": "1", "L": "1", "Z": "2",
     "S": "58", "B": "8", "G": "6", "T": "7",
 }
+MAX_LETTURE = 12
 
 
-def _cifre_possibili(gruppo: str) -> List[str]:
-    """"OS" → ["05", "08"]: ogni lettura numerica plausibile del gruppo."""
+def _simili(appreso: Optional[dict]) -> dict:
+    """Le confusioni fisse piu' quelle imparate dalle correzioni (vedi
+    card_learning), queste ultime per prime: sono gli errori veri del tuo
+    scanner."""
+    out = {k: v for k, v in CIFRE_SIMILI.items()}
+    for letto, veri in (appreso or {}).items():
+        cifre = "".join(c for c in veri if c.isdigit())
+        if cifre:
+            out[letto] = cifre + "".join(c for c in out.get(letto, "") if c not in cifre)
+    return out
+
+
+def _re_onepiece_sporco(appreso: Optional[dict]):
+    lettere = "".join(sorted(k for k in _simili(appreso) if k.isalpha()))
+    return re.compile(rf"\b(OP|ST|EB|PRB)\s?([0-9{lettere}]{{2}})\s?-\s?([0-9{lettere}]{{3}})")
+
+
+def _cifre_possibili(gruppo: str, appreso: Optional[dict] = None) -> List[str]:
+    """"OS" → ["05", "08"]: ogni lettura numerica plausibile del gruppo,
+    dalla piu' probabile. Anche una cifra puo' avere alternative, se le
+    correzioni hanno insegnato che il tuo scanner le confonde (5 per 8)."""
+    simili = _simili(appreso)
     out = [""]
     for ch in gruppo:
-        out = [o + c for o in out for c in (ch if ch.isdigit() else CIFRE_SIMILI.get(ch, ""))]
+        if ch.isdigit():
+            scelte = ch + "".join(c for c in (appreso or {}).get(ch, "") if c.isdigit() and c != ch)
+        else:
+            scelte = simili.get(ch, "")
+        out = [o + c for o in out for c in scelte][:MAX_LETTURE]
     return out
 # Yu-Gi-Oh!: LOB-EN001, LOB-001, SDK-I001, RA01-IT045, MP23-EN123
 RE_YUGIOH = re.compile(
@@ -277,7 +305,11 @@ def detect_language(testo: str) -> Optional[str]:
     return None
 
 
-def parse_codes(testi: dict, game_hint: Optional[str] = None) -> LetturaCarta:
+RE_NUMERO_SPORCO = re.compile(r"\b([0-9A-Z]{1,3})\s?/\s?([0-9A-Z]{2,3})\b")
+
+
+def parse_codes(testi: dict, game_hint: Optional[str] = None,
+                appreso: Optional[dict] = None) -> LetturaCarta:
     """Dai testi OCR ai codici della carta. `game_hint` ("pokemon",
     "magic", "yugioh", "onepiece") evita di cercare formati di altri
     giochi, che su una carta qualsiasi trovano sempre qualcosa."""
@@ -297,13 +329,15 @@ def parse_codes(testi: dict, game_hint: Optional[str] = None) -> LetturaCarta:
                 out.set_codes = [m.group(1)]
                 out.number = f"{m.group(1)}-{m.group(2)}"
                 out.printed_code = out.number
+                out.raw_set, out.raw_number = m.group(1), m.group(2)
                 return out
         for z in zone:
-            m = RE_ONEPIECE_SPORCO.search(alto(z))
+            m = _re_onepiece_sporco(appreso).search(alto(z))
             if not m:
                 continue
-            numeri = _cifre_possibili(m.group(3))
-            sigle = [m.group(1) + c for c in _cifre_possibili(m.group(2))]
+            out.raw_set, out.raw_number = m.group(1) + m.group(2), m.group(3)
+            numeri = _cifre_possibili(m.group(3), appreso)
+            sigle = [m.group(1) + c for c in _cifre_possibili(m.group(2), appreso)]
             codici = [f"{sg}-{n}" for sg in sigle for n in numeri]
             if codici:
                 out.set_codes = sigle
@@ -323,6 +357,7 @@ def parse_codes(testi: dict, game_hint: Optional[str] = None) -> LetturaCarta:
                 out.set_code = sigla
                 out.set_codes = [sigla]
                 out.number = m.group(3)
+                out.raw_set, out.raw_number = sigla, m.group(3)
                 if m.group(2):
                     out.language = LINGUE.get(m.group(2))
                 out.printed_code = m.group(0).replace(" ", "")
@@ -334,7 +369,23 @@ def parse_codes(testi: dict, game_hint: Optional[str] = None) -> LetturaCarta:
             if m:
                 out.number, out.total = m.group(1), m.group(2)
                 out.printed_code = f"{m.group(1)}/{m.group(2)}"
+                out.raw_number = m.group(1)
                 break
+        if not out.number and appreso:
+            # Con le confusioni imparate: "4S/1O2" → 48/102 o 45/102.
+            for z in zone:
+                for m in RE_NUMERO_SPORCO.finditer(alto(z)):
+                    if not any(c.isdigit() for c in m.group(0)):
+                        continue
+                    numeri, totali = _cifre_possibili(m.group(1), appreso), _cifre_possibili(m.group(2), appreso)
+                    if numeri and totali:
+                        out.number, out.total = numeri[0], totali[0]
+                        out.alt_numbers = numeri[1:]
+                        out.raw_number = m.group(1)
+                        out.notes.append(f"numero letto «{m.group(0)}»: provo {', '.join(numeri)}")
+                        break
+                if out.number:
+                    break
         if not out.number and game_hint == "magic":
             m = RE_NUMERO_MAGIC.search(bottom)
             if m:
@@ -349,6 +400,7 @@ def parse_codes(testi: dict, game_hint: Optional[str] = None) -> LetturaCarta:
                 if sigla in NON_SIGLE or sigla.isdigit() or sigla in out.set_codes:
                     continue
                 out.set_codes.append(sigla)
+                out.raw_set = out.raw_set or sigla
                 if not out.language:
                     out.language = LINGUE.get(m.group(2))
         out.set_code = out.set_codes[0] if out.set_codes else None
@@ -367,17 +419,17 @@ def _parole_vere(testo: str) -> int:
     return len(re.findall(r"[A-Za-zÀ-ÿ]{4,}", testo or ""))
 
 
-def read_card(raw: bytes, game_hint: Optional[str] = None) -> tuple:
+def read_card(raw: bytes, game_hint: Optional[str] = None, appreso: Optional[dict] = None) -> tuple:
     """Scan grezzo → (immagine ritagliata e raddrizzata, LetturaCarta).
 
     Se il numero non salta fuori si prova la carta capovolta, ma la si
     tiene solo se si legge MEGLIO: su un testo al rovescio Tesseract
     trova comunque qualcosa che somiglia a "594/007"."""
     card = prepare(raw)
-    lettura = parse_codes(ocr_card(card), game_hint)
+    lettura = parse_codes(ocr_card(card), game_hint, appreso)
     if not lettura.number:
         girata = card.rotate(180)
-        seconda = parse_codes(ocr_card(girata), game_hint)
+        seconda = parse_codes(ocr_card(girata), game_hint, appreso)
         if seconda.number and _parole_vere(seconda.full_text) > _parole_vere(lettura.full_text):
             seconda.rotated = 180
             return girata, seconda

@@ -29,7 +29,7 @@ def mondo_finto(monkeypatch, tmp_path, db_session):
         {"id": 1, "game_id": 5, "code": "ssp", "name": "Surging Sparks"},
     ])
     # La carta "letta" dallo scan
-    monkeypatch.setattr(card_ocr, "read_card", lambda raw, hint=None: (
+    monkeypatch.setattr(card_ocr, "read_card", lambda raw, hint=None, appreso=None: (
         Image.new("RGB", (63, 88), "white"),
         LetturaCarta(number="004", total="191", set_codes=["SSP"], language="it",
                      printed_code="004/191", name_text="Durant ex"),
@@ -317,6 +317,65 @@ def test_collection_card_is_not_pushed_to_cardtrader_twice(client, admin_headers
     art_id = client.post(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers).json()["article_id"]
     esito = cts.auto_publish_if_card(db_session, db_session.get(Article, art_id))
     assert esito["status"] == "skipped"
+
+
+# --- memoria ------------------------------------------------------------
+
+
+def test_second_copy_is_recognised_from_the_first_confirmed_scan(client, admin_headers, db_session, monkeypatch):
+    """L'OCR non legge niente e l'immagine CardTrader non somiglia: la
+    prima volta si cerca a mano, la seconda la carta e' gia' nota."""
+    from utils import card_ocr
+    db_session.add(CardBlueprint(
+        id=11, game_id=5, expansion_id=1, expansion_code="ssp", expansion_name="Surging Sparks",
+        name="Scatterbug", collector_number="005", number_norm="5", dhash="0f" * 32,
+        editable="pokemon_language:en|it",
+    ))
+    db_session.commit()
+    monkeypatch.setattr(card_ocr, "read_card", lambda raw, hint=None, appreso=None: (
+        Image.new("RGB", (63, 88), "white"), LetturaCarta(),
+    ))
+    prima = _carica(client, admin_headers).json()
+    assert not any(c["blueprint_id"] == 11 for c in prima["candidates"])
+    client.post(f"/api/card-scanner/scans/{prima['id']}/confirm",
+                json={"blueprint_id": 11, "price_now": False}, headers=admin_headers)
+
+    seconda = _carica(client, admin_headers).json()
+    assert seconda["candidates"][0]["blueprint_id"] == 11
+    assert seconda["candidates"][0]["seen_before"] == 1.0
+    assert seconda["confidence"] == "alta"
+    stato = client.get("/api/card-scanner/status", headers=admin_headers).json()
+    assert stato["learning"]["references"] == 1
+
+
+# --- conferma automatica (script giornaliero) -----------------------------
+
+
+def test_sure_scan_goes_into_the_collection_by_itself(client, admin_headers, db_session):
+    # L'immagine CardTrader uguale allo scan: riconoscimento davvero sicuro
+    db_session.get(CardBlueprint, 10).dhash = ci.dhash(Image.new("RGB", (63, 88), "white"))
+    db_session.commit()
+    scan = _carica(client, admin_headers).json()
+    assert scan["confidence"] == "alta"
+    r = client.post(f"/api/card-scanner/scans/{scan['id']}/auto-confirm?price_now=false", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["confirmed"] is True
+    assert r.json()["card"]["name"] == "Durant ex"
+    # Rifarlo non crea un doppione
+    r = client.post(f"/api/card-scanner/scans/{scan['id']}/auto-confirm", headers=admin_headers)
+    assert r.json()["confirmed"] is False
+    assert len(client.get("/api/card-scanner/cards", headers=admin_headers).json()) == 1
+
+
+def test_unsure_scan_waits_for_a_person(client, admin_headers, monkeypatch):
+    from utils import card_ocr
+    monkeypatch.setattr(card_ocr, "read_card", lambda raw, hint=None, appreso=None: (
+        Image.new("RGB", (63, 88), "white"), LetturaCarta(name_text="Durant ex"),
+    ))
+    scan = _carica(client, admin_headers).json()
+    r = client.post(f"/api/card-scanner/scans/{scan['id']}/auto-confirm", headers=admin_headers).json()
+    assert r["confirmed"] is False and "confidenza" in r["reason"]
+    assert [s["id"] for s in client.get("/api/card-scanner/scans", headers=admin_headers).json()] == [scan["id"]]
 
 
 def test_discarded_scan_leaves_the_queue(client, admin_headers):

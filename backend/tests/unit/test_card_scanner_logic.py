@@ -285,3 +285,79 @@ def test_set_only_in_japanese_has_no_language_choice():
     assert ci.lingue("pokemon_language:en|it|fr,pokemon_reverse") == {"en", "it", "fr"}
     assert ci.lingue("first_edition") == set()
     assert ci.lingue(None) is None
+
+
+# --- apprendimento dalle conferme -------------------------------------------
+
+from models.db import OcrCorrection  # noqa: E402
+from utils import card_learning as learn  # noqa: E402
+
+
+def test_ocr_confusions_are_learned_from_corrections(db_session):
+    db_session.add_all([
+        OcrCorrection(game_id=15, kind="number", read_text="O7E", true_text="076"),
+        OcrCorrection(game_id=15, kind="set", read_text="OPOS", true_text="OP08"),
+        OcrCorrection(game_id=15, kind="set", read_text="OPOS", true_text="OP08"),
+        OcrCorrection(game_id=15, kind="set", read_text="OP0S", true_text="OP05"),
+    ])
+    db_session.commit()
+    appreso = learn.confusions(db_session, 15)
+    assert appreso["S"] == "85"        # piu' spesso 8 che 5
+    assert appreso["E"] == "6"         # confusione che le regole fisse non hanno
+
+
+def test_learned_confusion_reads_a_code_the_rules_could_not():
+    """"OP08-O7E": la E per 6 l'ha insegnata una correzione."""
+    senza = parse_codes({"bottom": "OP08-O7E"}, "onepiece")
+    con = parse_codes({"bottom": "OP08-O7E"}, "onepiece", {"E": "6"})
+    assert senza.number is None
+    assert con.number == "OP08-076"
+    assert (con.raw_set, con.raw_number) == ("OP08", "O7E")
+
+
+def test_learned_order_puts_the_usual_mistake_first():
+    l = parse_codes({"bottom": "OPOS-076"}, "onepiece", {"S": "85"})
+    assert l.set_codes == ["OP08", "OP05"]
+
+
+def test_leading_zeros_are_not_a_reading_mistake():
+    assert learn._coppie("47", "047") == []
+    assert learn._coppie("0O4", "004") == [("O", "0")]
+
+
+def test_thresholds_need_enough_examples_on_both_sides():
+    pochi = [(1.9, True)] * 3 + [(0.9, False)] * 10
+    assert learn.soglie_binarie(pochi) is None
+    esempi = [(s, True) for s in (1.4, 1.5, 1.6, 1.7, 1.8, 2.0)] + \
+             [(s, False) for s in (0.8, 0.9, 1.0, 1.0, 1.1, 1.2)]
+    t = learn.soglie_binarie(esempi)
+    assert 1.1 <= t["no"] < t["si"] <= 1.5
+
+
+def test_wear_limits_learned_from_confirmed_conditions():
+    esempi = [(0.002, "Near Mint")] * 6 + [(0.03, "Slightly Played")] * 6
+    limiti = learn.soglie_usura(esempi)
+    assert limiti[0][1] == "Near Mint" and 0.002 < limiti[0][0] < 0.03
+    assert limiti[1][0] is None  # SP/MP: nessun esempio di MP, resta quello di partenza
+
+
+def test_calibrated_wear_limit_is_used_and_kept_increasing():
+    tarate = {"usura": [[0.02, "Near Mint"], [None, "Slightly Played"]]}
+    limiti, tarato = cf._limiti_usura(tarate)
+    assert tarato and limiti[0] == (0.02, "Near Mint")
+    assert [l for l, _ in limiti] == sorted(l for l, _ in limiti)
+
+
+def test_calibrated_foil_threshold_changes_the_answer():
+    import random
+    random.seed(3)
+    ref = _carta_finta()
+    rev = ref.copy()
+    d = ImageDraw.Draw(rev)
+    for _ in range(600):
+        x, y = random.randint(50, 580), random.randint(510, 760)
+        d.rectangle((x, y, x + 4, y + 4), fill=random.choice([(255, 255, 255), (90, 90, 90)]))
+    misura = cf.foil(rev, ref, "pokemon")["score"]
+    tarate = {"foil": {"pokemon": {"si": misura - 0.01, "no": misura - 0.2}}}
+    r = cf.foil(rev, ref, "pokemon", tarate)
+    assert r["value"] is True and r["calibrated"] is True

@@ -484,6 +484,7 @@ CREATE TABLE IF NOT EXISTS card_scans (
     confidence VARCHAR(10),
     back_image_url VARCHAR(500),
     features JSON NOT NULL DEFAULT '{}',
+    dhash VARCHAR(64),
     error TEXT,
     personal_card_id INTEGER REFERENCES personal_cards(id) ON DELETE SET NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -509,6 +510,29 @@ CREATE TABLE IF NOT EXISTS card_blueprints (
 CREATE INDEX IF NOT EXISTS idx_card_blueprints_game_number ON card_blueprints(game_id, number_norm);
 CREATE INDEX IF NOT EXISTS idx_card_blueprints_expansion ON card_blueprints(expansion_id);
 CREATE INDEX IF NOT EXISTS idx_card_blueprints_code ON card_blueprints(expansion_code);
+
+CREATE TABLE IF NOT EXISTS card_references (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    blueprint_id BIGINT NOT NULL,
+    game_id INTEGER NOT NULL,
+    dhash VARCHAR(64) NOT NULL,
+    scan_id INTEGER,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_card_references_game ON card_references(game_id);
+CREATE INDEX IF NOT EXISTS idx_card_references_blueprint ON card_references(blueprint_id);
+
+CREATE TABLE IF NOT EXISTS ocr_corrections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id INTEGER,
+    kind VARCHAR(10) NOT NULL,
+    read_text VARCHAR(50) NOT NULL,
+    true_text VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_ocr_corrections_game ON ocr_corrections(game_id);
 
 -- ============================================================
 -- expenses

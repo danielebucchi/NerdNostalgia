@@ -335,16 +335,20 @@ _SCAMBI = {
 }
 
 
-def _varianti_sigla(sigla: str) -> List[str]:
+def _varianti_sigla(sigla: str, appreso: Optional[dict] = None) -> List[str]:
     """Tutte le letture alternative. Le sigle sono di 2-5 caratteri: le
-    combinazioni restano poche centinaia al massimo."""
+    combinazioni restano poche centinaia al massimo. Le confusioni
+    imparate dalle correzioni si aggiungono a quelle fisse."""
     out = [""]
     for ch in sigla[:5]:
-        out = [o + alt for o in out for alt in _SCAMBI.get(ch, ch)]
+        scelte = _SCAMBI.get(ch, ch)
+        scelte += "".join(c for c in (appreso or {}).get(ch, "") if c not in scelte)
+        out = [o + alt for o in out for alt in scelte]
     return out
 
 
-def resolve_set_codes(game_id: int, sigle: Iterable[str], tutte: bool = False) -> List[dict]:
+def resolve_set_codes(game_id: int, sigle: Iterable[str], tutte: bool = False,
+                      appreso: Optional[dict] = None) -> List[dict]:
     """Sigle lette → espansioni CardTrader che esistono davvero."""
     exps = [e for e in ct.expansions_cached() if e.get("game_id") == game_id]
     per_codice: Dict[str, List[dict]] = {}
@@ -352,7 +356,7 @@ def resolve_set_codes(game_id: int, sigle: Iterable[str], tutte: bool = False) -
         per_codice.setdefault((e.get("code") or "").lower(), []).append(e)
     trovate: List[dict] = []
     for sigla in sigle:
-        for v in _varianti_sigla(sigla.upper()):
+        for v in _varianti_sigla(sigla.upper(), appreso):
             for e in per_codice.get(v.lower(), []):
                 if e not in trovate:
                     trovate.append(e)
@@ -422,6 +426,7 @@ def match(
     lettura: LetturaCarta,
     scan_hash: Optional[str],
     expansion_id: Optional[int] = None,
+    appreso: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """Candidati ordinati per lo scan. Ritorna {candidates, confidence,
     expansions_from_code}."""
@@ -432,7 +437,8 @@ def match(
         try:
             # Con piu' letture dello stesso codice (OP05/OP08) valgono
             # tutte: decide l'immagine.
-            da_sigla = resolve_set_codes(game_id, lettura.set_codes, tutte=bool(lettura.alt_numbers))
+            da_sigla = resolve_set_codes(game_id, lettura.set_codes, tutte=bool(lettura.alt_numbers),
+                                         appreso=appreso)
         except ct.CardTraderError as exc:
             LOGGER.info("Sigle non risolte: %s", exc)
     nell_indice = indexed_expansions(db, game_id)
@@ -450,6 +456,15 @@ def match(
     sigla_ids = {e["id"] for e in da_sigla}
     if sigla_ids and not exp_ids:
         pool += [bp for bp in _pool(db, game_id, lettura, list(sigla_ids)) if bp not in pool]
+
+    # Memoria: le carte gia' confermate con uno scan che somiglia a questo
+    # entrano fra i candidati anche se OCR e nome non le trovano.
+    from utils.card_learning import similar_references
+    gia_viste = similar_references(db, game_id, scan_hash) if scan_hash else {}
+    if gia_viste and not exp_ids:
+        presenti = {bp.id for bp in pool}
+        pool += db.query(CardBlueprint).filter(
+            CardBlueprint.id.in_([i for i in gia_viste if i not in presenti])).all()
 
     numeri = _numeri(lettura)
     totale = _norm_number(lettura.total)
@@ -501,6 +516,15 @@ def match(
                 riga[0] += max(0.0, sim - 0.55) * 40
         punteggi.sort(key=lambda x: -x[0])
 
+    # Un tuo scan confermato che somiglia a questo vale piu' di qualsiasi
+    # indizio: stesso scanner, stessa luce. 0.95 → +12, 0.85 → +4.
+    if gia_viste:
+        for riga in punteggi:
+            ref = gia_viste.get(riga[1].id)
+            if ref:
+                riga[0] += max(0.0, ref - SOGLIA_GIA_VISTA) * 80
+        punteggi.sort(key=lambda x: -x[0])
+
     _penalita_edizione(db, punteggi, lettura.language)
 
     candidati = [
@@ -516,6 +540,8 @@ def match(
             "score": round(s, 1),
             "number_match": num == 2,
             "image_similarity": round(sim, 3) if sim is not None else None,
+            # Somiglianza con un tuo scan gia' confermato di questa carta
+            "seen_before": round(gia_viste[bp.id], 3) if bp.id in gia_viste else None,
         }
         for s, bp, num, sim in punteggi[:MAX_CANDIDATI]
     ]
@@ -550,6 +576,11 @@ def _nota_varianti(c: List[dict]) -> Optional[str]:
         altro["variant_of_top"] = _stessa_carta_altra_versione(primo, altro)
     varianti = [x for x in c[1:] if x.get("variant_of_top")]
     if not varianti:
+        return None
+    # Gia' vista e confermata proprio in questa versione: la memoria ha
+    # gia' deciso, a meno che anche l'altra versione sia stata vista.
+    gv = primo.get("seen_before") or 0
+    if gv >= SOGLIA_GIA_VISTA_SICURA and all((v.get("seen_before") or 0) < gv - 0.03 for v in varianti):
         return None
     sp = primo.get("image_similarity") or 0
     vicine = [v for v in varianti if sp - (v.get("image_similarity") or 0) < 0.04]
@@ -593,12 +624,20 @@ def _penalita_edizione(db: Session, punteggi: list, lingua: Optional[str]) -> No
     punteggi.sort(key=lambda x: -x[0])
 
 
+# Sopra questa somiglianza con un tuo scan confermato, e' quasi certamente
+# la stessa carta (fra ristampe diverse due scan arrivano a ~0.9).
+SOGLIA_GIA_VISTA = 0.80
+SOGLIA_GIA_VISTA_SICURA = 0.93
+
+
 def _confidenza(c: List[dict]) -> str:
     if not c:
         return "bassa"
     primo = c[0]
     stacco = primo["score"] - (c[1]["score"] if len(c) > 1 else 0)
     immagine = primo.get("image_similarity") or 0
+    if (primo.get("seen_before") or 0) >= SOGLIA_GIA_VISTA_SICURA and stacco >= 6:
+        return "alta"
     if primo["number_match"] and stacco >= 6 and immagine >= 0.7:
         return "alta"
     if (primo["number_match"] or immagine >= 0.75) and stacco >= 3:
