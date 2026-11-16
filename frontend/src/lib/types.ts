@@ -313,6 +313,8 @@ export interface PersonalCard {
   cardtrader_product_id?: number | null;
   cardtrader_synced_at?: string | null;
   ebay_listing_id?: string | null;
+  /** Inserzione eBay con varianti di cui la carta e' una voce. */
+  ebay_group_key?: string | null;
   ebay_synced_at?: string | null;
   article_id?: number | null;
   site_status?: "DRAFT" | "PUBLISHED" | "SOLD" | "ARCHIVED" | null;

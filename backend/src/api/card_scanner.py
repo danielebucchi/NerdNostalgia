@@ -39,6 +39,7 @@ from utils import card_ocr
 from utils import card_pricing as cp
 from utils import cardtrader_client as ct
 from utils import ebay_client as eb
+from utils import ebay_variations
 from utils import storage
 from utils.cardtrader_sync import _default_game_id, _default_language, _norm_number
 from utils.session import SessionLocal, get_db
@@ -738,6 +739,40 @@ def publish_site(card_id: int, db: Session = Depends(get_db), _admin: User = Dep
 def unpublish_site(card_id: int, db: Session = Depends(get_db), _admin: User = Depends(require_admin)):
     _esegui(cl.unpublish_site, db, _card_or_404(db, card_id))
     return {"ok": True}
+
+
+class EbayGroupRequest(BaseModel):
+    card_ids: List[int]
+    title: Optional[str] = None
+    # Per aggiungere carte a un'inserzione con varianti gia' pubblicata.
+    group_key: Optional[str] = None
+
+
+@router.post("/ebay-group")
+def publish_ebay_group(payload: EbayGroupRequest, db: Session = Depends(get_db),
+                       _admin: User = Depends(require_admin)):
+    """Le carte scelte in un'unica inserzione eBay con varianti."""
+    carte = [_card_or_404(db, cid) for cid in dict.fromkeys(payload.card_ids)]
+    try:
+        return ebay_variations.publish_group(db, carte, payload.title, payload.group_key)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except eb.EbayError as exc:
+        db.rollback()
+        detail = f"{exc} (body={exc.body})" if getattr(exc, "body", None) else str(exc)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail) from exc
+
+
+@router.get("/ebay-groups")
+def list_ebay_groups(db: Session = Depends(get_db), _admin: User = Depends(require_admin)):
+    """Le inserzioni con varianti in corso, per aggiungerci carte."""
+    righe = (db.query(PersonalCard.ebay_group_key, PersonalCard.ebay_listing_id)
+             .filter(PersonalCard.ebay_group_key.isnot(None)).all())
+    gruppi: Dict[str, dict] = {}
+    for chiave, listing_id in righe:
+        g = gruppi.setdefault(chiave, {"group_key": chiave, "listing_id": listing_id, "count": 0})
+        g["count"] += 1
+    return list(gruppi.values())
 
 
 @router.post("/cards/{card_id}/ebay")

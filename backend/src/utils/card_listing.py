@@ -250,17 +250,8 @@ def _immagini(card: PersonalCard) -> list:
     return [u for u in (card.images or []) if isinstance(u, str) and u.startswith("https://")][:12]
 
 
-def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
-    if not eb.is_configured():
-        raise ValueError("eBay non collegato: completa il consenso OAuth da Impostazioni")
-    conf = _ebay_config(db)
-    prezzo = ebay_price(db, card)
-    foto = _immagini(card)
-    if not foto:
-        raise ValueError("eBay vuole almeno una foto pubblica (https): manca lo scan")
-    qty = _quantita_libera(card)
-    sku = ebay_sku(card)
-
+def _aspetti(card: PersonalCard) -> Dict[str, List[str]]:
+    """Item specifics della carta."""
     aspetti = {"Gioco": [NOMI_GIOCO.get(card.game_id or 0, "Altro")]}
     if card.name:
         aspetti["Nome carta"] = [card.name]
@@ -271,9 +262,14 @@ def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
     lingua = LINGUE_EBAY.get((card.language or "").lower())
     if lingua:
         aspetti["Lingua"] = [lingua]
+    return aspetti
 
-    articolo = {
-        "availability": {"shipToLocationAvailability": {"quantity": qty}},
+
+def _articolo_ebay(db: Session, card: PersonalCard, aspetti: Dict[str, List[str]],
+                   foto: list) -> Dict[str, Any]:
+    """Inventory item della carta (PUT /inventory_item/{sku})."""
+    return {
+        "availability": {"shipToLocationAvailability": {"quantity": _quantita_libera(card)}},
         # 4000 "Non gradata" per le carte collezionabili
         "condition": "USED_VERY_GOOD",
         "conditionDescriptors": [{
@@ -287,13 +283,15 @@ def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
             "aspects": aspetti,
         },
     }
-    eb.put_inventory_item(sku, articolo)
 
-    offerta = {
+
+def _offerta_ebay(db: Session, card: PersonalCard, conf: Dict[str, str], sku: str,
+                  prezzo: float) -> Dict[str, Any]:
+    return {
         "sku": sku,
         "marketplaceId": eb.marketplace_id(),
         "format": "FIXED_PRICE",
-        "availableQuantity": qty,
+        "availableQuantity": _quantita_libera(card),
         "categoryId": conf["categoryId"],
         "listingDescription": _descrizione(db, card),
         "listingPolicies": {
@@ -304,6 +302,22 @@ def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
         "merchantLocationKey": conf["merchantLocationKey"],
         "pricingSummary": {"price": {"value": f"{prezzo:.2f}", "currency": "EUR"}},
     }
+
+
+def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
+    if not eb.is_configured():
+        raise ValueError("eBay non collegato: completa il consenso OAuth da Impostazioni")
+    if card.ebay_group_key:
+        raise ValueError("La carta e' in un'inserzione eBay con varianti: si aggiorna da li'")
+    conf = _ebay_config(db)
+    prezzo = ebay_price(db, card)
+    foto = _immagini(card)
+    if not foto:
+        raise ValueError("eBay vuole almeno una foto pubblica (https): manca lo scan")
+    sku = ebay_sku(card)
+    articolo = _articolo_ebay(db, card, _aspetti(card), foto)
+    eb.put_inventory_item(sku, articolo)
+    offerta = _offerta_ebay(db, card, conf, sku, prezzo)
     offer_id = card.ebay_offer_id
     if not offer_id:
         # Un'offerta per lo SKU puo' esistere gia' (tentativo precedente
@@ -367,6 +381,11 @@ def ebay_listing_url(card: PersonalCard) -> Optional[str]:
 
 
 def unpublish_ebay(db: Session, card: PersonalCard) -> None:
+    if card.ebay_group_key:
+        # Voce di un'inserzione con varianti: si toglie la voce, le altre restano.
+        from utils import ebay_variations
+        ebay_variations.remove_card(db, card)
+        return
     if card.ebay_offer_id and card.ebay_listing_id:
         try:
             eb.withdraw_offer(card.ebay_offer_id)

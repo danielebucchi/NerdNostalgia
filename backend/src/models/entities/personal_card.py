@@ -130,6 +130,8 @@ class PersonalCardResponse(BaseModel):
     cardtrader_product_id: Optional[int] = None
     cardtrader_synced_at: Optional[datetime] = None
     ebay_listing_id: Optional[str] = None
+    # Chiave dell'inserzione con varianti di cui la carta e' una voce.
+    ebay_group_key: Optional[str] = None
     ebay_synced_at: Optional[datetime] = None
     article_id: Optional[int] = None
     # Stato dell'articolo sul sito: PUBLISHED / SOLD / ARCHIVED / DRAFT

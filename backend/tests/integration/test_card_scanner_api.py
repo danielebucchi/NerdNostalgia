@@ -564,3 +564,107 @@ def test_discarded_scan_leaves_the_queue(client, admin_headers):
 
 def test_only_admins(client):
     assert client.get("/api/card-scanner/status").status_code == 401
+
+
+# --- eBay: inserzione con varianti -----------------------------------------
+
+
+@pytest.fixture
+def ebay_finto(client, admin_headers, monkeypatch):
+    """eBay collegato e configurato, che registra cosa gli si chiede."""
+    from utils import card_listing as cl, ebay_client as eb
+    chiamate = {"items": {}, "offers": [], "groups": {}, "published": [], "withdrawn": [], "deleted": []}
+    monkeypatch.setattr(eb, "is_configured", lambda: True)
+    monkeypatch.setattr(cl, "_immagini", lambda card: [f"https://nerdnostalgia.store/static/scans/{card.id}.webp"])
+    monkeypatch.setattr(eb, "put_inventory_item", lambda sku, body: chiamate["items"].__setitem__(sku, body))
+    monkeypatch.setattr(eb, "get_offers", lambda sku: {"offers": []})
+
+    def crea_offerta(body):
+        chiamate["offers"].append(body)
+        return {"offerId": f"O{len(chiamate['offers'])}"}
+    monkeypatch.setattr(eb, "create_offer", crea_offerta)
+    monkeypatch.setattr(eb, "update_offer", lambda oid, body: None)
+    monkeypatch.setattr(eb, "put_inventory_item_group", lambda k, body: chiamate["groups"].__setitem__(k, body))
+    monkeypatch.setattr(eb, "get_inventory_item_group", lambda k: chiamate["groups"][k])
+    monkeypatch.setattr(eb, "publish_by_inventory_item_group",
+                        lambda k: chiamate["published"].append(k) or {"listingId": "800000000001"})
+    monkeypatch.setattr(eb, "withdraw_by_inventory_item_group", lambda k: chiamate["withdrawn"].append(k))
+    monkeypatch.setattr(eb, "delete_offer", lambda oid: chiamate["deleted"].append(oid))
+    monkeypatch.setattr(eb, "publish_offer", lambda oid: {"listingId": "800000000099"})
+    client.put("/api/settings/", json={"values": {
+        "ebay_fulfillment_policy_id": "F1", "ebay_payment_policy_id": "P1",
+        "ebay_return_policy_id": "R1", "ebay_merchant_location_key": "casa",
+    }}, headers=admin_headers)
+    return chiamate
+
+
+def test_cards_go_on_ebay_as_one_listing_with_variations(client, admin_headers, db_session, ebay_finto):
+    a = _carta_confermata(client, admin_headers)
+    b = _carta_confermata(client, admin_headers)
+    r = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
+                    json={"card_ids": [a["id"], b["id"]], "title": "Carte Pokemon singole"})
+    assert r.status_code == 200, r.text
+    esito = r.json()
+    assert esito["count"] == 2 and esito["listing_id"] == "800000000001"
+    assert esito["url"].endswith("/itm/800000000001")
+
+    gruppo = ebay_finto["groups"][esito["group_key"]]
+    assert gruppo["title"] == "Carte Pokemon singole"
+    assert gruppo["variantSKUs"] == [f"NN-PC-{a['id']}", f"NN-PC-{b['id']}"]
+    voci = gruppo["variesBy"]["specifications"][0]["values"]
+    # Stessa carta due volte: la seconda voce si distingue, eBay le vuole diverse
+    assert voci[0] == "Durant ex 004/191 Slightly Played"
+    assert voci[1] == f"Durant ex 004/191 Slightly Played #{b['id']}"
+    assert ebay_finto["items"][f"NN-PC-{b['id']}"]["product"]["aspects"]["Carta"] == [voci[1]]
+    # Le offerte si creano ma si pubblica solo il gruppo
+    assert len(ebay_finto["offers"]) == 2 and ebay_finto["published"] == [esito["group_key"]]
+
+    for carta in (a, b):
+        card = db_session.get(PersonalCard, carta["id"])
+        db_session.refresh(card)
+        assert card.ebay_group_key == esito["group_key"]
+        assert card.ebay_listing_id == "800000000001"
+
+
+def test_variations_need_two_free_cards(client, admin_headers, ebay_finto):
+    a = _carta_confermata(client, admin_headers)
+    r = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
+                    json={"card_ids": [a["id"]], "title": "Carte"})
+    assert r.status_code == 400 and "almeno 2" in r.json()["detail"]
+
+    b = _carta_confermata(client, admin_headers)
+    assert client.post(f"/api/card-scanner/cards/{b['id']}/ebay", headers=admin_headers).status_code == 200  # da sola
+    r = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
+                    json={"card_ids": [a["id"], b["id"]], "title": "Carte"})
+    assert r.status_code == 400 and "da sola" in r.json()["detail"]
+
+
+def test_card_sold_elsewhere_leaves_the_listing_others_stay(client, admin_headers, db_session, ebay_finto):
+    carte = [_carta_confermata(client, admin_headers) for _ in range(3)]
+    chiave = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
+                         json={"card_ids": [c["id"] for c in carte], "title": "Carte"}).json()["group_key"]
+
+    r = client.delete(f"/api/card-scanner/cards/{carte[0]['id']}/ebay", headers=admin_headers)
+    assert r.status_code < 300, r.text
+    assert ebay_finto["groups"][chiave]["variantSKUs"] == [f"NN-PC-{c['id']}" for c in carte[1:]]
+    assert ebay_finto["withdrawn"] == []
+
+    # Ne resterebbe una sola: l'inserzione con varianti si chiude
+    client.delete(f"/api/card-scanner/cards/{carte[1]['id']}/ebay", headers=admin_headers)
+    assert ebay_finto["withdrawn"] == [chiave]
+    ultima = db_session.get(PersonalCard, carte[2]["id"])
+    db_session.refresh(ultima)
+    assert ultima.ebay_group_key is None and ultima.ebay_listing_id is None
+
+
+def test_cards_can_join_an_existing_listing(client, admin_headers, ebay_finto):
+    a, b, c = (_carta_confermata(client, admin_headers) for _ in range(3))
+    chiave = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
+                         json={"card_ids": [a["id"], b["id"]], "title": "Carte Pokemon"}).json()["group_key"]
+    r = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
+                    json={"card_ids": [c["id"]], "group_key": chiave})
+    assert r.status_code == 200, r.text
+    assert r.json()["count"] == 3
+    assert ebay_finto["groups"][chiave]["title"] == "Carte Pokemon"
+    gruppi = client.get("/api/card-scanner/ebay-groups", headers=admin_headers).json()
+    assert gruppi == [{"group_key": chiave, "listing_id": "800000000001", "count": 3}]

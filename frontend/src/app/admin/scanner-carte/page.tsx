@@ -28,6 +28,9 @@ import {
   pubblicaCardTrader,
   pubblicaEbay,
   pubblicaOvunque,
+  gruppiEbay,
+  pubblicaGruppoEbay,
+  type GruppoEbay,
   pubblicaSito,
   ricerca,
   ritiraCardTrader,
@@ -1164,32 +1167,58 @@ function Collezione({
   const disponibili: Canali = { site: true, cardtrader: !!st?.cardtrader, ebay: !!st?.ebay_publish };
   const canaliAttivi = (Object.keys(canaliScelti) as (keyof Canali)[]).filter((k) => canaliScelti[k] && disponibili[k]);
 
+  // eBay: un'inserzione per carta, o tutte insieme in un'inserzione con
+  // varianti (il compratore sceglie la carta da un menu). Nuova, o
+  // aggiungendo le carte a una gia' pubblicata.
+  const [ebayVarianti, setEbayVarianti] = useState(false);
+  const [titoloGruppo, setTitoloGruppo] = useState("Carte singole - scegli la tua carta");
+  const [gruppoScelto, setGruppoScelto] = useState("");
+  const [gruppi, setGruppi] = useState<GruppoEbay[]>([]);
+  useEffect(() => {
+    if (pannello && ebayVarianti) gruppiEbay().then(setGruppi).catch(() => setGruppi([]));
+  }, [pannello, ebayVarianti]);
+  const conVarianti = ebayVarianti && canaliAttivi.includes("ebay");
+
   async function mettiInVendita() {
+    // Con le varianti eBay non va carta per carta: una chiamata sola alla fine.
+    const perCarta = canaliAttivi.filter((k) => !(k === "ebay" && conVarianti));
     const richiesta: Canali = { site: false, cardtrader: false, ebay: false };
-    canaliAttivi.forEach((k) => (richiesta[k] = true));
+    perCarta.forEach((k) => (richiesta[k] = true));
     const conta: Record<string, { ok: number; ko: string[] }> = {};
-    canaliAttivi.forEach((k) => (conta[k] = { ok: 0, ko: [] }));
+    perCarta.forEach((k) => (conta[k] = { ok: 0, ko: [] }));
     setBusy(true);
     setEsito(null);
-    const { errori } = await inFila(
-      scelte,
-      async (c) => {
-        const esiti = await pubblicaOvunque(c.id, richiesta);
-        for (const [k, e] of Object.entries(esiti)) {
-          if (!e) continue;
-          if (e.ok) conta[k].ok++;
-          else conta[k].ko.push(`${c.name}: ${e.detail ?? "errore"}`);
-        }
-      },
-      (n) => setAvanzamento(`In vendita ${n}/${scelte.length}…`),
-    );
+    const righe: string[] = [];
+    if (perCarta.length) {
+      const { errori } = await inFila(
+        scelte,
+        async (c) => {
+          const esiti = await pubblicaOvunque(c.id, richiesta);
+          for (const [k, e] of Object.entries(esiti)) {
+            if (!e) continue;
+            if (e.ok) conta[k].ok++;
+            else conta[k].ko.push(`${c.name}: ${e.detail ?? "errore"}`);
+          }
+        },
+        (n) => setAvanzamento(`In vendita ${n}/${scelte.length}…`),
+      );
+      for (const k of perCarta) {
+        const r = conta[k];
+        const tot = scelte.length - errori.length;
+        righe.push(`${NOMI_CANALI[k]}: ${r.ok}/${tot}` + (r.ko.length ? ` — ${r.ko.slice(0, 2).join(" | ")}` : ""));
+      }
+      if (errori.length) righe.push(`Non riuscite del tutto: ${errori.map((e) => `${e.item.name}: ${e.error}`).slice(0, 2).join(" | ")}`);
+    }
+    if (conVarianti) {
+      setAvanzamento("eBay: preparo l'inserzione con varianti…");
+      try {
+        const g = await pubblicaGruppoEbay(scelte.map((c) => c.id), titoloGruppo.trim(), gruppoScelto || undefined);
+        righe.push(`eBay: inserzione con ${g.count} carte` + (g.url ? ` — ${g.url}` : ""));
+      } catch (err) {
+        righe.push(`eBay (varianti): ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
     setAvanzamento(null);
-    const righe = canaliAttivi.map((k) => {
-      const r = conta[k];
-      const tot = scelte.length - errori.length;
-      return `${NOMI_CANALI[k]}: ${r.ok}/${tot}` + (r.ko.length ? ` — ${r.ko.slice(0, 2).join(" | ")}` : "");
-    });
-    if (errori.length) righe.push(`Non riuscite del tutto: ${errori.map((e) => `${e.item.name}: ${e.error}`).slice(0, 2).join(" | ")}`);
     setEsito(righe.join("\n"));
     setBusy(false);
     setPannello(false);
@@ -1310,6 +1339,43 @@ function Collezione({
               </label>
             ))}
           </div>
+          {disponibili.ebay && canaliScelti.ebay && (
+            <div className="mt-3 pl-3 border-l-2 border-lilac-deep/40 space-y-2">
+              <div className="flex flex-wrap gap-x-5 gap-y-1">
+                <label className="flex items-center gap-2 text-ink">
+                  <input type="radio" name="ebay-modo" className="h-4 w-4 accent-lilac-deep"
+                    checked={!ebayVarianti} onChange={() => setEbayVarianti(false)} />
+                  eBay: un&apos;inserzione per carta
+                </label>
+                <label className="flex items-center gap-2 text-ink">
+                  <input type="radio" name="ebay-modo" className="h-4 w-4 accent-lilac-deep"
+                    checked={ebayVarianti} onChange={() => setEbayVarianti(true)} />
+                  eBay: un&apos;unica inserzione con varianti
+                </label>
+              </div>
+              {ebayVarianti && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select className="input text-sm max-w-xs" value={gruppoScelto}
+                    onChange={(e) => setGruppoScelto(e.target.value)}>
+                    <option value="">Nuova inserzione</option>
+                    {gruppi.map((g) => (
+                      <option key={g.group_key} value={g.group_key}>
+                        Aggiungi a {g.listing_id ?? g.group_key} ({g.count} carte)
+                      </option>
+                    ))}
+                  </select>
+                  {!gruppoScelto && (
+                    <input className="input text-sm flex-1 min-w-48" maxLength={80} value={titoloGruppo}
+                      onChange={(e) => setTitoloGruppo(e.target.value)} placeholder="Titolo dell'inserzione" />
+                  )}
+                  <p className="text-xs text-ink-soft w-full">
+                    Una pagina eBay con il menu &quot;Carta&quot;: ogni carta con il suo prezzo e la sua foto.
+                    Le carte già su eBay da sole vanno tolte prima.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           <p className="text-xs text-ink-soft mt-2">
             Sito e CardTrader al prezzo di vendita di ogni carta (o al suggerito); eBay maggiorato della
             commissione eBay impostata in <a href="/admin/markups" className="underline">Commissioni</a> (+11% se

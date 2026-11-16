@@ -1,0 +1,224 @@
+"""
+Piu' carte in un'unica inserzione eBay con varianti ("scegli la carta").
+
+Ogni carta resta un articolo eBay a se' (SKU, offerta, prezzo, quantita' e
+foto propri, come nella pubblicazione singola), ma non si pubblica da sola:
+le carte stanno in un inventory item group che dice a eBay che variano per
+"Carta", e si pubblica il gruppo. Ne esce una pagina con il menu a tendina:
+meno inserzioni da pagare e da tenere d'occhio per tante carte da pochi euro.
+
+Il gruppo vive su eBay; qui ogni carta ricorda solo la chiave del gruppo
+(ebay_group_key) e condivide l'ebay_listing_id con le altre. Aggiungere
+carte a un gruppo esistente lo riscrive con tutte le voci e lo ripubblica:
+l'inserzione resta la stessa.
+"""
+import logging
+import uuid
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy.orm import Session
+
+from models.db import PersonalCard
+from utils import card_listing as cl
+from utils import ebay_client as eb
+
+LOGGER = logging.getLogger("ebay_variations")
+
+# La caratteristica per cui variano le voci: il nome del menu sulla pagina.
+ASPETTO_VARIANTE = "Carta"
+# Limiti eBay: 250 varianti per inserzione, 65 caratteri per valore.
+MAX_VARIANTI = 250
+MAX_VALORE = 65
+MAX_TITOLO = 80
+
+
+def etichetta(card: PersonalCard) -> str:
+    """Voce del menu: cosa distingue questa carta dalle altre a colpo
+    d'occhio (nome, numero, condizione)."""
+    parti = [card.name, card.printed_code or card.card_number, card.condition]
+    return " ".join(p for p in parti if p)[:MAX_VALORE].strip()
+
+
+def _etichette_uniche(carte: List[PersonalCard]) -> Dict[int, str]:
+    """Due copie della stessa carta nella stessa condizione avrebbero la
+    stessa voce, che eBay rifiuta: la seconda prende l'id."""
+    viste: Dict[str, int] = {}
+    esito: Dict[int, str] = {}
+    for c in carte:
+        base = etichetta(c) or f"Carta {c.id}"
+        valore = base
+        if valore in viste:
+            suffisso = f" #{c.id}"
+            valore = base[:MAX_VALORE - len(suffisso)] + suffisso
+        viste[valore] = c.id
+        esito[c.id] = valore
+    return esito
+
+
+def _aspetti_comuni(carte: List[PersonalCard]) -> Dict[str, List[str]]:
+    """Gli item specifics uguali per tutte le carte (es. Gioco, Lingua): a
+    livello di gruppo. Quelli diversi da carta a carta eBay li accetta solo
+    se sono la caratteristica per cui variano, quindi restano fuori."""
+    aspetti = [cl._aspetti(c) for c in carte]
+    comuni = dict(aspetti[0])
+    for a in aspetti[1:]:
+        comuni = {k: v for k, v in comuni.items() if a.get(k) == v}
+    return comuni
+
+
+def _descrizione_gruppo(db: Session, titolo: str) -> str:
+    righe = [
+        f"<p><b>{titolo}</b></p>",
+        "<p>Scegli la carta dal menu: ogni voce ha il suo prezzo e la sua condizione. "
+        "Nelle foto della voce la carta che riceverai (scansione).</p>",
+    ]
+    footer = cl.senza_contatti_esterni(cl._setting(db, "marketplace_footer_ebay"))
+    if footer:
+        righe.append("<p>" + "<br>".join(footer.splitlines()) + "</p>")
+    return "".join(righe)
+
+
+def _salva_offerta(card: PersonalCard, sku: str, offerta: Dict[str, Any]) -> str:
+    """Crea o aggiorna l'offerta della voce, senza pubblicarla: nel gruppo
+    si pubblica tutto insieme."""
+    offer_id = card.ebay_offer_id
+    if not offer_id:
+        try:
+            esistenti = (eb.get_offers(sku) or {}).get("offers") or []
+            offer_id = esistenti[0]["offerId"] if esistenti else None
+        except eb.EbayError as exc:
+            if exc.status != 404:
+                raise
+    if offer_id:
+        eb.update_offer(offer_id, offerta)
+        return offer_id
+    return (eb.create_offer(offerta) or {}).get("offerId")
+
+
+def _scrivi_gruppo(db: Session, chiave: str, titolo: str, carte: List[PersonalCard]) -> Dict[str, Any]:
+    """Articoli, offerte e gruppo su eBay per queste carte, poi pubblica."""
+    conf = cl._ebay_config(db)
+    voci = _etichette_uniche(carte)
+    comuni = _aspetti_comuni(carte)
+    foto_gruppo: List[str] = []
+    for c in carte:
+        foto = cl._immagini(c)
+        sku = cl.ebay_sku(c)
+        aspetti = {**comuni, ASPETTO_VARIANTE: [voci[c.id]]}
+        eb.put_inventory_item(sku, cl._articolo_ebay(db, c, aspetti, foto))
+        c.ebay_offer_id = _salva_offerta(c, sku, cl._offerta_ebay(db, c, conf, sku, cl.ebay_price(db, c)))
+        c.ebay_sku = sku
+        c.ebay_group_key = chiave
+        if foto and len(foto_gruppo) < 12:
+            foto_gruppo.append(foto[0])
+    db.commit()
+
+    eb.put_inventory_item_group(chiave, {
+        "title": titolo,
+        "description": _descrizione_gruppo(db, titolo),
+        "imageUrls": foto_gruppo,
+        "aspects": comuni,
+        "variantSKUs": [cl.ebay_sku(c) for c in carte],
+        "variesBy": {
+            # La foto cambia con la voce scelta: il compratore vede la sua carta.
+            "aspectsImageVariesBy": [ASPETTO_VARIANTE],
+            "specifications": [{"name": ASPETTO_VARIANTE, "values": [voci[c.id] for c in carte]}],
+        },
+    })
+    pub = eb.publish_by_inventory_item_group(chiave) or {}
+    listing_id = pub.get("listingId")
+    adesso = cl._now()
+    for c in carte:
+        c.ebay_listing_id = listing_id
+        c.ebay_synced_at = adesso
+    db.commit()
+    url = cl.ebay_listing_url(carte[0])
+    return {"group_key": chiave, "listing_id": listing_id, "url": url, "count": len(carte)}
+
+
+def _titolo_attuale(chiave: str) -> Optional[str]:
+    try:
+        return (eb.get_inventory_item_group(chiave) or {}).get("title")
+    except eb.EbayError as exc:
+        if exc.status == 404:
+            return None
+        raise
+
+
+def publish_group(db: Session, carte: List[PersonalCard], titolo: Optional[str] = None,
+                  chiave: Optional[str] = None) -> Dict[str, Any]:
+    """Le carte in un'unica inserzione con varianti. Con `chiave` si
+    aggiungono a un gruppo esistente (le voci che ha gia' restano)."""
+    if not eb.is_configured():
+        raise ValueError("eBay non collegato: completa il collegamento dalla pagina eBay del pannello")
+    titolo = (titolo or "").strip()
+
+    gia_dentro: List[PersonalCard] = []
+    if chiave:
+        gia_dentro = db.query(PersonalCard).filter(PersonalCard.ebay_group_key == chiave).all()
+        if not gia_dentro:
+            raise ValueError(f"Inserzione con varianti {chiave} non trovata")
+        titolo = titolo or _titolo_attuale(chiave) or ""
+    if not titolo:
+        raise ValueError("Serve un titolo per l'inserzione (es. 'Carte Pokemon singole - scegli la tua')")
+    if len(titolo) > MAX_TITOLO:
+        raise ValueError(f"Titolo troppo lungo: eBay ne accetta {MAX_TITOLO} caratteri")
+
+    problemi = []
+    for c in carte:
+        if c.status == "SOLD":
+            problemi.append(f"{c.name}: venduta")
+        elif c.ebay_group_key and c.ebay_group_key != chiave:
+            problemi.append(f"{c.name}: e' gia' in un'altra inserzione con varianti")
+        elif c.ebay_listing_id and not c.ebay_group_key:
+            problemi.append(f"{c.name}: e' gia' su eBay da sola, toglila prima da eBay")
+        elif not cl._immagini(c):
+            problemi.append(f"{c.name}: manca lo scan (eBay vuole una foto)")
+        else:
+            try:
+                cl.sale_price(c)
+            except ValueError:
+                problemi.append(f"{c.name}: manca il prezzo")
+    if problemi:
+        raise ValueError("Non posso metterle insieme: " + "; ".join(problemi))
+
+    tutte = gia_dentro + [c for c in carte if c.id not in {g.id for g in gia_dentro}]
+    if len(tutte) < 2:
+        raise ValueError("Un'inserzione con varianti vuole almeno 2 carte")
+    if len(tutte) > MAX_VARIANTI:
+        raise ValueError(f"eBay accetta al massimo {MAX_VARIANTI} carte per inserzione")
+    return _scrivi_gruppo(db, chiave or f"NN-GRP-{uuid.uuid4().hex[:10]}", titolo, tutte)
+
+
+def remove_card(db: Session, card: PersonalCard) -> None:
+    """Toglie la carta dall'inserzione con varianti (venduta altrove,
+    ritirata). Le altre restano in vendita; se ne resta una sola il gruppo
+    non ha piu' senso e l'inserzione si chiude."""
+    chiave = card.ebay_group_key
+    altre = (db.query(PersonalCard)
+             .filter(PersonalCard.ebay_group_key == chiave, PersonalCard.id != card.id)
+             .all())
+    restano = [c for c in altre if c.status != "SOLD"]
+    if len(restano) >= 2:
+        titolo = _titolo_attuale(chiave) or ""
+        _scrivi_gruppo(db, chiave, titolo, restano)
+    else:
+        try:
+            eb.withdraw_by_inventory_item_group(chiave)
+        except eb.EbayError as exc:
+            if exc.status != 404:
+                raise
+        for c in restano:
+            c.ebay_listing_id = None
+            c.ebay_group_key = None
+            c.ebay_synced_at = cl._now()
+    if card.ebay_offer_id:
+        try:
+            eb.delete_offer(card.ebay_offer_id)
+        except eb.EbayError as exc:
+            LOGGER.info("Offerta %s non cancellata: %s", card.ebay_offer_id, exc)
+    card.ebay_offer_id = None
+    card.ebay_listing_id = None
+    card.ebay_group_key = None
+    card.ebay_synced_at = cl._now()
+    db.commit()

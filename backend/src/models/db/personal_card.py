@@ -102,6 +102,8 @@ class PersonalCard(BaseModel):
     ebay_sku = Column(String(50))
     ebay_offer_id = Column(String(30))
     ebay_listing_id = Column(String(30))
+    # Inserzione con varianti di cui la carta e' una voce (None = da sola).
+    ebay_group_key = Column(String(50), index=True)
     ebay_synced_at = Column(DateTime)
     # Articolo del sito (vetrina) con cui la carta e' in vendita anche li'.
     # Gli ordini passano dagli articoli: la carta ne ha uno solo, che si

@@ -243,6 +243,24 @@ export const pubblicaEbay = (cardId: number) =>
   adminApi.post<{ listing_id: string; url: string | null; price_eur: number }>(`${B}/cards/${cardId}/ebay`);
 export const ritiraEbay = (cardId: number) => adminApi.delete<{ ok: boolean }>(`${B}/cards/${cardId}/ebay`);
 
+/** Inserzione eBay con varianti: piu' carte, una pagina, il menu "Carta". */
+export interface GruppoEbay {
+  group_key: string;
+  listing_id: string | null;
+  count: number;
+}
+
+export const gruppiEbay = () => adminApi.get<GruppoEbay[]>(`${B}/ebay-groups`);
+
+/** Le carte in un'unica inserzione con varianti; con groupKey si aggiungono
+ *  a una gia' pubblicata. */
+export const pubblicaGruppoEbay = (cardIds: number[], title: string, groupKey?: string) =>
+  adminApi.post<GruppoEbay & { url: string | null }>(`${B}/ebay-group`, {
+    card_ids: cardIds,
+    title: title || null,
+    group_key: groupKey || null,
+  });
+
 /** ZIP per il PC Windows dello scanner: Installa.cmd e lo script. */
 export async function scaricaKitWindows(): Promise<void> {
   const blob = await adminApi.getBlob(`${B}/windows-kit`);

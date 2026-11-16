@@ -270,6 +270,32 @@ def delete_offer(offer_id: str) -> Any:
     return _request("DELETE", f"/sell/inventory/v1/offer/{offer_id}")
 
 
+# ── Inserzioni con varianti (inventory item group) ─────────────────
+#
+# Piu' articoli (uno SKU ciascuno, con la sua offerta) sotto un'unica
+# inserzione: il compratore sceglie la variante da un menu. Il gruppo dice
+# per quale caratteristica variano; la pubblicazione e' del gruppo intero.
+
+def get_inventory_item_group(key: str) -> Any:
+    return _request("GET", f"/sell/inventory/v1/inventory_item_group/{urllib.parse.quote(key)}")
+
+
+def put_inventory_item_group(key: str, body: dict) -> Any:
+    """PUT /inventory_item_group/{key} — crea/sostituisce il gruppo."""
+    return _request("PUT", f"/sell/inventory/v1/inventory_item_group/{urllib.parse.quote(key)}", json=body)
+
+
+def publish_by_inventory_item_group(key: str) -> Any:
+    """Pubblica (o riallinea) l'inserzione del gruppo; risponde col listingId."""
+    return _request("POST", "/sell/inventory/v1/offer/publish_by_inventory_item_group",
+                    json={"inventoryItemGroupKey": key, "marketplaceId": marketplace_id()})
+
+
+def withdraw_by_inventory_item_group(key: str) -> Any:
+    return _request("POST", "/sell/inventory/v1/offer/withdraw_by_inventory_item_group",
+                    json={"inventoryItemGroupKey": key, "marketplaceId": marketplace_id()})
+
+
 # ── Venduti (Marketplace Insights) ─────────────────────────────────
 #
 # L'unica fonte ufficiale dei prezzi di vendita conclusi. E' un'API ad
