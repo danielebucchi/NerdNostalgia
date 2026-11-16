@@ -316,6 +316,7 @@ export interface PersonalCard {
   ebay_synced_at?: string | null;
   article_id?: number | null;
   site_status?: "DRAFT" | "PUBLISHED" | "SOLD" | "ARCHIVED" | null;
+  ebay_url?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -427,6 +427,17 @@ def test_republishing_does_not_duplicate_listings(client, admin_headers, mondo_f
     assert b.json()["cardtrader"]["ok"]  # la seconda volta la si aggiorna
 
 
+def test_ebay_listing_has_a_link(client, admin_headers, db_session, monkeypatch):
+    from utils import ebay_client as eb
+    monkeypatch.setattr(eb, "is_sandbox", lambda: False)
+    carta = _carta_confermata(client, admin_headers)
+    card = db_session.get(PersonalCard, carta["id"])
+    card.ebay_listing_id = "135792468"
+    db_session.commit()
+    c = client.get("/api/card-scanner/cards", headers=admin_headers).json()[0]
+    assert c["ebay_url"] == "https://www.ebay.it/itm/135792468"
+
+
 def test_discarded_scan_leaves_the_queue(client, admin_headers):
     scan = _carica(client, admin_headers).json()
     r = client.delete(f"/api/card-scanner/scans/{scan['id']}", headers=admin_headers)

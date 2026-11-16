@@ -134,6 +134,8 @@ class PersonalCardResponse(BaseModel):
     article_id: Optional[int] = None
     # Stato dell'articolo sul sito: PUBLISHED / SOLD / ARCHIVED / DRAFT
     site_status: Optional[str] = None
+    # Link all'inserzione eBay (ebay.it, o sandbox se EBAY_ENV=sandbox)
+    ebay_url: Optional[str] = None
 
     # Derived
     net_revenue: Optional[Decimal] = None

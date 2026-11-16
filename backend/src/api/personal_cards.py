@@ -41,6 +41,9 @@ def _to_response(card: PersonalCard) -> PersonalCardResponse:
     resp.profit = _profit(card)
     if card.article is not None:
         resp.site_status = card.article.status.value
+    if card.ebay_listing_id:
+        from utils.card_listing import ebay_listing_url
+        resp.ebay_url = ebay_listing_url(card)
     return resp
 
 

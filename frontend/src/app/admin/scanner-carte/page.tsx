@@ -1584,10 +1584,19 @@ function RigaCarta({
         </div>
         <div>
           {c.ebay_listing_id ? (
-            <button type="button" className="text-xs underline text-ink-soft" disabled={busy}
-              onClick={() => azione(async () => { await ritiraEbay(c.id); onRicarica(); }, "tolta da eBay")}>
-              ✅ eBay · ritira
-            </button>
+            <span className="text-xs text-ink-soft">
+              ✅ eBay ·{" "}
+              {c.ebay_url && (
+                <>
+                  <a href={c.ebay_url} target="_blank" rel="noreferrer" className="underline">vedi</a>
+                  {" · "}
+                </>
+              )}
+              <button type="button" className="underline" disabled={busy}
+                onClick={() => azione(async () => { await ritiraEbay(c.id); onRicarica(); }, "tolta da eBay")}>
+                ritira
+              </button>
+            </span>
           ) : (
             <button type="button" className="btn btn-ghost text-xs" disabled={busy || !st?.ebay_publish}
               onClick={() => azione(async () => { await pubblicaEbay(c.id); onRicarica(); }, "in vendita su eBay")}>
