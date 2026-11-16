@@ -15,11 +15,14 @@ import io
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from models.db import Article, ArticleCondition, ArticleStatus, Category, PersonalCard, PersonalCardStatus
+from models.db import (
+    Article, ArticleCondition, ArticleStatus, Category, MarketplaceFee, PersonalCard, PersonalCardStatus,
+)
 from utils import cardtrader_client as ct
 from utils import ebay_client as eb
 from utils.card_pricing import NOMI_GIOCO
@@ -64,6 +67,42 @@ def sale_price(card: PersonalCard) -> float:
     if prezzo is None or float(prezzo) <= 0:
         raise ValueError("Manca il prezzo: valuta la carta o scrivi il prezzo di vendita")
     return round(float(prezzo), 2)
+
+
+# Se nella pagina Commissioni non c'e' niente per il marketplace: lo stesso
+# ripiego della scheda articolo (useMarketplaceFees.ts), per non pubblicare
+# su eBay al prezzo del sito e regalare la commissione.
+MARKUP_DI_RIPIEGO = {"ebay": Decimal("11")}
+
+
+def marketplace_markup(db: Session, marketplace: str, category_id: Optional[int]) -> Decimal:
+    """Maggiorazione % per (marketplace, categoria), con la cascata della
+    scheda articolo: categoria → categoria padre → default del marketplace
+    → ripiego. Se a un livello ce n'e' piu' d'una si prende la piu' alta:
+    nel dubbio meglio coprire la commissione."""
+    livelli: List[Optional[int]] = []
+    if category_id is not None:
+        livelli.append(category_id)
+        cat = db.query(Category).filter(Category.id == category_id).first()
+        if cat is not None and cat.parent_id:
+            livelli.append(cat.parent_id)
+    livelli.append(None)
+    for livello in livelli:
+        q = db.query(MarketplaceFee.markup_percent).filter(MarketplaceFee.marketplace == marketplace)
+        q = q.filter(MarketplaceFee.category_id.is_(None) if livello is None
+                     else MarketplaceFee.category_id == livello)
+        valori = [Decimal(str(v)) for (v,) in q.all() if v is not None]
+        if valori:
+            return max(valori)
+    return MARKUP_DI_RIPIEGO.get(marketplace, Decimal("0"))
+
+
+def ebay_price(db: Session, card: PersonalCard) -> float:
+    """Prezzo eBay = prezzo di vendita + maggiorazione eBay (Commissioni),
+    come il pulsante "+11%" della scheda articolo."""
+    base = Decimal(str(sale_price(card)))
+    markup = marketplace_markup(db, "ebay", _categoria(db, card))
+    return float((base * (1 + markup / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 def _quantita_libera(card: PersonalCard) -> int:
@@ -199,7 +238,7 @@ def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
     if not eb.is_configured():
         raise ValueError("eBay non collegato: completa il consenso OAuth da Impostazioni")
     conf = _ebay_config(db)
-    prezzo = sale_price(card)
+    prezzo = ebay_price(db, card)
     foto = _immagini(card)
     if not foto:
         raise ValueError("eBay vuole almeno una foto pubblica (https): manca lo scan")

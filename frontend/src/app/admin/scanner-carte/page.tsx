@@ -1311,8 +1311,10 @@ function Collezione({
             ))}
           </div>
           <p className="text-xs text-ink-soft mt-2">
-            Al prezzo di vendita di ogni carta (o al suggerito). Se una carta è già in vendita su un canale,
-            l&apos;inserzione si aggiorna invece di duplicarsi.
+            Sito e CardTrader al prezzo di vendita di ogni carta (o al suggerito); eBay maggiorato della
+            commissione eBay impostata in <a href="/admin/markups" className="underline">Commissioni</a> (+11% se
+            non c&apos;è). Se una carta è già in vendita su un canale, l&apos;inserzione si aggiorna (anche il prezzo)
+            invece di duplicarsi.
           </p>
           <div className="flex gap-2 mt-3">
             <button type="button" className="btn btn-primary text-sm disabled:opacity-50"

@@ -438,6 +438,72 @@ def test_ebay_listing_has_a_link(client, admin_headers, db_session, monkeypatch)
     assert c["ebay_url"] == "https://www.ebay.it/itm/135792468"
 
 
+# --- prezzo eBay maggiorato -------------------------------------------------
+
+
+def _ebay_finto(monkeypatch, client, admin_headers):
+    """eBay collegato e configurato, ma finto: registra cosa gli si manda."""
+    from utils import ebay_client as eb
+    inviati = {}
+    monkeypatch.setattr(eb, "is_configured", lambda: True)
+    monkeypatch.setattr(eb, "put_inventory_item", lambda sku, body: inviati.setdefault("item", body))
+    monkeypatch.setattr(eb, "get_offers", lambda sku: {"offers": []})
+    monkeypatch.setattr(eb, "create_offer", lambda body: inviati.setdefault("offer", body) and {"offerId": "OF1"})
+    monkeypatch.setattr(eb, "publish_offer", lambda oid: {"listingId": "LST1"})
+    client.put("/api/settings/", json={"values": {
+        "ebay_fulfillment_policy_id": "F", "ebay_payment_policy_id": "P",
+        "ebay_return_policy_id": "R", "ebay_merchant_location_key": "L"}}, headers=admin_headers)
+    return inviati
+
+
+def _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="3.00"):
+    carta = _carta_confermata(client, admin_headers)
+    card = db_session.get(PersonalCard, carta["id"])
+    card.images = ["https://api.example.test/static/scans/1/x.webp"]
+    card.list_price = prezzo
+    db_session.commit()
+    return carta
+
+
+def test_ebay_price_gets_the_ebay_markup(client, admin_headers, db_session, monkeypatch):
+    from models.db import MarketplaceFee
+    db_session.add(MarketplaceFee(marketplace="ebay", category_id=None, markup_percent=13, fixed_fee=0))
+    db_session.commit()
+    inviati = _ebay_finto(monkeypatch, client, admin_headers)
+    carta = _carta_con_foto_pubblica(client, admin_headers, db_session)
+    r = client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["price_eur"] == 3.39
+    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "3.39"
+
+
+def test_ebay_markup_falls_back_like_the_article_page(client, admin_headers, db_session, monkeypatch):
+    """Nessuna commissione configurata: +11%, come la scheda articolo."""
+    inviati = _ebay_finto(monkeypatch, client, admin_headers)
+    carta = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="10.00")
+    client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
+    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "11.10"
+
+
+def test_category_markup_wins_over_the_default(db_session):
+    from models.db import Category, MarketplaceFee
+    from utils.card_listing import marketplace_markup
+    carte = Category(name="Carte", slug="carte-t")
+    db_session.add(carte); db_session.flush()
+    poke = Category(name="Pokemon", slug="pokemon-t", parent_id=carte.id)
+    db_session.add(poke); db_session.flush()
+    db_session.add_all([
+        MarketplaceFee(marketplace="ebay", category_id=None, markup_percent=11, fixed_fee=0),
+        MarketplaceFee(marketplace="ebay", category_id=carte.id, markup_percent=14, fixed_fee=0),
+    ])
+    db_session.commit()
+    assert marketplace_markup(db_session, "ebay", poke.id) == 14     # dal padre
+    db_session.add(MarketplaceFee(marketplace="ebay", category_id=poke.id, markup_percent=9, fixed_fee=0))
+    db_session.commit()
+    assert marketplace_markup(db_session, "ebay", poke.id) == 9      # la sua
+    assert marketplace_markup(db_session, "cardtrader", poke.id) == 0  # niente ripiego
+
+
 def test_discarded_scan_leaves_the_queue(client, admin_headers):
     scan = _carica(client, admin_headers).json()
     r = client.delete(f"/api/card-scanner/scans/{scan['id']}", headers=admin_headers)
