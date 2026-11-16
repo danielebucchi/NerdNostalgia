@@ -462,8 +462,6 @@ CREATE TABLE IF NOT EXISTS personal_cards (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_personal_cards_article ON personal_cards(article_id);
-CREATE INDEX IF NOT EXISTS idx_personal_cards_blueprint ON personal_cards(cardtrader_blueprint_id);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_collection ON personal_cards(collection);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_owned_by ON personal_cards(owned_by);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_purchase_date ON personal_cards(purchase_date DESC);
