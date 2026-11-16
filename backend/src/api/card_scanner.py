@@ -18,7 +18,7 @@ import logging
 import zipfile
 from datetime import date
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
@@ -662,6 +662,57 @@ def _esegui(fn, db: Session, card: PersonalCard):
         db.rollback()
         detail = f"{exc} (body={exc.body})" if getattr(exc, "body", None) else str(exc)
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail) from exc
+
+
+class PublishEverywhereRequest(BaseModel):
+    """Canali su cui mettere in vendita la carta, insieme."""
+    site: bool = False
+    cardtrader: bool = False
+    ebay: bool = False
+
+
+class EsitoCanale(BaseModel):
+    ok: bool
+    detail: Optional[str] = None
+
+
+@router.post("/cards/{card_id}/publish", response_model=Dict[str, EsitoCanale])
+def publish_everywhere(
+    card_id: int,
+    payload: PublishEverywhereRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """La carta in vendita su piu' canali in un colpo. Ogni canale va per
+    conto suo: eBay che rifiuta non deve lasciare la carta fuori dal sito e
+    da CardTrader. Se e' gia' in vendita su un canale, l'inserzione si
+    riallinea (prezzo, quantita') invece di duplicarsi."""
+    card = _card_or_404(db, card_id)
+    canali = [
+        ("cardtrader", payload.cardtrader, cl.publish_cardtrader,
+         None if ct.is_configured() else "CardTrader non configurato"),
+        ("site", payload.site, lambda d, c: cl.publish_site(d, c, _admin.id), None),
+        ("ebay", payload.ebay, cl.publish_ebay, None),
+    ]
+    esiti: Dict[str, EsitoCanale] = {}
+    for nome, richiesto, fn, bloccato in canali:
+        if not richiesto:
+            continue
+        if bloccato:
+            esiti[nome] = EsitoCanale(ok=False, detail=bloccato)
+            continue
+        try:
+            fn(db, card)
+            esiti[nome] = EsitoCanale(ok=True)
+        except (ValueError, ct.CardTraderError, eb.EbayError) as exc:
+            db.rollback()
+            esiti[nome] = EsitoCanale(ok=False, detail=str(exc))
+        except Exception as exc:  # noqa: BLE001 — un canale non ferma gli altri
+            db.rollback()
+            LOGGER.exception("Pubblicazione %s della carta %s fallita", nome, card_id)
+            esiti[nome] = EsitoCanale(ok=False, detail=str(exc))
+        db.refresh(card)
+    return esiti
 
 
 @router.post("/cards/{card_id}/cardtrader")

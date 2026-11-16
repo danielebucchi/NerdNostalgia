@@ -39,6 +39,8 @@ def mondo_finto(monkeypatch, tmp_path, db_session):
         "cents": 400, "position": 2, "total": 9, "all_cents": [], "filtered": True})
     monkeypatch.setattr(ct, "create_product", lambda **kw: prodotti.append(kw) or {"resource": {"id": 777}})
     monkeypatch.setattr(ct, "delete_product", lambda pid: None)
+    aggiornati = []
+    monkeypatch.setattr(ct, "update_product", lambda pid, **kw: aggiornati.append((pid, kw)))
     monkeypatch.setattr(eb, "has_app_credentials", lambda: True)
     monkeypatch.setattr(eb, "sold_items_search", lambda q, **kw: [
         {"title": f"Durant ex 004/191 #{i}", "lastSoldPrice": {"value": "6.00", "currency": "EUR"},
@@ -390,6 +392,39 @@ def test_windows_kit_is_ready_to_install(client, admin_headers):
     ini = z.read("NerdNostalgia-Scanner/predefiniti.ini").decode()
     assert "api = " in ini and "password" not in ini
     assert client.get("/api/card-scanner/windows-kit").status_code == 401
+
+
+# --- in vendita ovunque ----------------------------------------------------
+
+
+def test_one_click_puts_the_card_on_site_and_cardtrader(client, admin_headers):
+    carta = _carta_confermata(client, admin_headers)
+    r = client.post(f"/api/card-scanner/cards/{carta['id']}/publish",
+                    json={"site": True, "cardtrader": True}, headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"cardtrader": {"ok": True, "detail": None}, "site": {"ok": True, "detail": None}}
+    c = client.get("/api/card-scanner/cards", headers=admin_headers).json()[0]
+    assert c["site_status"] == "PUBLISHED" and c["cardtrader_product_id"] == 777
+
+
+def test_a_channel_that_fails_does_not_stop_the_others(client, admin_headers, monkeypatch):
+    from utils import ebay_client as eb
+    monkeypatch.setattr(eb, "is_configured", lambda: True)
+    carta = _carta_confermata(client, admin_headers)
+    r = client.post(f"/api/card-scanner/cards/{carta['id']}/publish",
+                    json={"site": True, "cardtrader": True, "ebay": True}, headers=admin_headers).json()
+    assert r["cardtrader"]["ok"] and r["site"]["ok"]
+    assert r["ebay"]["ok"] is False and "Impostazioni eBay" in r["ebay"]["detail"]
+
+
+def test_republishing_does_not_duplicate_listings(client, admin_headers, mondo_finto):
+    carta = _carta_confermata(client, admin_headers)
+    corpo = {"site": True, "cardtrader": True}
+    a = client.post(f"/api/card-scanner/cards/{carta['id']}/publish", json=corpo, headers=admin_headers)
+    b = client.post(f"/api/card-scanner/cards/{carta['id']}/publish", json=corpo, headers=admin_headers)
+    assert a.status_code == b.status_code == 200
+    assert len(mondo_finto) == 1  # una sola inserzione CardTrader creata
+    assert b.json()["cardtrader"]["ok"]  # la seconda volta la si aggiorna
 
 
 def test_discarded_scan_leaves_the_queue(client, admin_headers):

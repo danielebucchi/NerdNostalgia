@@ -224,6 +224,17 @@ export const pubblicaCardTrader = (cardId: number) =>
   adminApi.post<{ product_id: number; price_eur: number }>(`${B}/cards/${cardId}/cardtrader`);
 export const ritiraCardTrader = (cardId: number) => adminApi.delete<{ ok: boolean }>(`${B}/cards/${cardId}/cardtrader`);
 
+export interface Canali {
+  site: boolean;
+  cardtrader: boolean;
+  ebay: boolean;
+}
+
+/** In vendita su piu' canali insieme: un esito per canale. */
+export const pubblicaOvunque = (cardId: number, canali: Canali) =>
+  adminApi.post<Partial<Record<keyof Canali, { ok: boolean; detail?: string | null }>>>(
+    `${B}/cards/${cardId}/publish`, canali);
+
 export const pubblicaSito = (cardId: number) =>
   adminApi.post<{ article_id: number; price_eur: number }>(`${B}/cards/${cardId}/site`);
 export const ritiraSito = (cardId: number) => adminApi.delete<{ ok: boolean }>(`${B}/cards/${cardId}/site`);

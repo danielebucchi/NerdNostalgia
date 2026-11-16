@@ -9,6 +9,7 @@ import type { PersonalCard } from "@/lib/types";
 import {
   type Analisi,
   type Candidato,
+  type Canali,
   type Misura,
   GIOCHI,
   type Scan,
@@ -26,6 +27,7 @@ import {
   nomeDelFronte,
   pubblicaCardTrader,
   pubblicaEbay,
+  pubblicaOvunque,
   pubblicaSito,
   ricerca,
   ritiraCardTrader,
@@ -1072,6 +1074,8 @@ function canali(c: PersonalCard): string[] {
 
 type Vista = "da_caricare" | "in_vendita" | "vendute" | "tutte";
 
+const NOMI_CANALI: Record<keyof Canali, string> = { site: "Sito", cardtrader: "CardTrader", ebay: "eBay" };
+
 const VISTE: { id: Vista; label: string; filtro: (c: PersonalCard) => boolean }[] = [
   { id: "da_caricare", label: "Da mettere in vendita",
     filtro: (c) => c.status !== "SOLD" && c.status !== "ARCHIVED" && canali(c).length === 0 },
@@ -1135,6 +1139,61 @@ function Collezione({
         : `${scelte.length} fatte`,
     );
     setBusy(false);
+    onCerca(cerca);
+  }
+
+  // Metti in vendita su piu' canali insieme. La scelta dei canali resta
+  // quella dell'ultima volta.
+  const [pannello, setPannello] = useState(false);
+  const [canaliScelti, setCanaliScelti] = useState<Canali>({ site: true, cardtrader: true, ebay: true });
+  useEffect(() => {
+    try {
+      const v = JSON.parse(window.localStorage.getItem("nn_scanner_canali") || "null");
+      if (v) setCanaliScelti(v);
+    } catch {
+      /* scelta salvata illeggibile: si tengono i default */
+    }
+  }, []);
+  function scegliCanale(k: keyof Canali, v: boolean) {
+    setCanaliScelti((c) => {
+      const n = { ...c, [k]: v };
+      window.localStorage.setItem("nn_scanner_canali", JSON.stringify(n));
+      return n;
+    });
+  }
+  const disponibili: Canali = { site: true, cardtrader: !!st?.cardtrader, ebay: !!st?.ebay_publish };
+  const canaliAttivi = (Object.keys(canaliScelti) as (keyof Canali)[]).filter((k) => canaliScelti[k] && disponibili[k]);
+
+  async function mettiInVendita() {
+    const richiesta: Canali = { site: false, cardtrader: false, ebay: false };
+    canaliAttivi.forEach((k) => (richiesta[k] = true));
+    const conta: Record<string, { ok: number; ko: string[] }> = {};
+    canaliAttivi.forEach((k) => (conta[k] = { ok: 0, ko: [] }));
+    setBusy(true);
+    setEsito(null);
+    const { errori } = await inFila(
+      scelte,
+      async (c) => {
+        const esiti = await pubblicaOvunque(c.id, richiesta);
+        for (const [k, e] of Object.entries(esiti)) {
+          if (!e) continue;
+          if (e.ok) conta[k].ok++;
+          else conta[k].ko.push(`${c.name}: ${e.detail ?? "errore"}`);
+        }
+      },
+      (n) => setAvanzamento(`In vendita ${n}/${scelte.length}…`),
+    );
+    setAvanzamento(null);
+    const righe = canaliAttivi.map((k) => {
+      const r = conta[k];
+      const tot = scelte.length - errori.length;
+      return `${NOMI_CANALI[k]}: ${r.ok}/${tot}` + (r.ko.length ? ` — ${r.ko.slice(0, 2).join(" | ")}` : "");
+    });
+    if (errori.length) righe.push(`Non riuscite del tutto: ${errori.map((e) => `${e.item.name}: ${e.error}`).slice(0, 2).join(" | ")}`);
+    setEsito(righe.join("\n"));
+    setBusy(false);
+    setPannello(false);
+    setSelezione(new Set());
     onCerca(cerca);
   }
 
@@ -1211,17 +1270,8 @@ function Collezione({
           💶 Valuta
         </button>
         <button type="button" className="btn btn-primary text-xs disabled:opacity-50" disabled={busy || !selezione.size}
-          onClick={() => inBlocco("Sito", (c) => pubblicaSito(c.id))}>
-          Carica sul sito
-        </button>
-        <button type="button" className="btn btn-primary text-xs disabled:opacity-50" disabled={busy || !selezione.size || !st?.cardtrader}
-          onClick={() => inBlocco("CardTrader", (c) => pubblicaCardTrader(c.id))}>
-          Carica su CardTrader
-        </button>
-        <button type="button" className="btn btn-primary text-xs disabled:opacity-50" disabled={busy || !selezione.size || !st?.ebay_publish}
-          title={st?.ebay_publish ? undefined : "eBay non collegato"}
-          onClick={() => inBlocco("eBay", (c) => pubblicaEbay(c.id))}>
-          Carica su eBay
+          onClick={() => setPannello((v) => !v)} aria-expanded={pannello}>
+          🛒 Metti in vendita…
         </button>
         <button type="button" className="btn btn-ghost text-xs text-pink-deep disabled:opacity-50" disabled={busy || !selezione.size}
           onClick={() => {
@@ -1240,7 +1290,40 @@ function Collezione({
         </div>
         {avanzamento && <span className="text-ink">{avanzamento}</span>}
       </div>
-      {esito && <p className="text-xs text-ink-soft mb-3">{esito}</p>}
+      {pannello && selezione.size > 0 && (
+        <div className="mb-3 p-3 rounded-xl border border-lilac-deep/40 bg-lilac/10 text-sm">
+          <p className="font-semibold text-ink mb-2">
+            Metti in vendita {selezione.size} cart{selezione.size === 1 ? "a" : "e"} su:
+          </p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {([
+              ["site", "Sito", true, null],
+              ["cardtrader", "CardTrader", !!st?.cardtrader, "non configurato"],
+              ["ebay", "eBay", !!st?.ebay_publish, "non collegato"],
+            ] as const).map(([k, label, disponibile, motivo]) => (
+              <label key={k} className={"flex items-center gap-2 " + (disponibile ? "text-ink" : "text-ink-soft")}>
+                <input type="checkbox" className="h-5 w-5 accent-lilac-deep" disabled={!disponibile}
+                  checked={disponibile && canaliScelti[k]}
+                  onChange={(e) => scegliCanale(k, e.target.checked)} />
+                {label}
+                {!disponibile && <span className="text-xs">({motivo})</span>}
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-ink-soft mt-2">
+            Al prezzo di vendita di ogni carta (o al suggerito). Se una carta è già in vendita su un canale,
+            l&apos;inserzione si aggiorna invece di duplicarsi.
+          </p>
+          <div className="flex gap-2 mt-3">
+            <button type="button" className="btn btn-primary text-sm disabled:opacity-50"
+              disabled={busy || !canaliAttivi.length} onClick={mettiInVendita}>
+              {busy ? "…" : `Vai: ${canaliAttivi.map((k) => NOMI_CANALI[k]).join(" + ") || "scegli un canale"}`}
+            </button>
+            <button type="button" className="btn btn-ghost text-sm" onClick={() => setPannello(false)}>Annulla</button>
+          </div>
+        </div>
+      )}
+      {esito && <p className="text-xs text-ink-soft mb-3 whitespace-pre-line">{esito}</p>}
 
       {carte.length === 0 ? (
         <p className="text-ink-soft text-sm">
