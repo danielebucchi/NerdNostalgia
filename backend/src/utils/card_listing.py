@@ -13,6 +13,7 @@ di qualsiasi foto col telefono.
 """
 import io
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -137,6 +138,23 @@ def ebay_title(card: PersonalCard) -> str:
     return titolo[:80]
 
 
+# Cosa eBay considera un invito a comprare fuori da eBay: link, domini,
+# email, telefoni, social e gli altri canali di vendita. La riga che ne
+# contiene uno si scarta intera: l'inserzione verrebbe nascosta.
+_FUORI_EBAY = re.compile(
+    r"https?://|www\.|\b[\w-]+\.(store|com|it|net|org|eu|shop)\b|@"
+    r"|whats\s?app|telegram|instagram|facebook|tiktok"
+    r"|vinted|subito|cardtrader|cardmarket|wallapop"
+    r"|(?:\+?\d[\s./-]?){9,}",  # telefono: almeno 9 cifre (le date ne hanno 8)
+    re.IGNORECASE,
+)
+
+
+def senza_contatti_esterni(testo: str) -> str:
+    """Il testo senza le righe che rimandano fuori da eBay."""
+    return "\n".join(r for r in testo.splitlines() if not _FUORI_EBAY.search(r)).strip()
+
+
 def _descrizione(db: Session, card: PersonalCard) -> str:
     righe = [f"<p><b>{ebay_title(card)}</b></p>", "<ul>"]
     for etichetta, valore in (
@@ -150,7 +168,7 @@ def _descrizione(db: Session, card: PersonalCard) -> str:
         if valore:
             righe.append(f"<li>{etichetta}: {valore}</li>")
     righe.append("</ul><p>Nelle foto la carta che riceverai (scansione).</p>")
-    footer = _setting(db, "marketplace_footer_ebay")
+    footer = senza_contatti_esterni(_setting(db, "marketplace_footer_ebay"))
     if footer:
         righe.append("<p>" + "<br>".join(footer.splitlines()) + "</p>")
     return "".join(righe)

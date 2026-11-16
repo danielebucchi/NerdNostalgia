@@ -157,10 +157,14 @@ SETTINGS_SPEC: Dict[str, dict] = {
                 "(più lento e ambiguo). Imposta se vendi soprattutto un gioco.",
     },
     "marketplace_footer_ebay": {
-        "default": "Spedizione Veloce\nAltri pezzi su www.nerdnostalgia.store",
+        # Niente link al sito: eBay nasconde le inserzioni che rimandano a
+        # vendite fuori da eBay (regola "offerte al di fuori di eBay").
+        "default": "Spedizione Veloce",
         "public": False,
         "label": "Footer descrizione eBay",
-        "help": "Aggiunto in fondo alla descrizione copiata per eBay.",
+        "help": "Aggiunto in fondo alla descrizione per eBay. Niente link, email, "
+                "telefono o social: eBay nasconde l'inserzione. Le righe che li "
+                "contengono vengono comunque scartate.",
     },
 }
 

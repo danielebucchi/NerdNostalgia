@@ -33,7 +33,7 @@ const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
     emoji: "🏷",
     newListingUrl: "https://www.ebay.it/sl/sell",
     footerSettingKey: "marketplace_footer_ebay",
-    defaultFooter: "Spedizione Veloce\nAltri pezzi su www.nerdnostalgia.store",
+    defaultFooter: "Spedizione Veloce",
   },
 };
 
@@ -96,6 +96,20 @@ function getMarketplaceData(article: Article, key: MarketplaceKey) {
 // Il footer del SITO ("Spedizione veloce") non e' mai salvato dentro
 // article.description, ma per sicurezza filtriamo eventuali righe uguali
 // scritte a mano nelle descrizioni vecchie: qui va il footer marketplace.
+// Stesso filtro di senza_contatti_esterni (backend/src/utils/card_listing.py):
+// su eBay una riga con link, email, telefono, social o un altro canale di
+// vendita fa nascondere l'inserzione ("offerte al di fuori di eBay").
+const OFF_EBAY =
+  /https?:\/\/|www\.|\b[\w-]+\.(store|com|it|net|org|eu|shop)\b|@|whats\s?app|telegram|instagram|facebook|tiktok|vinted|subito|cardtrader|cardmarket|wallapop|(?:\+?\d[\s./-]?){9,}/i;
+
+export function withoutOffEbayContacts(text: string): string {
+  return text
+    .split("\n")
+    .filter((l) => !OFF_EBAY.test(l))
+    .join("\n")
+    .trim();
+}
+
 function buildDescription(article: Article, footer: string): string {
   const lines: string[] = [];
   if (article.description) {
@@ -209,6 +223,9 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
       text = article.title;
     } else if (field === "description") {
       text = buildDescription(article, footer);
+      // Anche la descrizione dell'articolo: quelle importate da Vinted
+      // citano spesso il profilo o altri annunci.
+      if (config.key === "ebay") text = withoutOffEbayContacts(text);
     } else {
       // Prezzo: number puro (senza simbolo/valuta) — Vinted/eBay hanno un
       // input numerico che vuole solo cifre + punto/virgola decimale.
