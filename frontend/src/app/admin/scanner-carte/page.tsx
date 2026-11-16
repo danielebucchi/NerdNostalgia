@@ -34,6 +34,7 @@ import {
   salvaSessione,
   scanInAttesa,
   scaricaCsv,
+  scaricaKitWindows,
   scarta,
   stato,
   urlVendutiEbay,
@@ -415,6 +416,15 @@ function ImpostazioniScan({
         )}
         {esitoIndice && <span className="text-pink-deep">{esitoIndice}</span>}
         {st?.learning && <Apprendimento l={st.learning} />}
+        <span className="basis-full text-xs flex flex-wrap items-center gap-2 border-t border-ink/10 pt-3">
+          💻 Scanner collegato a un PC Windows? Lo script carica da solo, una volta al giorno, le carte
+          nuove della sua cartella.
+          <button type="button" className="btn btn-ghost text-xs"
+            onClick={() => scaricaKitWindows().catch((e) => setEsitoIndice(msg(e)))}>
+            Scarica per Windows
+          </button>
+          <span className="text-ink-soft">Estrai lo ZIP e fai doppio clic su Installa.cmd.</span>
+        </span>
         {!indice?.blueprints && !build?.running && (
           <span className="basis-full text-xs">
             Serve per riconoscere le carte senza sigla stampata (es. Pokémon vecchi): qualche

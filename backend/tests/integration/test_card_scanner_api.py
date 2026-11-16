@@ -378,6 +378,20 @@ def test_unsure_scan_waits_for_a_person(client, admin_headers, monkeypatch):
     assert [s["id"] for s in client.get("/api/card-scanner/scans", headers=admin_headers).json()] == [scan["id"]]
 
 
+def test_windows_kit_is_ready_to_install(client, admin_headers):
+    import zipfile
+    r = client.get("/api/card-scanner/windows-kit", headers=admin_headers)
+    assert r.status_code == 200
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    nomi = {n.split("/", 1)[1] for n in z.namelist()}
+    assert {"Installa.cmd", "Installa.ps1", "scanner_sync.py", "predefiniti.ini", "LEGGIMI.txt"} <= nomi
+    # A capo Windows nei .cmd, e l'indirizzo del sito gia' scritto
+    assert b"\r\n" in z.read("NerdNostalgia-Scanner/Installa.cmd")
+    ini = z.read("NerdNostalgia-Scanner/predefiniti.ini").decode()
+    assert "api = " in ini and "password" not in ini
+    assert client.get("/api/card-scanner/windows-kit").status_code == 401
+
+
 def test_discarded_scan_leaves_the_queue(client, admin_headers):
     scan = _carica(client, admin_headers).json()
     r = client.delete(f"/api/card-scanner/scans/{scan['id']}", headers=admin_headers)

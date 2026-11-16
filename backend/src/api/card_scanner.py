@@ -15,7 +15,9 @@ Admin-only. NB: NIENTE `from __future__ import annotations` (vedi api/orders.py)
 import csv
 import io
 import logging
+import zipfile
 from datetime import date
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -759,4 +761,54 @@ def export_csv(
         content="﻿" + out.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{nome}"'},
+    )
+
+
+# ── Pacchetto per Windows ─────────────────────────────────────────
+
+SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
+# (file nel repo, nome nello ZIP)
+FILE_PACCHETTO = [
+    ("scanner_sync.py", "scanner_sync.py"),
+    ("installa-scanner-sync.ps1", "installa-scanner-sync.ps1"),
+    ("windows/Installa.cmd", "Installa.cmd"),
+    ("windows/Installa.ps1", "Installa.ps1"),
+    ("windows/Disinstalla.cmd", "Disinstalla.cmd"),
+    ("windows/Disinstalla.ps1", "Disinstalla.ps1"),
+    ("windows/LEGGIMI.txt", "LEGGIMI.txt"),
+]
+
+
+def _a_capo_windows(testo: str) -> bytes:
+    """I .cmd con gli a capo Unix su certi Windows saltano le righe; il
+    Blocco note vecchio mostra tutto su una riga. Meglio CRLF ovunque."""
+    return testo.replace("\r\n", "\n").replace("\n", "\r\n").encode("utf-8")
+
+
+@router.get("/windows-kit")
+def windows_kit(_admin: User = Depends(require_admin)):
+    """Lo ZIP da scaricare sul PC dello scanner: script, installazione
+    guidata, e l'indirizzo di questo sito gia' scritto dentro. Nessuna
+    password: il file si scarica e puo' girare."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for sorgente, nome in FILE_PACCHETTO:
+            dati = (SCRIPTS / sorgente).read_text(encoding="utf-8")
+            if not nome.endswith(".py"):
+                dati = _a_capo_windows(dati)
+            z.writestr(f"NerdNostalgia-Scanner/{nome}", dati)
+        z.writestr(
+            "NerdNostalgia-Scanner/predefiniti.ini",
+            _a_capo_windows(
+                "; Scritto dal sito quando hai scaricato il pacchetto.\n"
+                "[scanner]\n"
+                f"api = {storage.BASE_URL}\n"
+                "auto_conferma = si\n"
+                "valuta_subito = si\n"
+            ),
+        )
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="NerdNostalgia-Scanner-Windows.zip"'},
     )

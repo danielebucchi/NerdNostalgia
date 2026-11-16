@@ -1,0 +1,34 @@
+NerdNostalgia - Scanner carte per Windows
+=========================================
+
+Carica da solo, una volta al giorno, le carte nuove che lo scanner salva in
+una cartella. Quelle riconosciute con certezza vanno in collezione; le
+altre aspettano in admin > Scanner carte > Da confermare.
+
+INSTALLARE
+  1. Estrai lo ZIP (tasto destro > Estrai tutto).
+  2. Doppio clic su Installa.cmd.
+     Se Windows dice "PC protetto da Windows": Ulteriori informazioni >
+     Esegui comunque (il file viene da internet e non e' firmato).
+  3. Segui le domande: cartella dello scanner, utente e password admin,
+     ora del giro giornaliero.
+
+COME ORGANIZZARE LA CARTELLA
+  - Gioco: dal nome di una cartella nel percorso: Pokemon, Magic, YuGiOh,
+    OnePiece (es. Carte\Pokemon\2026-11\carta01.jpg).
+  - Retro (facoltativo): stesso nome del fronte con _retro in fondo
+    (carta12.jpg + carta12_retro.jpg).
+  - JPEG, PNG, TIFF, 300-600 dpi.
+  I file non vengono mai spostati ne' cancellati; un file rinominato non
+  viene ricaricato.
+
+OGNI GIORNO
+  Il giro parte all'ora scelta (o alla riaccensione, se il PC era spento).
+  Per caricare subito: icona "Carica carte adesso" sul desktop.
+  Log: %APPDATA%\NerdNostalgia\scanner_sync.log
+
+CAMBIARE IMPOSTAZIONI O AGGIORNARE
+  Rilancia Installa.cmd (anche da uno ZIP scaricato di nuovo dal sito).
+
+TOGLIERE TUTTO
+  Disinstalla.cmd in %LOCALAPPDATA%\NerdNostalgia\Scanner

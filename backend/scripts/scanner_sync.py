@@ -111,12 +111,25 @@ def leggi_config() -> configparser.ConfigParser:
     return cfg
 
 
-def configura() -> None:
+def predefiniti() -> dict:
+    """predefiniti.ini accanto allo script: lo scrive il sito quando
+    prepara il pacchetto per Windows (l'indirizzo giusto del backend).
+    Mai password: il pacchetto si scarica."""
+    p = configparser.ConfigParser()
+    p.read(Path(__file__).with_name("predefiniti.ini"), encoding="utf-8")
+    return dict(p["scanner"]) if p.has_section("scanner") else {}
+
+
+def configura(cartella: Optional[str] = None) -> None:
     """Domande a terminale, una volta sola. La password resta nel file di
     configurazione: lo si tiene nella cartella dati dell'utente, non in
     una cartella condivisa."""
     cfg = leggi_config()
     s = cfg["scanner"]
+    for k, v in predefiniti().items():
+        s.setdefault(k, v)
+    if cartella:
+        s["cartella"] = cartella
 
     def chiedi(chiave, domanda, default=""):
         attuale = s.get(chiave, default)
@@ -278,6 +291,23 @@ class Api:
 
 # ── Il giro ──────────────────────────────────────────────────────
 
+def segna_esistenti(cartella: Path) -> int:
+    """Mette nello stato i file gia' presenti SENZA caricarli: alla prima
+    installazione su una cartella piena di scan vecchi, si parte da oggi."""
+    stato = leggi_stato(cartella)
+    adesso = datetime.now().isoformat(timespec="seconds")
+    n = 0
+    for p in elenca(cartella):
+        imp = impronta(p)
+        if imp not in stato["file"]:
+            stato["file"][imp] = {"percorso": str(p.relative_to(cartella)), "quando": adesso,
+                                  "esito": "ignorato all'installazione"}
+            n += 1
+    salva_stato(cartella, stato)
+    LOGGER.info("Cartella %s: %d file segnati come gia' visti, non verranno caricati", cartella, n)
+    return 0
+
+
 def giro(cartella: Path, api: Optional[Api], auto: bool, valuta: bool, prova: bool,
          gioco_default: Optional[int] = None) -> int:
     stato = leggi_stato(cartella)
@@ -371,12 +401,23 @@ def main() -> int:
     ap.add_argument("--prova", action="store_true", help="elenca cosa caricherebbe, senza caricare")
     ap.add_argument("--cartella", help="sovrascrive la cartella della configurazione")
     ap.add_argument("--api", help="sovrascrive l'indirizzo del sito (es. http://localhost:7373)")
+    ap.add_argument("--segna-esistenti", action="store_true",
+                    help="i file gia' nella cartella non verranno caricati: si parte dai prossimi")
+    ap.add_argument("--conta", action="store_true", help="dice quanti file nuovi ci sono e basta")
+    ap.add_argument("--pausa", action="store_true", help="alla fine aspetta Invio (per l'icona sul desktop)")
     args = ap.parse_args()
 
     if args.configura:
-        configura()
+        configura(args.cartella)
         return 0
+    try:
+        return _main(args)
+    finally:
+        if args.pausa:
+            input("\nPremi Invio per chiudere...")
 
+
+def _main(args) -> int:
     cartella_dati().mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S",
@@ -391,6 +432,12 @@ def main() -> int:
     if not str(cartella) or not cartella.is_dir():
         LOGGER.error("Cartella non trovata: «%s». Lancia: python scanner_sync.py --configura", cartella)
         return 2
+    if args.segna_esistenti:
+        return segna_esistenti(cartella)
+    if args.conta:
+        noti = leggi_stato(cartella)["file"]
+        print(sum(1 for p in elenca(cartella) if impronta(p) not in noti))
+        return 0
 
     api = None
     if not args.prova:

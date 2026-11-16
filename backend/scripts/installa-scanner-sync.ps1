@@ -12,7 +12,10 @@
 #>
 param(
     [string]$Ora = "21:00",
-    [switch]$Rimuovi
+    [switch]$Rimuovi,
+    # Li passa l'installazione guidata (Installa.ps1); a mano si possono omettere.
+    [string]$Python = "",
+    [string]$Script = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,18 +31,19 @@ if ($Rimuovi) {
 # va bene uguale. Gli alias del Microsoft Store (cartella WindowsApps) dalla
 # pianificazione spesso non partono: meglio l'installer di python.org.
 $python = $null
-foreach ($c in @("pyw.exe", "pythonw.exe")) {
+if ($Python) { $python = $Python }
+else { foreach ($c in @("pyw.exe", "pythonw.exe")) {
     $trovato = Get-Command $c -ErrorAction SilentlyContinue
     if ($trovato -and $trovato.Source -notmatch "WindowsApps") { $python = $trovato.Source; break }
-}
+} }
 if (-not $python) {
     throw "Python non trovato (o solo quello del Microsoft Store). Installa Python da https://www.python.org/downloads/ spuntando 'Add python.exe to PATH'."
 }
 
-$script = Join-Path $PSScriptRoot "scanner_sync.py"
+$script = if ($Script) { $Script } else { Join-Path $PSScriptRoot "scanner_sync.py" }
 if (-not (Test-Path $script)) { throw "scanner_sync.py non trovato accanto a questo file." }
 
-$azione = New-ScheduledTaskAction -Execute $python -Argument "`"$script`"" -WorkingDirectory $PSScriptRoot
+$azione = New-ScheduledTaskAction -Execute $python -Argument "`"$script`"" -WorkingDirectory (Split-Path $script)
 $quando = New-ScheduledTaskTrigger -Daily -At $Ora
 $opzioni = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 2)

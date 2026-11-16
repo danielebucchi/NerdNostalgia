@@ -32,7 +32,25 @@ lo sposta in `caricati/`.
   fronte più `_retro` → `carta12.jpg` + `carta12_retro.jpg`.
 - Formati: JPEG, PNG, TIFF, BMP, WebP. 300–600 dpi.
 
-## Installazione su Windows
+## Installazione su Windows (dal sito)
+
+1. **admin → Scanner carte → Impostazioni → Scarica per Windows**: uno ZIP con
+   tutto, e l'indirizzo del sito già scritto dentro (`predefiniti.ini`, mai
+   password).
+2. Estrai lo ZIP e fai doppio clic su **`Installa.cmd`**. Se Windows dice "PC
+   protetto": *Ulteriori informazioni → Esegui comunque* (il file non è firmato).
+3. L'installazione guidata (`windows/Installa.ps1`):
+   Python con winget se manca, Pillow, copia in
+   `%LOCALAPPDATA%\NerdNostalgia\Scanner`, scelta della cartella con la finestra
+   di Windows, utente e password, cosa fare dei file **già** nella cartella
+   (caricarli o ignorarli e partire da oggi), ora del giro giornaliero, icona
+   **"Carica carte adesso"** sul desktop.
+
+Per aggiornare o cambiare impostazioni si rilancia `Installa.cmd`; per togliere
+tutto `Disinstalla.cmd` (la configurazione e lo stato si tengono, se non si dice
+di cancellarli).
+
+## Installazione su Windows (a mano)
 
 1. **Python** da <https://www.python.org/downloads/> (non quello del Microsoft
    Store), spuntando *Add python.exe to PATH*.

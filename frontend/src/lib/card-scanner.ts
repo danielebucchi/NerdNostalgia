@@ -232,6 +232,16 @@ export const pubblicaEbay = (cardId: number) =>
   adminApi.post<{ listing_id: string; url: string | null; price_eur: number }>(`${B}/cards/${cardId}/ebay`);
 export const ritiraEbay = (cardId: number) => adminApi.delete<{ ok: boolean }>(`${B}/cards/${cardId}/ebay`);
 
+/** ZIP per il PC Windows dello scanner: Installa.cmd e lo script. */
+export async function scaricaKitWindows(): Promise<void> {
+  const blob = await adminApi.getBlob(`${B}/windows-kit`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "NerdNostalgia-Scanner-Windows.zip";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 export async function scaricaCsv(): Promise<void> {
   const blob = await adminApi.getBlob(`${B}/cards/export.csv`);
   const a = document.createElement("a");
