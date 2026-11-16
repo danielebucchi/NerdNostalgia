@@ -154,7 +154,23 @@ def unpublish_cardtrader(db: Session, card: PersonalCard) -> None:
 # ── eBay ──────────────────────────────────────────────────────────
 
 def ebay_sku(card: PersonalCard) -> str:
-    return f"NN-PC-{card.id}"
+    """Lo SKU in uso (puo' avere un suffisso, vedi _sku_nuovo)."""
+    return card.ebay_sku or f"NN-PC-{card.id}"
+
+
+def _sku_nuovo(card: PersonalCard) -> str:
+    """NN-PC-12 → NN-PC-12-r2 → NN-PC-12-r3: uno SKU mai usato, per
+    ripartire da un'offerta pulita quando eBay blocca quella vecchia."""
+    m = re.search(r"-r(\d+)$", card.ebay_sku or "")
+    return f"NN-PC-{card.id}-r{int(m.group(1)) + 1 if m else 2}"
+
+
+def _offerta_bloccata(exc: "eb.EbayError") -> bool:
+    """eBay ha tolto l'inserzione per una violazione delle regole (25098:
+    "offerte di acquisto o vendita al di fuori di eBay") e non permette di
+    rimettere in vendita quell'offerta, nemmeno dopo averla corretta."""
+    body = exc.body if isinstance(exc.body, dict) else {}
+    return any(e.get("errorId") == 25098 for e in body.get("errors") or [] if isinstance(e, dict))
 
 
 def ebay_title(card: PersonalCard) -> str:
@@ -256,7 +272,7 @@ def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
     if lingua:
         aspetti["Lingua"] = [lingua]
 
-    eb.put_inventory_item(sku, {
+    articolo = {
         "availability": {"shipToLocationAvailability": {"quantity": qty}},
         # 4000 "Non gradata" per le carte collezionabili
         "condition": "USED_VERY_GOOD",
@@ -270,7 +286,8 @@ def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
             "imageUrls": foto,
             "aspects": aspetti,
         },
-    })
+    }
+    eb.put_inventory_item(sku, articolo)
 
     offerta = {
         "sku": sku,
@@ -308,7 +325,33 @@ def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
     db.commit()
 
     if not card.ebay_listing_id:
-        pub = eb.publish_offer(offer_id) or {}
+        try:
+            pub = eb.publish_offer(offer_id) or {}
+        except eb.EbayError as exc:
+            if not _offerta_bloccata(exc):
+                raise
+            # L'offerta vecchia e' marchiata: la si toglie e si riparte da
+            # uno SKU nuovo, con descrizione e prezzo di adesso.
+            LOGGER.warning("Offerta eBay %s bloccata da eBay (25098): ne creo una nuova", offer_id)
+            try:
+                eb.delete_offer(offer_id)
+            except eb.EbayError as exc_del:
+                LOGGER.info("Offerta %s non cancellata: %s", offer_id, exc_del)
+            sku = _sku_nuovo(card)
+            eb.put_inventory_item(sku, articolo)
+            offer_id = (eb.create_offer({**offerta, "sku": sku}) or {}).get("offerId")
+            card.ebay_sku, card.ebay_offer_id = sku, offer_id
+            db.commit()
+            try:
+                pub = eb.publish_offer(offer_id) or {}
+            except eb.EbayError as exc2:
+                if _offerta_bloccata(exc2):
+                    raise ValueError(
+                        "eBay blocca anche l'offerta nuova per 'vendita fuori da eBay': c'e' ancora un "
+                        "link, un'email o un altro canale nella descrizione (Impostazioni → footer eBay)"
+                    ) from exc2
+                raise
+            azione = "recreated"
         card.ebay_listing_id = pub.get("listingId")
     card.ebay_synced_at = _now()
     db.commit()

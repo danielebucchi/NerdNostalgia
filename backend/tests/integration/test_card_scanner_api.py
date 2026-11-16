@@ -504,6 +504,57 @@ def test_category_markup_wins_over_the_default(db_session):
     assert marketplace_markup(db_session, "cardtrader", poke.id) == 0  # niente ripiego
 
 
+def _errore_25098():
+    from utils import ebay_client as eb
+    return eb.EbayError("eBay 400 su /publish", 400, {"errors": [{
+        "errorId": 25098, "message": "Questa inserzione viola le regole (Offerte di acquisto o "
+        "vendita al di fuori di eBay). Impossibile applicare l'opzione Rimetti in vendita."}]})
+
+
+def test_offer_blocked_by_ebay_is_replaced_with_a_clean_one(client, admin_headers, db_session, monkeypatch):
+    """eBay ha tolto l'inserzione e non lascia ripubblicare quell'offerta:
+    si cancella e si riparte da uno SKU nuovo."""
+    from utils import ebay_client as eb
+    _ebay_finto(monkeypatch, client, admin_headers)
+    carta = _carta_con_foto_pubblica(client, admin_headers, db_session)
+    card = db_session.get(PersonalCard, carta["id"])
+    card.ebay_sku, card.ebay_offer_id = f"NN-PC-{card.id}", "VECCHIA"
+    db_session.commit()
+
+    cancellate, pubblicate, creati = [], [], []
+    monkeypatch.setattr(eb, "update_offer", lambda oid, body: None)
+    monkeypatch.setattr(eb, "delete_offer", lambda oid: cancellate.append(oid))
+    monkeypatch.setattr(eb, "create_offer", lambda body: creati.append(body["sku"]) or {"offerId": "NUOVA"})
+
+    def publish(oid):
+        pubblicate.append(oid)
+        if oid == "VECCHIA":
+            raise _errore_25098()
+        return {"listingId": "LST2"}
+    monkeypatch.setattr(eb, "publish_offer", publish)
+
+    r = client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["action"] == "recreated"
+    assert cancellate == ["VECCHIA"] and pubblicate == ["VECCHIA", "NUOVA"]
+    assert creati == [f"NN-PC-{card.id}-r2"]
+    db_session.refresh(card)
+    assert (card.ebay_sku, card.ebay_offer_id, card.ebay_listing_id) == (f"NN-PC-{card.id}-r2", "NUOVA", "LST2")
+
+
+def test_blocked_again_says_what_to_fix(client, admin_headers, db_session, monkeypatch):
+    from utils import ebay_client as eb
+    _ebay_finto(monkeypatch, client, admin_headers)
+    carta = _carta_con_foto_pubblica(client, admin_headers, db_session)
+    monkeypatch.setattr(eb, "delete_offer", lambda oid: None)
+    def sempre_bloccata(oid):
+        raise _errore_25098()
+    monkeypatch.setattr(eb, "publish_offer", sempre_bloccata)
+    r = client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
+    assert r.status_code == 400
+    assert "footer eBay" in r.json()["detail"]
+
+
 def test_discarded_scan_leaves_the_queue(client, admin_headers):
     scan = _carica(client, admin_headers).json()
     r = client.delete(f"/api/card-scanner/scans/{scan['id']}", headers=admin_headers)
