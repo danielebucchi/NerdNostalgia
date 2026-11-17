@@ -465,7 +465,6 @@ CREATE TABLE IF NOT EXISTS personal_cards (
 );
 CREATE INDEX IF NOT EXISTS idx_personal_cards_collection ON personal_cards(collection);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_owned_by ON personal_cards(owned_by);
-CREATE INDEX IF NOT EXISTS idx_personal_cards_ebay_group ON personal_cards(ebay_group_key);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_purchase_date ON personal_cards(purchase_date DESC);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_status ON personal_cards(status);
 CREATE INDEX IF NOT EXISTS idx_personal_cards_sold_date ON personal_cards(sold_date DESC);
