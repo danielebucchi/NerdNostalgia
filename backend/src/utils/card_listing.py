@@ -105,6 +105,22 @@ def ebay_price(db: Session, card: PersonalCard) -> float:
     return float((base * (1 + markup / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+# eBay non accetta inserzioni a prezzo fisso sotto 1 euro: il rifiuto
+# arriva solo alla pubblicazione, dopo aver creato articolo e offerta.
+EBAY_PREZZO_MINIMO = 1.00
+
+
+def controlla_minimo_ebay(db: Session, card: PersonalCard) -> float:
+    """Prezzo eBay della carta, o errore se sotto il minimo di eBay."""
+    prezzo = ebay_price(db, card)
+    if prezzo < EBAY_PREZZO_MINIMO:
+        raise ValueError(
+            f"{card.name}: {prezzo:.2f} € su eBay, sotto il minimo di eBay "
+            f"({EBAY_PREZZO_MINIMO:.2f} €). Alza il prezzo di vendita della carta"
+        )
+    return prezzo
+
+
 def _quantita_libera(card: PersonalCard) -> int:
     return max(int(card.quantity or 1), 1)
 
@@ -314,7 +330,7 @@ def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
         from utils import ebay_variations
         ebay_variations.scarta_gruppo_mai_pubblicato(db, card)
     conf = _ebay_config(db)
-    prezzo = ebay_price(db, card)
+    prezzo = controlla_minimo_ebay(db, card)
     foto = _immagini(card)
     if not foto:
         raise ValueError("eBay vuole almeno una foto pubblica (https): manca lo scan")

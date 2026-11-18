@@ -704,3 +704,17 @@ def test_card_stuck_in_a_never_published_group_is_free_again(client, admin_heade
     r = client.post(f"/api/card-scanner/cards/{a['id']}/ebay", headers=admin_headers)
     assert r.status_code == 200, r.text
     assert ebay_finto["groups_deleted"] == ["NN-GRP-vecchio"]
+
+
+def test_ebay_refuses_cards_under_one_euro_before_calling_ebay(client, admin_headers, ebay_finto):
+    """eBay non accetta prezzi fissi sotto 1 €: lo si dice subito, invece
+    di creare articolo e offerta e farsi rifiutare alla pubblicazione."""
+    a, b = (_carta_confermata(client, admin_headers) for _ in range(2))
+    client.patch(f"/api/personal-cards/{a['id']}", json={"list_price": "0.12"}, headers=admin_headers)
+
+    r = client.post(f"/api/card-scanner/cards/{a['id']}/ebay", headers=admin_headers)
+    assert r.status_code == 400 and "minimo" in r.json()["detail"]
+    r = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
+                    json={"card_ids": [a["id"], b["id"]], "title": "Carte"})
+    assert r.status_code == 400 and "minimo" in r.json()["detail"]
+    assert ebay_finto["items"] == {} and ebay_finto["groups"] == {}
