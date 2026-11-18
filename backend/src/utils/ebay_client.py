@@ -285,6 +285,11 @@ def put_inventory_item_group(key: str, body: dict) -> Any:
     return _request("PUT", f"/sell/inventory/v1/inventory_item_group/{urllib.parse.quote(key)}", json=body)
 
 
+def delete_inventory_item_group(key: str) -> Any:
+    """Cancella il gruppo (non gli articoli): gli SKU tornano liberi."""
+    return _request("DELETE", f"/sell/inventory/v1/inventory_item_group/{urllib.parse.quote(key)}")
+
+
 def publish_by_inventory_item_group(key: str) -> Any:
     """Pubblica (o riallinea) l'inserzione del gruppo; risponde col listingId."""
     return _request("POST", "/sell/inventory/v1/offer/publish_by_inventory_item_group",

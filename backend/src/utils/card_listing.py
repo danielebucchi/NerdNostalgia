@@ -307,8 +307,12 @@ def _offerta_ebay(db: Session, card: PersonalCard, conf: Dict[str, str], sku: st
 def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
     if not eb.is_configured():
         raise ValueError("eBay non collegato: completa il consenso OAuth da Impostazioni")
-    if card.ebay_group_key:
+    if card.ebay_group_key and card.ebay_listing_id:
         raise ValueError("La carta e' in un'inserzione eBay con varianti: si aggiorna da li'")
+    if card.ebay_group_key:
+        # Agganciata a un gruppo che eBay non ha mai pubblicato: e' libera.
+        from utils import ebay_variations
+        ebay_variations.scarta_gruppo_mai_pubblicato(db, card)
     conf = _ebay_config(db)
     prezzo = ebay_price(db, card)
     foto = _immagini(card)

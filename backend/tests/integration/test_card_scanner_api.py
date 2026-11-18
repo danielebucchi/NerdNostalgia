@@ -591,6 +591,8 @@ def ebay_finto(client, admin_headers, monkeypatch):
     monkeypatch.setattr(eb, "withdraw_by_inventory_item_group", lambda k: chiamate["withdrawn"].append(k))
     monkeypatch.setattr(eb, "delete_offer", lambda oid: chiamate["deleted"].append(oid))
     monkeypatch.setattr(eb, "publish_offer", lambda oid: {"listingId": "800000000099"})
+    chiamate["groups_deleted"] = []
+    monkeypatch.setattr(eb, "delete_inventory_item_group", lambda k: chiamate["groups_deleted"].append(k))
     client.put("/api/settings/", json={"values": {
         "ebay_fulfillment_policy_id": "F1", "ebay_payment_policy_id": "P1",
         "ebay_return_policy_id": "R1", "ebay_merchant_location_key": "casa",
@@ -668,3 +670,37 @@ def test_cards_can_join_an_existing_listing(client, admin_headers, ebay_finto):
     assert ebay_finto["groups"][chiave]["title"] == "Carte Pokemon"
     gruppi = client.get("/api/card-scanner/ebay-groups", headers=admin_headers).json()
     assert gruppi == [{"group_key": chiave, "listing_id": "800000000001", "count": 3}]
+
+
+def test_refused_variations_leave_the_cards_free(client, admin_headers, db_session, ebay_finto, monkeypatch):
+    """eBay rifiuta la pubblicazione: le carte non devono restare agganciate
+    a un gruppo che non esiste, se no non si vendono piu' nemmeno da sole."""
+    from utils import ebay_client as eb
+
+    def rifiuta(k):
+        raise eb.EbayError("eBay 400", 400, {"errors": [{"errorId": 25001, "message": "no"}]})
+    monkeypatch.setattr(eb, "publish_by_inventory_item_group", rifiuta)
+    a, b = (_carta_confermata(client, admin_headers) for _ in range(2))
+    r = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
+                    json={"card_ids": [a["id"], b["id"]], "title": "Carte"})
+    assert r.status_code == 502 and "25001" in r.json()["detail"]
+    assert len(ebay_finto["groups_deleted"]) == 1
+    for carta in (a, b):
+        card = db_session.get(PersonalCard, carta["id"])
+        db_session.refresh(card)
+        assert card.ebay_group_key is None
+    # E da sola si pubblica
+    r = client.post(f"/api/card-scanner/cards/{a['id']}/ebay", headers=admin_headers)
+    assert r.status_code == 200, r.text
+
+
+def test_card_stuck_in_a_never_published_group_is_free_again(client, admin_headers, db_session, ebay_finto):
+    """Il caso di produzione: carte rimaste con ebay_group_key ma senza
+    inserzione, da prima del fix."""
+    a = _carta_confermata(client, admin_headers)
+    card = db_session.get(PersonalCard, a["id"])
+    card.ebay_group_key = "NN-GRP-vecchio"
+    db_session.commit()
+    r = client.post(f"/api/card-scanner/cards/{a['id']}/ebay", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert ebay_finto["groups_deleted"] == ["NN-GRP-vecchio"]

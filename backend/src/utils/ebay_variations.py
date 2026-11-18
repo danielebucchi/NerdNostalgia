@@ -78,6 +78,24 @@ def _descrizione_gruppo(db: Session, titolo: str) -> str:
     return "".join(righe)
 
 
+def scarta_gruppo_mai_pubblicato(db: Session, card: PersonalCard) -> None:
+    """La carta e' agganciata a un gruppo che eBay non ha mai pubblicato
+    (tentativo rifiutato): il gruppo si cancella anche su eBay, dove tiene
+    occupati gli SKU, e la carta torna libera."""
+    chiave = card.ebay_group_key
+    if not chiave or card.ebay_listing_id:
+        return
+    try:
+        eb.delete_inventory_item_group(chiave)
+    except eb.EbayError as exc:
+        if exc.status != 404:
+            LOGGER.info("Gruppo eBay %s non cancellato: %s", chiave, exc)
+    for c in db.query(PersonalCard).filter(PersonalCard.ebay_group_key == chiave).all():
+        if not c.ebay_listing_id:
+            c.ebay_group_key = None
+    db.commit()
+
+
 def _salva_offerta(card: PersonalCard, sku: str, offerta: Dict[str, Any]) -> str:
     """Crea o aggiorna l'offerta della voce, senza pubblicarla: nel gruppo
     si pubblica tutto insieme."""
@@ -113,6 +131,23 @@ def _scrivi_gruppo(db: Session, chiave: str, titolo: str, carte: List[PersonalCa
             foto_gruppo.append(foto[0])
     db.commit()
 
+    try:
+        _pubblica_gruppo(db, chiave, titolo, carte, voci, comuni, foto_gruppo)
+    except eb.EbayError as exc:
+        # Il motivo vero e' nel corpo della risposta: senza, nei log resta
+        # solo un 502 e non si capisce cosa eBay non accetta.
+        LOGGER.warning("eBay rifiuta l'inserzione con varianti %s: %s %s", chiave, exc, exc.body)
+        if not any(c.ebay_listing_id for c in carte):
+            # Mai pubblicata: le carte tornano libere, se no restano agganciate
+            # a un gruppo che non esiste e non si vendono piu' nemmeno da sole.
+            scarta_gruppo_mai_pubblicato(db, carte[0])
+        raise
+    url = cl.ebay_listing_url(carte[0])
+    return {"group_key": chiave, "listing_id": carte[0].ebay_listing_id, "url": url, "count": len(carte)}
+
+
+def _pubblica_gruppo(db: Session, chiave: str, titolo: str, carte: List[PersonalCard],
+                     voci: Dict[int, str], comuni: Dict[str, List[str]], foto_gruppo: List[str]) -> None:
     eb.put_inventory_item_group(chiave, {
         "title": titolo,
         "description": _descrizione_gruppo(db, titolo),
@@ -132,8 +167,6 @@ def _scrivi_gruppo(db: Session, chiave: str, titolo: str, carte: List[PersonalCa
         c.ebay_listing_id = listing_id
         c.ebay_synced_at = adesso
     db.commit()
-    url = cl.ebay_listing_url(carte[0])
-    return {"group_key": chiave, "listing_id": listing_id, "url": url, "count": len(carte)}
 
 
 def _titolo_attuale(chiave: str) -> Optional[str]:
@@ -164,6 +197,9 @@ def publish_group(db: Session, carte: List[PersonalCard], titolo: Optional[str] 
     if len(titolo) > MAX_TITOLO:
         raise ValueError(f"Titolo troppo lungo: eBay ne accetta {MAX_TITOLO} caratteri")
 
+    for c in carte:
+        # Resto di un tentativo che eBay ha rifiutato: la carta e' libera.
+        scarta_gruppo_mai_pubblicato(db, c)
     problemi = []
     for c in carte:
         if c.status == "SOLD":
