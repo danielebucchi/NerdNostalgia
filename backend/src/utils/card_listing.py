@@ -15,8 +15,8 @@ import io
 import logging
 import re
 from datetime import datetime, timezone
-from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, Dict, List, Optional
+from decimal import ROUND_CEILING, Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -75,11 +75,11 @@ def sale_price(card: PersonalCard) -> float:
 MARKUP_DI_RIPIEGO = {"ebay": Decimal("11")}
 
 
-def marketplace_markup(db: Session, marketplace: str, category_id: Optional[int]) -> Decimal:
-    """Maggiorazione % per (marketplace, categoria), con la cascata della
-    scheda articolo: categoria → categoria padre → default del marketplace
-    → ripiego. Se a un livello ce n'e' piu' d'una si prende la piu' alta:
-    nel dubbio meglio coprire la commissione."""
+def marketplace_fee(db: Session, marketplace: str, category_id: Optional[int]) -> Tuple[Decimal, Decimal]:
+    """Commissione (percentuale, quota fissa) per (marketplace, categoria),
+    con la cascata della scheda articolo: categoria → categoria padre →
+    default del marketplace → ripiego. Se a un livello ce n'e' piu' d'una si
+    prende quella con la percentuale piu' alta: nel dubbio meglio coprire."""
     livelli: List[Optional[int]] = []
     if category_id is not None:
         livelli.append(category_id)
@@ -88,13 +88,19 @@ def marketplace_markup(db: Session, marketplace: str, category_id: Optional[int]
             livelli.append(cat.parent_id)
     livelli.append(None)
     for livello in livelli:
-        q = db.query(MarketplaceFee.markup_percent).filter(MarketplaceFee.marketplace == marketplace)
+        q = db.query(MarketplaceFee.markup_percent, MarketplaceFee.fixed_fee)
+        q = q.filter(MarketplaceFee.marketplace == marketplace)
         q = q.filter(MarketplaceFee.category_id.is_(None) if livello is None
                      else MarketplaceFee.category_id == livello)
-        valori = [Decimal(str(v)) for (v,) in q.all() if v is not None]
-        if valori:
-            return max(valori)
-    return MARKUP_DI_RIPIEGO.get(marketplace, Decimal("0"))
+        righe = [(Decimal(str(p)), Decimal(str(f or 0))) for p, f in q.all() if p is not None]
+        if righe:
+            return max(righe)
+    return MARKUP_DI_RIPIEGO.get(marketplace, Decimal("0")), Decimal("0")
+
+
+def marketplace_markup(db: Session, marketplace: str, category_id: Optional[int]) -> Decimal:
+    """Solo la percentuale della commissione (vedi marketplace_fee)."""
+    return marketplace_fee(db, marketplace, category_id)[0]
 
 
 # eBay non accetta inserzioni a prezzo fisso sotto 1 euro (e lo dice solo
@@ -103,13 +109,20 @@ EBAY_PREZZO_MINIMO = Decimal("1.00")
 
 
 def ebay_price(db: Session, card: PersonalCard) -> float:
-    """Prezzo eBay = prezzo di vendita + maggiorazione eBay (Commissioni),
-    come il pulsante "+11%" della scheda articolo; mai sotto il minimo di
-    eBay. Solo eBay: sito e CardTrader restano al prezzo della carta."""
+    """Prezzo eBay: quello che, tolta la commissione eBay (Commissioni:
+    percentuale + quota fissa), lascia in tasca il prezzo della carta.
+
+    La commissione si calcola sul lordo, quindi non basta aggiungere la
+    percentuale: lordo = (prezzo + fisso) / (1 - percentuale), arrotondato
+    al centesimo superiore, come grossUpPrice della scheda articolo. Con
+    6,5% + 0,35 € una carta da 3 € va a 3,59 € (non 3,20: ci si rimetteva).
+
+    Se anche cosi' resta sotto il minimo di eBay, va a 1 € e basta. Solo
+    eBay: sito e CardTrader restano al prezzo della carta."""
     base = Decimal(str(sale_price(card)))
-    markup = marketplace_markup(db, "ebay", _categoria(db, card))
-    prezzo = (base * (1 + markup / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    return float(max(prezzo, EBAY_PREZZO_MINIMO))
+    percentuale, fisso = marketplace_fee(db, "ebay", _categoria(db, card))
+    lordo = ((base + fisso) / (1 - percentuale / 100)).quantize(Decimal("0.01"), rounding=ROUND_CEILING)
+    return float(max(lordo, EBAY_PREZZO_MINIMO))
 
 
 def _quantita_libera(card: PersonalCard) -> int:

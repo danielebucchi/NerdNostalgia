@@ -473,8 +473,9 @@ def test_ebay_price_gets_the_ebay_markup(client, admin_headers, db_session, monk
     carta = _carta_con_foto_pubblica(client, admin_headers, db_session)
     r = client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
     assert r.status_code == 200, r.text
-    assert r.json()["price_eur"] == 3.39
-    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "3.39"
+    # 3 / (1 - 0,13): la commissione si paga sul lordo
+    assert r.json()["price_eur"] == 3.45
+    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "3.45"
 
 
 def test_ebay_markup_falls_back_like_the_article_page(client, admin_headers, db_session, monkeypatch):
@@ -482,7 +483,24 @@ def test_ebay_markup_falls_back_like_the_article_page(client, admin_headers, db_
     inviati = _ebay_finto(monkeypatch, client, admin_headers)
     carta = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="10.00")
     client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
-    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "11.10"
+    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "11.24"  # 10 / 0,89
+
+
+def test_ebay_price_covers_percent_and_fixed_fee(client, admin_headers, db_session, monkeypatch):
+    """6,5% + 0,35 €, la commissione eBay delle carte: tolta quella, alla
+    carta da 3 € restano 3 €. Sotto 1 € anche coi costi: 1 €, il minimo."""
+    from models.db import MarketplaceFee
+    db_session.add(MarketplaceFee(marketplace="ebay", category_id=None, markup_percent=6.5, fixed_fee=0.35))
+    db_session.commit()
+    inviati = _ebay_finto(monkeypatch, client, admin_headers)
+    carta = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="3.00")
+    assert client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers).json()["price_eur"] == 3.59
+    lordo = 3.59
+    assert round(lordo - lordo * 0.065 - 0.35, 2) >= 3.00
+
+    economica = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="0.13")
+    r = client.post(f"/api/card-scanner/cards/{economica['id']}/ebay", headers=admin_headers)
+    assert r.json()["price_eur"] == 1.00
 
 
 def test_category_markup_wins_over_the_default(db_session):
