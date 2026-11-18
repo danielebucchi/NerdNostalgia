@@ -1370,7 +1370,7 @@ function Collezione({
                   )}
                   <p className="text-xs text-ink-soft w-full">
                     Una pagina eBay con il menu &quot;Carta&quot;: ogni carta con il suo prezzo e la sua foto.
-                    Le carte già su eBay da sole vanno tolte prima. eBay vuole almeno 1 € a carta.
+                    Le carte già su eBay da sole vanno tolte prima. Su eBay sotto 1 € si va a 1 € (il minimo di eBay).
                   </p>
                 </div>
               )}

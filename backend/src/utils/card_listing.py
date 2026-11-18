@@ -97,28 +97,19 @@ def marketplace_markup(db: Session, marketplace: str, category_id: Optional[int]
     return MARKUP_DI_RIPIEGO.get(marketplace, Decimal("0"))
 
 
+# eBay non accetta inserzioni a prezzo fisso sotto 1 euro (e lo dice solo
+# alla pubblicazione, dopo aver creato articolo e offerta).
+EBAY_PREZZO_MINIMO = Decimal("1.00")
+
+
 def ebay_price(db: Session, card: PersonalCard) -> float:
     """Prezzo eBay = prezzo di vendita + maggiorazione eBay (Commissioni),
-    come il pulsante "+11%" della scheda articolo."""
+    come il pulsante "+11%" della scheda articolo; mai sotto il minimo di
+    eBay. Solo eBay: sito e CardTrader restano al prezzo della carta."""
     base = Decimal(str(sale_price(card)))
     markup = marketplace_markup(db, "ebay", _categoria(db, card))
-    return float((base * (1 + markup / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
-
-
-# eBay non accetta inserzioni a prezzo fisso sotto 1 euro: il rifiuto
-# arriva solo alla pubblicazione, dopo aver creato articolo e offerta.
-EBAY_PREZZO_MINIMO = 1.00
-
-
-def controlla_minimo_ebay(db: Session, card: PersonalCard) -> float:
-    """Prezzo eBay della carta, o errore se sotto il minimo di eBay."""
-    prezzo = ebay_price(db, card)
-    if prezzo < EBAY_PREZZO_MINIMO:
-        raise ValueError(
-            f"{card.name}: {prezzo:.2f} € su eBay, sotto il minimo di eBay "
-            f"({EBAY_PREZZO_MINIMO:.2f} €). Alza il prezzo di vendita della carta"
-        )
-    return prezzo
+    prezzo = (base * (1 + markup / 100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return float(max(prezzo, EBAY_PREZZO_MINIMO))
 
 
 def _quantita_libera(card: PersonalCard) -> int:
@@ -330,7 +321,7 @@ def publish_ebay(db: Session, card: PersonalCard) -> Dict[str, Any]:
         from utils import ebay_variations
         ebay_variations.scarta_gruppo_mai_pubblicato(db, card)
     conf = _ebay_config(db)
-    prezzo = controlla_minimo_ebay(db, card)
+    prezzo = ebay_price(db, card)
     foto = _immagini(card)
     if not foto:
         raise ValueError("eBay vuole almeno una foto pubblica (https): manca lo scan")

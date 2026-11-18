@@ -212,11 +212,9 @@ def publish_group(db: Session, carte: List[PersonalCard], titolo: Optional[str] 
             problemi.append(f"{c.name}: manca lo scan (eBay vuole una foto)")
         else:
             try:
-                cl.controlla_minimo_ebay(db, c)
-            except ValueError as exc:
-                # Senza prezzo, o sotto il minimo di eBay (1 €): ogni voce
-                # dell'inserzione con varianti deve rispettarlo.
-                problemi.append(str(exc) if "minimo" in str(exc) else f"{c.name}: manca il prezzo")
+                cl.sale_price(c)
+            except ValueError:
+                problemi.append(f"{c.name}: manca il prezzo")
     if problemi:
         raise ValueError("Non posso metterle insieme: " + "; ".join(problemi))
 
