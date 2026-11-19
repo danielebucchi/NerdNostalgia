@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from helpers.auth import require_admin
 from helpers.personal_card import PersonalCardHelper, get_personal_card_helper
@@ -44,6 +44,14 @@ def _to_response(card: PersonalCard) -> PersonalCardResponse:
     if card.ebay_listing_id:
         from utils.card_listing import ebay_listing_url
         resp.ebay_url = ebay_listing_url(card)
+    db = object_session(card)
+    if db is not None:
+        from utils import card_listing as cl
+        try:
+            resp.cardtrader_price_auto = cl.sale_price(card)
+            resp.ebay_price_auto = cl.ebay_price_auto(db, card)
+        except ValueError:
+            pass  # niente prezzo: niente da proporre
     return resp
 
 

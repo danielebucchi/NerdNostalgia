@@ -212,7 +212,7 @@ def publish_group(db: Session, carte: List[PersonalCard], titolo: Optional[str] 
             problemi.append(f"{c.name}: manca lo scan (eBay vuole una foto)")
         else:
             try:
-                cl.sale_price(c)
+                cl.ebay_price(db, c)
             except ValueError:
                 problemi.append(f"{c.name}: manca il prezzo")
     if problemi:

@@ -310,6 +310,13 @@ export interface PersonalCard {
   ebay_sold_source?: "api" | "manuale" | null;
   prices_updated_at?: string | null;
   list_price?: string | null;
+  /** Prezzo scritto per CardTrader / eBay; null = calcolato (vedi *_auto). */
+  list_price_cardtrader?: string | null;
+  list_price_ebay?: string | null;
+  /** A quanto va senza un prezzo scritto: CardTrader come il sito, eBay con
+   *  commissioni e minimo 1 euro. */
+  cardtrader_price_auto?: number | null;
+  ebay_price_auto?: number | null;
   cardtrader_product_id?: number | null;
   cardtrader_synced_at?: string | null;
   ebay_listing_id?: string | null;

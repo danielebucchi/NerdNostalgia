@@ -458,6 +458,8 @@ CREATE TABLE IF NOT EXISTS personal_cards (
     ebay_offer_id VARCHAR(30),
     ebay_listing_id VARCHAR(30),
     ebay_group_key VARCHAR(50),
+    list_price_cardtrader NUMERIC(10,2),
+    list_price_ebay NUMERIC(10,2),
     ebay_synced_at TIMESTAMP,
     article_id INTEGER REFERENCES articles(id) ON DELETE SET NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

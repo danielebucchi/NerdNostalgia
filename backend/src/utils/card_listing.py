@@ -108,21 +108,35 @@ def marketplace_markup(db: Session, marketplace: str, category_id: Optional[int]
 EBAY_PREZZO_MINIMO = Decimal("1.00")
 
 
-def ebay_price(db: Session, card: PersonalCard) -> float:
-    """Prezzo eBay: quello che, tolta la commissione eBay (Commissioni:
-    percentuale + quota fissa), lascia in tasca il prezzo della carta.
+def ebay_price_auto(db: Session, card: PersonalCard) -> float:
+    """Prezzo eBay calcolato: quello che, tolta la commissione eBay
+    (Commissioni: percentuale + quota fissa), lascia in tasca il prezzo
+    della carta.
 
     La commissione si calcola sul lordo, quindi non basta aggiungere la
     percentuale: lordo = (prezzo + fisso) / (1 - percentuale), arrotondato
     al centesimo superiore, come grossUpPrice della scheda articolo. Con
-    6,5% + 0,35 € una carta da 3 € va a 3,59 € (non 3,20: ci si rimetteva).
-
-    Se anche cosi' resta sotto il minimo di eBay, va a 1 € e basta. Solo
-    eBay: sito e CardTrader restano al prezzo della carta."""
+    6,5% + 0,35 euro una carta da 3 euro va a 3,59 (non 3,20: ci si
+    rimetteva). Se anche cosi' resta sotto il minimo di eBay, va a 1 euro."""
     base = Decimal(str(sale_price(card)))
     percentuale, fisso = marketplace_fee(db, "ebay", _categoria(db, card))
     lordo = ((base + fisso) / (1 - percentuale / 100)).quantize(Decimal("0.01"), rounding=ROUND_CEILING)
     return float(max(lordo, EBAY_PREZZO_MINIMO))
+
+
+def ebay_price(db: Session, card: PersonalCard) -> float:
+    """Il prezzo scritto per eBay se c'e' (mai sotto il minimo di eBay),
+    se no quello calcolato. Solo eBay: sito e CardTrader hanno il loro."""
+    if card.list_price_ebay is not None and float(card.list_price_ebay) > 0:
+        return float(max(Decimal(str(card.list_price_ebay)), EBAY_PREZZO_MINIMO))
+    return ebay_price_auto(db, card)
+
+
+def cardtrader_price(card: PersonalCard) -> float:
+    """Il prezzo scritto per CardTrader se c'e', se no quello del sito."""
+    if card.list_price_cardtrader is not None and float(card.list_price_cardtrader) > 0:
+        return round(float(card.list_price_cardtrader), 2)
+    return sale_price(card)
 
 
 def _quantita_libera(card: PersonalCard) -> int:
@@ -134,7 +148,7 @@ def _quantita_libera(card: PersonalCard) -> int:
 def publish_cardtrader(db: Session, card: PersonalCard) -> Dict[str, Any]:
     if not card.cardtrader_blueprint_id:
         raise ValueError("Carta non abbinata a CardTrader")
-    prezzo = sale_price(card)
+    prezzo = cardtrader_price(card)
     qty = _quantita_libera(card)
     if card.cardtrader_product_id:
         ct.update_product(card.cardtrader_product_id, price=prezzo, quantity=qty)

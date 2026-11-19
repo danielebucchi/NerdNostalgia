@@ -1404,10 +1404,10 @@ function Collezione({
             </div>
           )}
           <p className="text-xs text-ink-soft mt-2">
-            Sito e CardTrader al prezzo di vendita di ogni carta (o al suggerito); eBay maggiorato della
-            commissione eBay impostata in <a href="/admin/markups" className="underline">Commissioni</a> (+11% se
-            non c&apos;è). Se una carta è già in vendita su un canale, l&apos;inserzione si aggiorna (anche il prezzo)
-            invece di duplicarsi.
+            Ogni piattaforma al suo prezzo (colonna Prezzi). Dove non l&apos;hai scritto: CardTrader come il sito;
+            eBay quanto serve a coprire la commissione di <a href="/admin/markups" className="underline">Commissioni</a>
+            (11% se non c&apos;è), mai sotto 1 €. Se una carta è già in vendita su un canale, l&apos;inserzione si
+            aggiorna (anche il prezzo) invece di duplicarsi.
           </p>
           <div className="flex gap-2 mt-3">
             <button type="button" className="btn btn-primary text-sm disabled:opacity-50"
@@ -1465,7 +1465,7 @@ function Collezione({
                 <th className="py-2 pr-2 text-right">CardTrader</th>
                 <th className="py-2 pr-2 text-right">Venduti eBay</th>
                 <th className="py-2 pr-2 text-right">Suggerito</th>
-                <th className="py-2 pr-2 text-right">Prezzo</th>
+                <th className="py-2 pr-2 text-right">Prezzi</th>
                 <th className="py-2">In vendita</th>
               </tr>
             </thead>
@@ -1478,6 +1478,37 @@ function Collezione({
         </div>
       )}
     </section>
+  );
+}
+
+/** Prezzo di una piattaforma: salva all'uscita dal campo (o Invio) solo se
+ *  e' cambiato. Vuoto mostra in grigio quello che si userebbe. */
+function CampoPrezzo({ etichetta, valore, auto, onSalva }: {
+  etichetta: string;
+  valore?: string | null;
+  auto?: string | number | null;
+  onSalva: (v: string) => void;
+}) {
+  const [testo, setTesto] = useState(valore ?? "");
+  useEffect(() => setTesto(valore ?? ""), [valore]);
+  const segnaposto = auto != null && auto !== "" ? Number(auto).toFixed(2) : "";
+  return (
+    <>
+      <span>{etichetta}</span>
+      <input
+        className="input py-1 text-sm !w-20 text-right"
+        inputMode="decimal"
+        value={testo}
+        placeholder={segnaposto}
+        onChange={(e) => setTesto(e.target.value)}
+        onBlur={() => {
+          const v = testo.replace(",", ".").trim();
+          if (v !== (valore ?? "")) onSalva(v);
+        }}
+        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+        aria-label={`Prezzo ${etichetta}`}
+      />
+    </>
   );
 }
 
@@ -1514,13 +1545,11 @@ function RigaCarta({
   onRicarica: () => void;
   st: StatoScanner | null;
 }) {
-  const [prezzo, setPrezzo] = useState(c.list_price ?? "");
   const [busy, setBusy] = useState(false);
   const [nota, setNota] = useState<string | null>(null);
   const [aMano, setAMano] = useState(false);
   const [prezziEbay, setPrezziEbay] = useState("");
 
-  useEffect(() => setPrezzo(c.list_price ?? ""), [c.list_price]);
 
   async function azione(fn: () => Promise<unknown>, ok?: string) {
     setBusy(true);
@@ -1535,10 +1564,8 @@ function RigaCarta({
     }
   }
 
-  async function salvaPrezzo() {
-    const v = String(prezzo).replace(",", ".").trim();
-    if (v === (c.list_price ?? "")) return;
-    await azione(async () => onCambiata(await aggiornaCarta(c.id, { list_price: v || null })));
+  async function salvaPrezzo(campo: "list_price" | "list_price_cardtrader" | "list_price_ebay", v: string) {
+    await azione(async () => onCambiata(await aggiornaCarta(c.id, { [campo]: v || null })));
   }
 
   async function apriVenduti() {
@@ -1629,16 +1656,17 @@ function RigaCarta({
     </button>
   );
 
+  // Tre prezzi: il sito usa quello della carta; CardTrader ed eBay il loro
+  // se scritto, se no il calcolato (in grigio). Vuoto = torna al calcolato.
   const campoPrezzo = (
-    <input
-      className="input py-1 text-sm !w-24 text-right"
-      inputMode="decimal"
-      value={prezzo}
-      onChange={(e) => setPrezzo(e.target.value)}
-      onBlur={salvaPrezzo}
-      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-      aria-label="Prezzo di vendita"
-    />
+    <div className="grid grid-cols-[auto_auto] gap-x-2 gap-y-1 items-center justify-end text-xs text-ink-soft">
+      <CampoPrezzo etichetta="Sito" valore={c.list_price} auto={c.estimated_value}
+        onSalva={(v) => salvaPrezzo("list_price", v)} />
+      <CampoPrezzo etichetta="CardTrader" valore={c.list_price_cardtrader} auto={c.cardtrader_price_auto}
+        onSalva={(v) => salvaPrezzo("list_price_cardtrader", v)} />
+      <CampoPrezzo etichetta="eBay" valore={c.list_price_ebay} auto={c.ebay_price_auto}
+        onSalva={(v) => salvaPrezzo("list_price_ebay", v)} />
+    </div>
   );
 
   const inVendita = (
@@ -1746,9 +1774,9 @@ function RigaCarta({
           <div className="text-left">{rivaluta}</div>
           <div>{venduti}</div>
         </div>
-        <label className="flex items-center justify-between gap-3 mt-2 text-sm text-ink-soft">
-          Prezzo di vendita {campoPrezzo}
-        </label>
+        <div className="flex items-start justify-between gap-3 mt-2 text-sm text-ink-soft">
+          Prezzi di vendita {campoPrezzo}
+        </div>
         <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 pt-3 border-t border-ink/10 [&>div]:min-h-[2.25rem] [&>div]:flex [&>div]:items-center">
           {inVendita}
         </div>

@@ -740,3 +740,39 @@ def test_ebay_price_is_never_under_one_euro_the_other_channels_keep_theirs(
 
     art_id = client.post(f"/api/card-scanner/cards/{a['id']}/site", headers=admin_headers).json()["article_id"]
     assert float(db_session.get(Article, art_id).price) == 0.12
+
+
+def test_each_platform_can_have_its_own_price(client, admin_headers, db_session, monkeypatch, mondo_finto):
+    """Tre prezzi: il sito usa quello della carta, CardTrader ed eBay il
+    loro se scritto, se no il calcolato (eBay: commissioni, minimo 1 €)."""
+    from models.db import Article
+    inviati = _ebay_finto(monkeypatch, client, admin_headers)
+    carta = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="3.00")
+
+    card = client.get("/api/card-scanner/cards", headers=admin_headers).json()[0]
+    assert card["cardtrader_price_auto"] == 3.0
+    assert card["ebay_price_auto"] == 3.38  # 3 / 0,89 per eccesso: ripiego 11% senza commissioni
+
+    r = client.patch(f"/api/personal-cards/{carta['id']}", headers=admin_headers,
+                     json={"list_price_cardtrader": "2.50", "list_price_ebay": "4.20"})
+    assert r.status_code == 200, r.text
+    client.post(f"/api/card-scanner/cards/{carta['id']}/cardtrader", headers=admin_headers)
+    assert mondo_finto[-1]["price_eur"] == 2.50
+    assert client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers).json()["price_eur"] == 4.20
+    # Il sito resta al prezzo della carta (5 €), qualunque cosa si scriva per gli altri
+    sito = _carta_confermata(client, admin_headers)
+    client.patch(f"/api/personal-cards/{sito['id']}", headers=admin_headers,
+                 json={"list_price_cardtrader": "2.50", "list_price_ebay": "4.20"})
+    r = client.post(f"/api/card-scanner/cards/{sito['id']}/site", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert float(db_session.get(Article, r.json()["article_id"]).price) == 5.00
+
+    # Anche scritto a mano, su eBay mai sotto 1 €
+    from utils import ebay_client as eb
+    aggiornate = []
+    monkeypatch.setattr(eb, "update_offer", lambda oid, body: aggiornate.append(body))
+    client.patch(f"/api/personal-cards/{carta['id']}", headers=admin_headers, json={"list_price_ebay": "0.50"})
+    r = client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["price_eur"] == 1.00
+    assert aggiornate[-1]["pricingSummary"]["price"]["value"] == "1.00"

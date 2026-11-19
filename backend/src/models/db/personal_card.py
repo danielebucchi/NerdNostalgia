@@ -95,6 +95,10 @@ class PersonalCard(BaseModel):
     ebay_sold_source = Column(String(20))  # api / manuale
     prices_updated_at = Column(DateTime)
     list_price = Column(Numeric(10, 2))
+    # Prezzo diverso per piattaforma (None = calcolato: CardTrader come il
+    # sito, eBay con le commissioni e il minimo di 1 euro).
+    list_price_cardtrader = Column(Numeric(10, 2))
+    list_price_ebay = Column(Numeric(10, 2))
 
     # Inserzioni
     cardtrader_product_id = Column(BigInteger)
