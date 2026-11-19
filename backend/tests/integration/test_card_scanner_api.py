@@ -828,3 +828,22 @@ def test_article_page_gives_the_vinted_title_of_the_card(client, admin_headers, 
     a = client.get(f"/api/articles/{art_id}").json()
     assert a["vinted_title"] == "Durant ex 4 reverse surging sparks IT pokemon"  # la carta di prova e' reverse
     assert a["vinted_description"].endswith("Lingua italiano")
+
+
+def test_existing_cards_get_italian_names_and_site_titles(client, admin_headers, db_session, monkeypatch):
+    """Carte confermate prima dei nomi italiani: le sistema il job, e
+    l'articolo del sito cambia titolo senza ripubblicarlo."""
+    from models.db import Article
+    from utils import card_listing as cl, card_names_it as cn
+    carta = _carta_confermata(client, admin_headers)          # nomi finti: nessuno
+    art_id = client.post(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers).json()["article_id"]
+    assert "Surging Sparks" in db_session.get(Article, art_id).title
+
+    monkeypatch.setattr(cn, "cerca", lambda *a, **kw: ("Durant-ex", "Scintille Folgoranti"))
+    esito = cl.aggiorna_nomi_italiani(db_session, pausa=0)
+    assert (esito["trovate"], esito["articoli"]) == (1, 1)
+    db_session.expire_all()
+    titolo = db_session.get(Article, art_id).title
+    assert "Durant-ex · Scintille Folgoranti" in titolo
+    # Seconda passata: niente da rifare
+    assert cl.aggiorna_nomi_italiani(db_session, pausa=0)["carte"] == 0

@@ -77,13 +77,47 @@ def riempi_nomi_italiani(db: Session, card: PersonalCard) -> bool:
           if card.cardtrader_blueprint_id else None)
     nome, nome_set = cn.cerca(card.game_id, card.collection, card.printed_code or card.card_number,
                               codice_set=bp.expansion_code if bp else None,
-                              numero=(bp.collector_number if bp else None) or card.card_number)
+                              numero=(bp.collector_number if bp else None) or card.card_number,
+                              nome_inglese=card.name)
     trovato = False
     if nome and not card.name_it:
         card.name_it, trovato = nome[:200], True
     if nome_set and not card.collection_it:
         card.collection_it, trovato = nome_set[:100], True
     return trovato
+
+
+def aggiorna_nomi_italiani(db: Session, pausa: float = 0.3) -> Dict[str, int]:
+    """Nomi italiani per le carte che non li hanno ancora (confermate prima
+    che ci fossero, o con una fonte che allora non rispondeva). Se la carta
+    e' in vetrina, l'articolo prende subito titolo e descrizione nuovi: non
+    serve ripubblicarla. Le inserzioni eBay/CardTrader no: si aggiornano
+    quando le si ripubblica."""
+    import time
+    carte = (db.query(PersonalCard)
+             .filter(PersonalCard.status != PersonalCardStatus.SOLD)
+             .filter((PersonalCard.name_it.is_(None)) |
+                     ((PersonalCard.game_id == cn.POKEMON) & PersonalCard.collection_it.is_(None)))
+             .all())
+    trovate = articoli = 0
+    for card in carte:
+        try:
+            if not riempi_nomi_italiani(db, card):
+                continue
+            trovate += 1
+            art = card.article
+            if art is not None and art.status == ArticleStatus.PUBLISHED:
+                art.title = site_title(card)
+                art.description = site_description(card)
+                articoli += 1
+            db.commit()
+        except Exception as exc:  # noqa: BLE001 — una carta non ferma le altre
+            db.rollback()
+            LOGGER.warning("Nomi italiani per la carta %s: %s", card.id, exc)
+        if pausa:
+            time.sleep(pausa)
+    LOGGER.info("Nomi italiani: %d carte su %d, %d articoli aggiornati", trovate, len(carte), articoli)
+    return {"carte": len(carte), "trovate": trovate, "articoli": articoli}
 
 
 def _now() -> datetime:

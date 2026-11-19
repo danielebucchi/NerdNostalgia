@@ -44,3 +44,24 @@ def test_old_ex_sets_match_without_the_ex_prefix(monkeypatch):
     }
     monkeypatch.setattr(cn, "_get", lambda url, params=None: risposte.get(url))
     assert cn.cerca(5, "EX Crystal Guardians", "061/100") == (None, "EX Guardiani dei Cristalli")
+
+
+def test_trainer_name_from_another_set_when_the_set_has_none(monkeypatch):
+    """Set vecchio senza nomi italiani delle carte: Switch → Scambio da
+    un'altra espansione (i kit introduttivi "tk-" per ultimi)."""
+    cn._cache_set.clear()
+
+    def finto(url, params=None):
+        if url.endswith("/v2/en/sets"):
+            return [{"id": "ex14", "name": "Crystal Guardians"}]
+        if url.endswith("/v2/it/sets/ex14"):
+            return {"name": "EX Guardiani dei Cristalli", "cards": []}
+        if url.endswith("/v2/en/cards"):
+            assert params == {"name": "eq:Switch"}
+            return [{"id": "tk-xy-sy-4"}, {"id": "base1-95"}]
+        if url.endswith("/v2/it/cards/base1-95"):
+            return {"name": "Scambio"}
+        return None
+    monkeypatch.setattr(cn, "_get", finto)
+    assert cn.cerca(5, "EX Crystal Guardians", "090/100", nome_inglese="Switch") == \
+        ("Scambio", "EX Guardiani dei Cristalli")

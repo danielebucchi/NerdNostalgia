@@ -104,6 +104,41 @@ def _pokemon(nome_set: Optional[str], codice: Optional[str]) -> Tuple[Optional[s
     return nome_it, set_it
 
 
+def _nome_da_altri_set(nome_inglese: Optional[str]) -> Optional[str]:
+    """Nome italiano preso da un'altra espansione dove la stessa carta esiste
+    in italiano. Serve per i set vecchi (EX, Platinum), di cui TCGdex ha il
+    nome italiano del set ma non delle singole carte: per i Pokemon cambia
+    poco (i nomi sono uguali), per Allenatori ed Energie si' (Switch →
+    Scambio, Double Colorless Energy → Energia Incolore doppia)."""
+    if not nome_inglese:
+        return None
+    # CardTrader: "Crobat G Lv.44", "Primeape δ Delta Species"; TCGdex no.
+    candidati = list(dict.fromkeys([
+        nome_inglese,
+        re.sub(r"\s+Lv\.?\s*\d+$", "", nome_inglese),
+        nome_inglese.replace(" Delta Species", ""),
+    ]))
+    for nome in candidati:
+        trovato = _in_cache(f"tcgdex:tradotto:{nome}", lambda n=nome: _traduci(n))
+        if trovato:
+            return trovato
+    return None
+
+
+def _traduci(nome: str) -> Optional[str]:
+    carte = _get("https://api.tcgdex.net/v2/en/cards", {"name": f"eq:{nome}"})
+    if not isinstance(carte, list):
+        return None
+    # Prima le espansioni vere: i kit introduttivi ("tk-") spesso non hanno l'italiano.
+    ids = [c.get("id") for c in carte if c.get("id")]
+    ids = [i for i in ids if not i.startswith("tk-")] + [i for i in ids if i.startswith("tk-")]
+    for card_id in ids[:10]:
+        it = _get(f"https://api.tcgdex.net/v2/it/cards/{card_id}")
+        if isinstance(it, dict) and it.get("name"):
+            return it["name"]
+    return None
+
+
 # ── Magic (Scryfall) ────────────────────────────────────────────────
 
 def _magic(codice_set: Optional[str], numero: Optional[str]) -> Optional[str]:
@@ -130,11 +165,13 @@ def _yugioh(codice: Optional[str]) -> Optional[str]:
 
 
 def cerca(game_id: Optional[int], nome_set: Optional[str], codice: Optional[str],
-          codice_set: Optional[str] = None, numero: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
+          codice_set: Optional[str] = None, numero: Optional[str] = None,
+          nome_inglese: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """(nome carta, nome set) in italiano; None dove non si trova."""
     try:
         if game_id == POKEMON:
-            return _pokemon(nome_set, codice or numero)
+            nome_it, set_it = _pokemon(nome_set, codice or numero)
+            return nome_it or _nome_da_altri_set(nome_inglese), set_it
         if game_id == MAGIC:
             return _magic(codice_set, numero or _numero(codice)), None
         if game_id == YUGIOH:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -74,6 +74,18 @@ def _price_watch_job():
         db.close()
 
 
+def _italian_names_job():
+    """Nomi italiani alle carte che non li hanno (e titoli del sito)."""
+    from utils.card_listing import aggiorna_nomi_italiani
+    db = SessionLocal()
+    try:
+        aggiorna_nomi_italiani(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Nomi italiani: %s", exc)
+    finally:
+        db.close()
+
+
 def start_scheduler() -> None:
     """Avvia lo scheduler in background.
 
@@ -118,6 +130,17 @@ def start_scheduler() -> None:
         replace_existing=True,
         max_instances=1,
         coalesce=True,
+    )
+    # Nomi italiani: poco dopo l'avvio (cosi' un deploy sistema le carte che
+    # ne erano senza) e poi ogni notte alle 04:45 per le nuove.
+    _scheduler.add_job(
+        _italian_names_job,
+        CronTrigger(hour=4, minute=45),
+        id="italian_names",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        next_run_time=datetime.now(tz=APP_TZ) + timedelta(minutes=2),
     )
     # Backup giornaliero (SQLite snapshot + tar uploads) alle 03:30 locali
     _scheduler.add_job(
