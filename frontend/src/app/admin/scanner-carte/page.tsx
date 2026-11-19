@@ -1548,8 +1548,8 @@ function Collezione({
                 <th className="py-2 pr-2 text-right">CardTrader</th>
                 <th className="py-2 pr-2 text-right">Venduti eBay</th>
                 <th className="py-2 pr-2 text-right">Suggerito</th>
-                <th className="py-2 pr-2 text-right">Prezzi</th>
-                <th className="py-2">In vendita</th>
+                <th className="py-2 pr-2">Prezzo e vendita per canale</th>
+                <th className="py-2 text-right">Azioni</th>
               </tr>
             </thead>
             <tbody>
@@ -1577,7 +1577,6 @@ function CampoPrezzo({ etichetta, valore, auto, onSalva }: {
   const segnaposto = auto != null && auto !== "" ? Number(auto).toFixed(2) : "";
   return (
     <>
-      <span>{etichetta}</span>
       <input
         className="input py-1 text-sm !w-20 text-right"
         inputMode="decimal"
@@ -1746,91 +1745,103 @@ function RigaCarta({
     </button>
   );
 
-  // Tre prezzi: il sito usa quello della carta; CardTrader ed eBay il loro
-  // se scritto, se no il calcolato (in grigio). Vuoto = torna al calcolato.
-  const campoPrezzo = (
-    <div className="grid grid-cols-[auto_auto] gap-x-2 gap-y-1 items-center justify-end text-xs text-ink-soft">
+  // Una riga per piattaforma: nome · prezzo · stato. Nella stessa griglia,
+  // cosi' prezzo e stato di ogni canale stanno sulla stessa linea (in due
+  // colonne separate non si allineavano mai). Il sito usa il prezzo della
+  // carta; CardTrader ed eBay il loro se scritto, se no il calcolato (in
+  // grigio). Vuoto = torna al calcolato.
+  const pulsante = "btn btn-ghost text-xs !py-1 !px-3";
+  const statoSito =
+    c.site_status === "PUBLISHED" ? (
+      <span>
+        ✅{" "}
+        <a href={`/articles/${c.article_id}`} target="_blank" rel="noreferrer" className="underline">vedi</a>
+        {" · "}
+        <button type="button" className="underline" disabled={busy}
+          onClick={() => azione(async () => { await ritiraSito(c.id); onRicarica(); }, "tolta dal sito")}>
+          ritira
+        </button>
+      </span>
+    ) : c.site_status === "SOLD" ? (
+      <span>💰 venduta</span>
+    ) : (
+      <button type="button" className={pulsante} disabled={busy || c.status === "SOLD"}
+        title="In vetrina sul sito, con le foto dello scan"
+        onClick={() => azione(async () => { await pubblicaSito(c.id); onRicarica(); }, "in vetrina sul sito")}>
+        Pubblica
+      </button>
+    );
+  const statoCardTrader = c.cardtrader_product_id ? (
+    <span>
+      ✅{" "}
+      {c.cardtrader_blueprint_id && (
+        <>
+          <a href={`https://www.cardtrader.com/cards/${c.cardtrader_blueprint_id}`} target="_blank" rel="noreferrer"
+            className="underline">vedi</a>
+          {" · "}
+        </>
+      )}
+      <button type="button" className="underline" disabled={busy}
+        onClick={() => azione(async () => { await ritiraCardTrader(c.id); onRicarica(); }, "tolta da CardTrader")}>
+        ritira
+      </button>
+    </span>
+  ) : (
+    <button type="button" className={pulsante} disabled={busy || !st?.cardtrader}
+      onClick={() => azione(async () => { await pubblicaCardTrader(c.id); onRicarica(); }, "in vendita su CardTrader")}>
+      Pubblica
+    </button>
+  );
+  const statoEbay = c.ebay_listing_id ? (
+    <span>
+      ✅{" "}
+      <span className="text-ink" title={c.ebay_group_key ? `Inserzione con varianti ${c.ebay_group_key}` : undefined}>
+        {c.ebay_group_key ? `varianti${vociGruppo ? ` (${vociGruppo})` : ""}` : "singola"}
+      </span>{" · "}
+      {c.ebay_url && (
+        <>
+          <a href={c.ebay_url} target="_blank" rel="noreferrer" className="underline">vedi</a>
+          {" · "}
+        </>
+      )}
+      <button type="button" className="underline" disabled={busy}
+        onClick={() => azione(async () => { await ritiraEbay(c.id); onRicarica(); }, "tolta da eBay")}>
+        ritira
+      </button>
+    </span>
+  ) : (
+    <button type="button" className={pulsante} disabled={busy || !st?.ebay_publish}
+      onClick={() => azione(async () => { await pubblicaEbay(c.id); onRicarica(); }, "in vendita su eBay")}>
+      Pubblica
+    </button>
+  );
+
+  const canaliEPrezzi = (
+    <div className="grid grid-cols-[auto_auto_1fr] gap-x-3 gap-y-1.5 items-center text-xs text-ink-soft whitespace-nowrap">
+      <span>Sito</span>
       <CampoPrezzo etichetta="Sito" valore={c.list_price} auto={c.estimated_value}
         onSalva={(v) => salvaPrezzo("list_price", v)} />
+      {statoSito}
+      <span>CardTrader</span>
       <CampoPrezzo etichetta="CardTrader" valore={c.list_price_cardtrader} auto={c.cardtrader_price_auto}
         onSalva={(v) => salvaPrezzo("list_price_cardtrader", v)} />
+      {statoCardTrader}
+      <span>eBay</span>
       <CampoPrezzo etichetta="eBay" valore={c.list_price_ebay} auto={c.ebay_price_auto}
         onSalva={(v) => salvaPrezzo("list_price_ebay", v)} />
+      {statoEbay}
     </div>
   );
 
-  const inVendita = (
-    <>
-        <div>
-          {c.site_status === "PUBLISHED" ? (
-            <span className="text-xs text-ink-soft">
-              ✅ Sito ·{" "}
-              <a href={`/articles/${c.article_id}`} target="_blank" rel="noreferrer" className="underline">vedi</a>
-              {" · "}
-              <button type="button" className="underline" disabled={busy}
-                onClick={() => azione(async () => { await ritiraSito(c.id); onRicarica(); }, "tolta dal sito")}>
-                ritira
-              </button>
-            </span>
-          ) : c.site_status === "SOLD" ? (
-            <span className="text-xs text-ink-soft">💰 venduta sul sito</span>
-          ) : (
-            <button type="button" className="btn btn-ghost text-xs" disabled={busy || c.status === "SOLD"}
-              title="In vetrina sul sito, con le foto dello scan"
-              onClick={() => azione(async () => { await pubblicaSito(c.id); onRicarica(); }, "in vetrina sul sito")}>
-              Sito
-            </button>
-          )}
-        </div>
-        <div>
-          {c.cardtrader_product_id ? (
-            <button type="button" className="text-xs underline text-ink-soft" disabled={busy}
-              onClick={() => azione(async () => { await ritiraCardTrader(c.id); onRicarica(); }, "tolta da CardTrader")}>
-              ✅ CardTrader · ritira
-            </button>
-          ) : (
-            <button type="button" className="btn btn-ghost text-xs" disabled={busy || !st?.cardtrader}
-              onClick={() => azione(async () => { await pubblicaCardTrader(c.id); onRicarica(); }, "in vendita su CardTrader")}>
-              CardTrader
-            </button>
-          )}
-        </div>
-        <div>
-          {c.ebay_listing_id ? (
-            <span className="text-xs text-ink-soft">
-              ✅ eBay{" "}
-              <span className="text-ink" title={c.ebay_group_key ? `Inserzione con varianti ${c.ebay_group_key}` : undefined}>
-                {c.ebay_group_key ? `(varianti${vociGruppo ? `, ${vociGruppo} carte` : ""})` : "(singola)"}
-              </span>{" "}·{" "}
-              {c.ebay_url && (
-                <>
-                  <a href={c.ebay_url} target="_blank" rel="noreferrer" className="underline">vedi</a>
-                  {" · "}
-                </>
-              )}
-              <button type="button" className="underline" disabled={busy}
-                onClick={() => azione(async () => { await ritiraEbay(c.id); onRicarica(); }, "tolta da eBay")}>
-                ritira
-              </button>
-            </span>
-          ) : (
-            <button type="button" className="btn btn-ghost text-xs" disabled={busy || !st?.ebay_publish}
-              onClick={() => azione(async () => { await pubblicaEbay(c.id); onRicarica(); }, "in vendita su eBay")}>
-              eBay
-            </button>
-          )}
-        </div>
-        <div>
-          <button type="button" className="text-xs underline text-pink-deep disabled:opacity-50" disabled={busy}
-            title={c.cardtrader_product_id || c.ebay_listing_id || c.site_status === "PUBLISHED" ? "Prima ritirala dalla vendita" : undefined}
-            onClick={() => {
-              if (!window.confirm(`Eliminare «${c.name}» dalla collezione? Sparisce anche lo scan.`)) return;
-              azione(async () => { await eliminaCarta(c.id); onRicarica(); });
-            }}>
-            🗑 elimina
-          </button>
-        </div>
-</>
+  const azioni = (
+    <button type="button" className="text-xs underline text-pink-deep disabled:opacity-50" disabled={busy}
+      title={c.cardtrader_product_id || c.ebay_listing_id || c.site_status === "PUBLISHED" ? "Prima ritirala dalla vendita" : undefined}
+      onClick={() => {
+        if (!window.confirm(`Eliminare «${c.name}» dalla collezione? Sparisce anche lo scan.`)) return;
+        azione(async () => { await eliminaCarta(c.id); onRicarica(); });
+      }}>
+      🗑 elimina
+    </button>
   );
 
   if (layout === "scheda") {
@@ -1867,12 +1878,11 @@ function RigaCarta({
           <div className="text-left">{rivaluta}</div>
           <div>{venduti}</div>
         </div>
-        <div className="flex items-start justify-between gap-3 mt-2 text-sm text-ink-soft">
-          Prezzi di vendita {campoPrezzo}
+        <div className="mt-3 pt-3 border-t border-ink/10 overflow-x-auto">
+          <p className="text-[10px] uppercase tracking-wide text-ink-soft mb-1.5">Prezzo e vendita per canale</p>
+          {canaliEPrezzi}
         </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 pt-3 border-t border-ink/10 [&>div]:min-h-[2.25rem] [&>div]:flex [&>div]:items-center">
-          {inVendita}
-        </div>
+        <div className="flex justify-end mt-2">{azioni}</div>
       </li>
     );
   }
@@ -1905,8 +1915,8 @@ function RigaCarta({
         <strong className="text-ink">{eur(c.estimated_value)}</strong>
         <div>{rivaluta}</div>
       </td>
-      <td className="py-2 pr-2 text-right">{campoPrezzo}</td>
-      <td className="py-2 whitespace-nowrap space-y-1">{inVendita}</td>
+      <td className="py-2 pr-2">{canaliEPrezzi}</td>
+      <td className="py-2 text-right whitespace-nowrap">{azioni}</td>
     </tr>
   );
 }
