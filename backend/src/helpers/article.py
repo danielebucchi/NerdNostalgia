@@ -2,6 +2,7 @@
 Helper per la gestione degli articoli.
 """
 import datetime
+import re
 from datetime import datetime as dt
 from decimal import Decimal
 from typing import List, Optional, Tuple
@@ -20,6 +21,12 @@ from models.db import (
 )
 from models.entities.article import ArticleUpdate
 from utils.session import get_db
+
+
+def vinted_item_id_from_url(url: Optional[str]) -> Optional[int]:
+    """https://www.vinted.it/items/5123456789-spearow-61 → 5123456789."""
+    m = re.search(r"/items/(\d+)", url or "")
+    return int(m.group(1)) if m else None
 
 
 class ArticleHelper(BaseHelper):
@@ -94,6 +101,15 @@ class ArticleHelper(BaseHelper):
         now = dt.now(datetime.UTC)
         article.vinted_status = status
         article.vinted_url = url.strip() if url else None
+        # Il link all'annuncio aggancia l'articolo all'annuncio Vinted: da li'
+        # la sync lo segue (prezzo, venduto) anche se e' nato sul sito.
+        item_id = vinted_item_id_from_url(article.vinted_url)
+        if item_id is not None and item_id != article.vinted_item_id:
+            altro = (self.db.query(Article)
+                     .filter(Article.vinted_item_id == item_id, Article.id != article.id).first())
+            if altro is not None:
+                raise ValueError(f"Questo annuncio Vinted e' gia' collegato all'articolo #{altro.id}")
+            article.vinted_item_id = item_id
         article.vinted_price = price
         article.vinted_synced_at = now
 

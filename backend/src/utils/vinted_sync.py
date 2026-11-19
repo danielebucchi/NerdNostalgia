@@ -257,6 +257,42 @@ def _save_photo(photo_bytes: bytes, article_id: int) -> Optional[str]:
         return None
 
 
+def _norm_titolo(t: Optional[str]) -> str:
+    return " ".join((t or "").lower().split())
+
+
+def _carta_del_sito(db: Session, item: VintedItem) -> Optional[Article]:
+    """L'articolo di una carta dello scanner il cui titolo Vinted (quello
+    copiato dal pannello, card_listing.vinted_title) e' il titolo di
+    questo annuncio. Solo se ce n'e' uno: due copie della stessa carta
+    avrebbero lo stesso titolo, e meglio non agganciare che sbagliare."""
+    from models.db import PersonalCard
+    from utils.card_listing import vinted_title
+    cercato = _norm_titolo(item.title)
+    if not cercato:
+        return None
+    trovati = []
+    for card in (db.query(PersonalCard)
+                 .filter(PersonalCard.article_id.isnot(None), PersonalCard.status != "SOLD").all()):
+        art = card.article
+        if (art is not None and art.vinted_item_id is None and art.status == ArticleStatus.PUBLISHED
+                and _norm_titolo(vinted_title(card)) == cercato):
+            trovati.append(art)
+    return trovati[0] if len(trovati) == 1 else None
+
+
+def _venduto_su_vinted(db: Session, article: Article) -> None:
+    """Venduto su Vinted: venduto anche sul sito, e la carta collegata (se
+    e' una carta dello scanner) via da CardTrader ed eBay."""
+    article.status = ArticleStatus.SOLD
+    article.vinted_status = VintedStatus.SOLD
+    if not article.sold_at:
+        article.sold_at = datetime.now(_dt.UTC)
+    db.commit()
+    from utils.cardtrader_sync import auto_unpublish_on_sold
+    auto_unpublish_on_sold(db, article, "vinted")
+
+
 def _apply_item_to_article(
     db: Session,
     item: VintedItem,
@@ -276,7 +312,14 @@ def _apply_item_to_article(
         item.title, item.description, item.catalog_branch_title, item.brand,
     )
     if existing is None and detected_slug in CARD_SLUGS:
-        return None, "card_skipped"
+        # Una carta nuova non diventa articolo, ma puo' essere una carta del
+        # sito copiata su Vinted: se il titolo e' quello che generiamo noi,
+        # la si aggancia e da qui in poi si segue (venduta → ritirata).
+        existing = _carta_del_sito(db, item)
+        if existing is None:
+            return None, "card_skipped"
+        existing.vinted_item_id = item.item_id
+        LOGGER.info("Annuncio Vinted %s agganciato all'articolo %s (titolo carta)", item.item_id, existing.id)
     if detected_slug:
         target_category_id = _resolve_category_id(db, detected_slug)
 
@@ -300,6 +343,9 @@ def _apply_item_to_article(
         if existing.vinted_status != new_status:
             existing.vinted_status = new_status
             changed = True
+        if new_status == VintedStatus.SOLD and existing.status == ArticleStatus.PUBLISHED:
+            _venduto_su_vinted(db, existing)
+            return existing, "updated"
         if (not existing.description) and item.description:
             existing.description = item.description
             changed = True
@@ -668,17 +714,23 @@ def archive_missing_items(
                 continue
 
             if piano[item_id] == "sold":
-                article.status = ArticleStatus.SOLD
-                article.vinted_status = VintedStatus.SOLD
-                if not article.sold_at:
-                    article.sold_at = datetime.now(_dt.UTC)
-                db.commit()
+                _venduto_su_vinted(db, article)
                 sold.append(item_id)
                 LOGGER.info(
                     "Articolo %s (Vinted item %s) marcato SOLD: venduto su Vinted",
                     article.id, item_id,
                 )
             else:
+                from utils.card_listing import is_collection_article
+                if is_collection_article(db, article):
+                    # Carta nata sul sito e copiata su Vinted: tolta da Vinted
+                    # resta in vendita qui, si stacca solo l'annuncio.
+                    article.vinted_status = VintedStatus.NOT_LISTED
+                    article.vinted_item_id = None
+                    db.commit()
+                    LOGGER.info("Articolo %s: annuncio Vinted %s tolto, resta sul sito",
+                                article.id, item_id)
+                    continue
                 article.status = ArticleStatus.ARCHIVED
                 article.vinted_status = VintedStatus.NOT_LISTED
                 db.commit()

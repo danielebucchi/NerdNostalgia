@@ -639,7 +639,7 @@ def unpublish_site(db: Session, card: PersonalCard) -> None:
         db.commit()
 
 
-def on_article_sold(db: Session, article: Article) -> None:
+def on_article_sold(db: Session, article: Article, piattaforma: str = "sito") -> None:
     """Venduta sul sito: la carta della collezione diventa VENDUTA e si
     ritira da CardTrader ed eBay, per non venderla due volte. Best effort:
     la vendita sul sito non deve fallire per un marketplace che non
@@ -649,8 +649,8 @@ def on_article_sold(db: Session, article: Article) -> None:
         return
     card.status = PersonalCardStatus.SOLD
     card.sold_date = _now().date()
-    card.sold_platform = "sito"
-    card.sale_price = article.price
+    card.sold_platform = piattaforma
+    card.sale_price = article.vinted_price if piattaforma == "vinted" and article.vinted_price else article.price
     db.commit()
     for nome, fn, attiva in (("CardTrader", unpublish_cardtrader, card.cardtrader_product_id),
                              ("eBay", unpublish_ebay, card.ebay_listing_id)):

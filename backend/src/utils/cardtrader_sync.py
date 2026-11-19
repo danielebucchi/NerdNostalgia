@@ -347,7 +347,7 @@ def auto_publish_if_card(
         return {"status": "error", "reason": str(exc)}
 
 
-def auto_unpublish_on_sold(db, article: Article) -> None:
+def auto_unpublish_on_sold(db, article: Article, piattaforma: str = "sito") -> None:
     """Hook alla vendita: toglie la carta da CardTrader per non venderla
     due volte. Best-effort."""
     try:
@@ -360,7 +360,7 @@ def auto_unpublish_on_sold(db, article: Article) -> None:
     # dalle sue inserzioni CardTrader/eBay.
     try:
         from utils.card_listing import on_article_sold
-        on_article_sold(db, article)
+        on_article_sold(db, article, piattaforma)
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         LOGGER.warning("Carta della collezione non aggiornata per articolo %s: %s", article.id, exc)

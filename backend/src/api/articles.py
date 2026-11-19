@@ -572,12 +572,20 @@ def update_vinted_sync(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Articolo con ID {article_id} non trovato",
         )
-    article_helper.set_vinted(
-        article,
-        VintedStatus(payload.vinted_status.value),
-        payload.vinted_url,
-        payload.vinted_price,
-    )
+    era_venduto = article.status == ArticleStatus.SOLD
+    try:
+        article_helper.set_vinted(
+            article,
+            VintedStatus(payload.vinted_status.value),
+            payload.vinted_url,
+            payload.vinted_price,
+        )
+    except ValueError as exc:
+        article_helper.db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if article.status == ArticleStatus.SOLD and not era_venduto:
+        # Venduto su Vinted: la carta collegata via da CardTrader ed eBay.
+        cts.auto_unpublish_on_sold(article_helper.db, article, "vinted")
     return _to_response(article)
 
 
