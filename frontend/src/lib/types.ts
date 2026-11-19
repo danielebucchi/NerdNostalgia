@@ -97,6 +97,8 @@ export interface Article {
    *  ("Spearow 61 ex guardiani dei cristalli IT pokemon"). */
   vinted_title?: string | null;
   vinted_description?: string | null;
+  /** Prezzo proposto per Vinted: minimo CardTrader + 2 € all'euro superiore. */
+  vinted_price_suggested?: number | null;
   cardtrader_synced_at: string | null;
   created_at: string;
   updated_at: string;

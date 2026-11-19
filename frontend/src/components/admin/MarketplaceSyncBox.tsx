@@ -230,7 +230,10 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
     } else {
       // Prezzo: number puro (senza simbolo/valuta) — Vinted/eBay hanno un
       // input numerico che vuole solo cifre + punto/virgola decimale.
-      const raw = price.trim() || current.price || article.price;
+      // Carte su Vinted senza un prezzo scritto: quello della regola carte.
+      const regola = config.key === "vinted" && article.vinted_price_suggested != null
+        ? article.vinted_price_suggested.toFixed(2) : null;
+      const raw = price.trim() || current.price || regola || article.price;
       text = String(raw ?? "");
     }
     try {
@@ -322,6 +325,16 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
           <span className="text-[10px] uppercase tracking-wider text-ink-soft self-center mr-1">
             Da catalogo:
           </span>
+          {config.key === "vinted" && article.vinted_price_suggested != null && (
+            <button
+              type="button"
+              onClick={() => setPrice(article.vinted_price_suggested!.toFixed(2))}
+              className="text-[11px] font-bold px-2.5 py-1 rounded-full ring-2 ring-pink-deep bg-pink-soft/60 hover:bg-pink-soft transition-all"
+              title="Minimo CardTrader + 2 € arrotondato all'euro superiore (sopra i 15 €: suggerito normale)"
+            >
+              Regola carte: {article.vinted_price_suggested.toFixed(2)}
+            </button>
+          )}
           {commissioni.map((f) => (
             <button
               key={`${f.percent}-${f.fixed}`}

@@ -167,6 +167,8 @@ class ArticleResponse(BaseModel):
     # (vedi card_listing.vinted_title). Solo nella pagina del singolo articolo.
     vinted_title: Optional[str] = None
     vinted_description: Optional[str] = None
+    # Prezzo proposto per Vinted (card_listing.vinted_price).
+    vinted_price_suggested: Optional[float] = None
     created_at: str
     updated_at: str
     published_at: Optional[str]

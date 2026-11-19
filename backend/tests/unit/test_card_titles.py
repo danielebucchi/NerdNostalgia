@@ -43,3 +43,17 @@ def test_vinted_title_keeps_letter_codes_and_flags():
     c = _carta(name="Mago Nero", printed_code="LOB-IT005", collection="Legend of Blue Eyes",
                game_id=4, reverse=True)
     assert vinted_title(c) == "Mago Nero LOB-IT005 reverse legend of blue eyes IT yu-gi-oh"
+
+
+def test_vinted_price_is_cardtrader_minimum_plus_two_rounded_up():
+    """La regola usata su Vinted: +2..3 € sul minimo, all'euro superiore."""
+    from decimal import Decimal
+    from utils.card_listing import vinted_price
+    assert vinted_price(_carta(cardtrader_price=Decimal("2.60"))) == 5.0     # +2,40
+    assert vinted_price(_carta(cardtrader_price=Decimal("12.10"))) == 15.0   # +2,90
+    assert vinted_price(_carta(cardtrader_price=Decimal("3.00"))) == 5.0     # +2 esatti
+    # Sopra i 15 €: suggerito normale (+7%) all'euro superiore
+    assert vinted_price(_carta(cardtrader_price=Decimal("16.00"))) == 18.0   # 17,15 → 18
+    # Senza minimo CardTrader: dal prezzo della carta
+    assert vinted_price(_carta(cardtrader_price=None, list_price=Decimal("1.50"))) == 4.0
+    assert vinted_price(_carta(cardtrader_price=None)) is None

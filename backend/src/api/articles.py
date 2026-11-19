@@ -417,9 +417,10 @@ def get_article(
     risposta.marketplace_links = _marketplace_links(article)
     carta = _carta_collegata(article)
     if carta is not None:
-        from utils.card_listing import vinted_description, vinted_title
+        from utils.card_listing import vinted_description, vinted_price, vinted_title
         risposta.vinted_title = vinted_title(carta)
         risposta.vinted_description = vinted_description(carta)
+        risposta.vinted_price_suggested = vinted_price(carta)
     return risposta
 
 

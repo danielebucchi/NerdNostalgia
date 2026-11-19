@@ -578,6 +578,30 @@ def vinted_title(card: PersonalCard) -> str:
     return " ".join(p for p in parti if p)
 
 
+VINTED_SOGLIA = 15.0
+VINTED_RICARICO = 2.0
+
+
+def vinted_price(card: PersonalCard) -> Optional[float]:
+    """Prezzo per Vinted, con la regola che usi su Vinted: minimo CardTrader
+    + 2 euro arrotondato all'euro superiore, cioe' da +2 a +3 (2,60 → 5;
+    12,10 → 15). Sopra i 15 euro il suggerito normale (minimo + ricarico a
+    fasce), arrotondato all'euro. Senza minimo CardTrader si parte dal
+    prezzo della carta."""
+    import math
+    from utils.card_pricing import ricarico
+    if card.cardtrader_price is not None and float(card.cardtrader_price) > 0:
+        base = float(card.cardtrader_price)
+    else:
+        try:
+            base = sale_price(card)
+        except ValueError:
+            return None
+    if base < VINTED_SOGLIA:
+        return float(math.ceil(round(base + VINTED_RICARICO, 6)))
+    return float(math.ceil(ricarico(base)))
+
+
 def vinted_description(card: PersonalCard) -> str:
     """Titolo e lingua; il footer Vinted lo aggiunge chi copia (impostazioni)."""
     lingua = LINGUE_EBAY.get((card.language or "").lower(), card.language or "")
