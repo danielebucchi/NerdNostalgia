@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
 import { CategoryPicker } from "@/components/admin/CategoryPicker";
 import { Sortable } from "@/components/admin/Sortable";
-import { calcMarkup } from "@/components/admin/MarketplaceSyncBox";
 import { useCategories } from "@/lib/useCategories";
 import {
-  getMarkupsFromFees,
+  feeLabel,
+  getFeesFor,
+  priceCoveringFee,
   grossUpPrice,
   netAfterFee,
   resolveFee,
@@ -867,7 +868,7 @@ function MarketplacePicker({
   const { fees } = useMarketplaceFees();
   const { byId } = useCategories();
   const parentId = categoryId != null ? byId[categoryId]?.parent_id ?? null : null;
-  const markups = getMarkupsFromFees(fees, marketplace, categoryId, parentId);
+  const commissioni = getFeesFor(fees, marketplace, categoryId, parentId);
 
   return (
     <div
@@ -942,17 +943,17 @@ function MarketplacePicker({
                 <span className="text-[10px] uppercase tracking-wider text-ink-soft self-center mr-1">
                   Da catalogo:
                 </span>
-                {markups.map((m) => (
+                {commissioni.map((f) => (
                   <button
-                    key={m}
+                    key={`${f.percent}-${f.fixed}`}
                     type="button"
                     onClick={() =>
-                      onChange({ ...state, price: calcMarkup(basePrice, m) })
+                      onChange({ ...state, price: priceCoveringFee(basePrice, f, marketplace) })
                     }
                     className="text-[11px] font-bold px-2.5 py-1 rounded-full ring-1 ring-ink/15 bg-white/80 backdrop-blur hover:ring-lilac-deep hover:bg-lilac-soft transition-all"
-                    title={`${basePrice} + ${m}% = ${calcMarkup(basePrice, m)}`}
+                    title={`Tolta la commissione ti restano ${basePrice}: ${priceCoveringFee(basePrice, f, marketplace)}`}
                   >
-                    {m === 0 ? "uguale" : `+${m}%`}
+                    {feeLabel(f)}
                   </button>
                 ))}
                 {state.price && (

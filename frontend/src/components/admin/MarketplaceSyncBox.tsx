@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/admin-api";
-import { getMarkupsFromFees, useMarketplaceFees } from "@/lib/useMarketplaceFees";
+import { feeLabel, getFeesFor, priceCoveringFee, useMarketplaceFees } from "@/lib/useMarketplaceFees";
 import type { Article, MarketplaceStatus } from "@/lib/types";
 
 export type MarketplaceKey = "vinted" | "ebay";
@@ -53,12 +53,6 @@ function fetchFooters(): Promise<Record<string, string>> {
       });
   }
   return footersPromise;
-}
-
-export function calcMarkup(basePrice: string | number, percent: number): string {
-  const base = typeof basePrice === "string" ? Number(basePrice) : basePrice;
-  if (!Number.isFinite(base) || base <= 0) return "";
-  return (base * (1 + percent / 100)).toFixed(2);
 }
 
 const STATUS_LABEL: Record<MarketplaceStatus, string> = {
@@ -147,7 +141,7 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
   const config = CONFIGS[marketplace];
   const current = getMarketplaceData(article, marketplace);
   const { fees } = useMarketplaceFees();
-  const markups = getMarkupsFromFees(
+  const commissioni = getFeesFor(
     fees,
     marketplace,
     article.category_id,
@@ -321,15 +315,15 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
           <span className="text-[10px] uppercase tracking-wider text-ink-soft self-center mr-1">
             Da catalogo:
           </span>
-          {markups.map((m) => (
+          {commissioni.map((f) => (
             <button
-              key={m}
+              key={`${f.percent}-${f.fixed}`}
               type="button"
-              onClick={() => setPrice(calcMarkup(article.price, m))}
+              onClick={() => setPrice(priceCoveringFee(article.price, f, marketplace))}
               className="text-[11px] font-bold px-2.5 py-1 rounded-full ring-1 ring-ink/15 bg-white/80 backdrop-blur hover:ring-lilac-deep hover:bg-lilac-soft transition-all"
-              title={`Calcola ${article.price} ${article.currency} + ${m}% = ${calcMarkup(article.price, m)} ${article.currency}`}
+              title={`Tolta la commissione ti restano ${article.price} ${article.currency}: ${priceCoveringFee(article.price, f, marketplace)} ${article.currency}`}
             >
-              {m === 0 ? "uguale" : `+${m}%`}
+              {feeLabel(f)}
             </button>
           ))}
           {price && (

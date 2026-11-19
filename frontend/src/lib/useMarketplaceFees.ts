@@ -48,46 +48,6 @@ export function useMarketplaceFees(): State {
   return { fees, loading, error, reload: () => setBump((b) => b + 1) };
 }
 
-/**
- * Risolve i markup per (marketplace, category) cercando in ordine:
- *   1) match esatto su category_id
- *   2) match sulla categoria padre (per le sottocategorie)
- *   3) default del marketplace (category_id NULL)
- *   4) fallback hardcoded
- */
-export function getMarkupsFromFees(
-  fees: MarketplaceFee[],
-  marketplace: string,
-  categoryId: number | null,
-  parentCategoryId: number | null = null,
-): number[] {
-  if (fees.length === 0) {
-    return FALLBACK[marketplace] ?? [];
-  }
-
-  if (categoryId != null) {
-    const specific = fees.filter(
-      (f) => f.marketplace === marketplace && f.category_id === categoryId,
-    );
-    if (specific.length > 0) return specific.map((f) => Number(f.markup_percent));
-  }
-
-  if (parentCategoryId != null) {
-    const parent = fees.filter(
-      (f) => f.marketplace === marketplace && f.category_id === parentCategoryId,
-    );
-    if (parent.length > 0) return parent.map((f) => Number(f.markup_percent));
-  }
-
-  const defaults = fees.filter(
-    (f) => f.marketplace === marketplace && f.category_id == null,
-  );
-  if (defaults.length > 0) return defaults.map((f) => Number(f.markup_percent));
-
-  return FALLBACK[marketplace] ?? [];
-}
-
-
 /* ───────────────── Commissioni del canale di vendita diretta ─────────────────
  * "sito" = quello che tratteni tu vendendo dal tuo sito, cioe' la commissione
  * del gateway di pagamento (PayPal, Stripe). A differenza dei marketplace ha
@@ -156,4 +116,55 @@ export function grossUpPrice(net: number, fee: ResolvedFee): number | null {
 export function netAfterFee(gross: number, fee: ResolvedFee): number | null {
   if (!Number.isFinite(gross) || gross <= 0) return null;
   return Math.round((gross - (gross * fee.percent) / 100 - fee.fixed) * 100) / 100;
+}
+
+
+/**
+ * Le commissioni complete (percentuale + quota fissa) per (marketplace,
+ * categoria), cercando in ordine: categoria esatta, categoria padre,
+ * default del marketplace, ripiego fisso (FALLBACK). Ogni voce diventa un
+ * pulsante "copri la commissione" nei riquadri marketplace.
+ */
+export function getFeesFor(
+  fees: MarketplaceFee[],
+  marketplace: string,
+  categoryId: number | null,
+  parentCategoryId: number | null = null,
+): ResolvedFee[] {
+  const of = (predicate: (f: MarketplaceFee) => boolean) =>
+    fees
+      .filter((f) => f.marketplace === marketplace && predicate(f))
+      .map((f) => ({ percent: Number(f.markup_percent), fixed: Number(f.fixed_fee ?? 0) }));
+  if (fees.length === 0) return (FALLBACK[marketplace] ?? []).map((percent) => ({ percent, fixed: 0 }));
+  for (const livello of [
+    categoryId != null ? of((f) => f.category_id === categoryId) : [],
+    parentCategoryId != null ? of((f) => f.category_id === parentCategoryId) : [],
+    of((f) => f.category_id == null),
+  ]) {
+    if (livello.length > 0) return livello;
+  }
+  return (FALLBACK[marketplace] ?? []).map((percent) => ({ percent, fixed: 0 }));
+}
+
+/** eBay non accetta inserzioni a prezzo fisso sotto 1 euro. */
+const MINIMO: Record<string, number> = { ebay: 1 };
+
+/**
+ * Prezzo sul marketplace che, tolta la commissione, lascia `base` in tasca
+ * (grossUpPrice), mai sotto il minimo del marketplace. Stringa "12.34"
+ * pronta per il campo prezzo; "" se il prezzo base non e' valido.
+ */
+export function priceCoveringFee(base: string | number, fee: ResolvedFee, marketplace: string): string {
+  const gross = grossUpPrice(Number(base), fee);
+  if (gross == null) return "";
+  return Math.max(gross, MINIMO[marketplace] ?? 0).toFixed(2);
+}
+
+/** Etichetta del pulsante: "+6.5% +0,35 €", o "uguale" senza commissione. */
+export function feeLabel(fee: ResolvedFee): string {
+  if (!fee.percent && !fee.fixed) return "uguale";
+  const parti = [];
+  if (fee.percent) parti.push(`+${fee.percent}%`);
+  if (fee.fixed) parti.push(`+${fee.fixed.toFixed(2).replace(".", ",")} €`);
+  return parti.join(" ");
 }
