@@ -330,7 +330,7 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
               type="button"
               onClick={() => setPrice(article.vinted_price_suggested!.toFixed(2))}
               className="text-[11px] font-bold px-2.5 py-1 rounded-full ring-2 ring-pink-deep bg-pink-soft/60 hover:bg-pink-soft transition-all"
-              title="Minimo CardTrader: sotto 0,90 → 1 €; 0,90-1,10 → 2 €; poi +2 € (sopra i 15 € anche il 15% della parte che li supera), all'euro superiore"
+              title="Minimo CardTrader: sotto 0,90 → 1 €; fino a 1,10 → 2 €; fino a 1,90 → 3 €; poi +2 € (sopra i 15 € anche il 15% della parte che li supera), all'euro superiore"
             >
               Regola carte: {article.vinted_price_suggested.toFixed(2)}
             </button>

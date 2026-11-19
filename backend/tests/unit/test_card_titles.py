@@ -63,7 +63,11 @@ def test_vinted_price_is_cardtrader_minimum_plus_two_rounded_up():
     assert vinted_price(_carta(cardtrader_price=Decimal("0.89"))) == 1.0
     assert vinted_price(_carta(cardtrader_price=Decimal("0.90"))) == 2.0
     assert vinted_price(_carta(cardtrader_price=Decimal("1.10"))) == 2.0
-    assert vinted_price(_carta(cardtrader_price=Decimal("1.20"))) == 4.0
+    # Da 1,11 a 1,90 → 3 €, poi la regola +2 riprende senza salti
+    assert vinted_price(_carta(cardtrader_price=Decimal("1.11"))) == 3.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("1.20"))) == 3.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("1.90"))) == 3.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("1.95"))) == 4.0
     # Senza minimo CardTrader: dal prezzo della carta
-    assert vinted_price(_carta(cardtrader_price=None, list_price=Decimal("1.50"))) == 4.0  # 1,50 + 2 → 4
+    assert vinted_price(_carta(cardtrader_price=None, list_price=Decimal("1.50"))) == 3.0  # scalino 1,11-1,90
     assert vinted_price(_carta(cardtrader_price=None)) is None
