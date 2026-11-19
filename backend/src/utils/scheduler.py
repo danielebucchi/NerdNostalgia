@@ -75,7 +75,13 @@ def _price_watch_job():
 
 
 def start_scheduler() -> None:
-    """Avvia lo scheduler in background. Disabilitabile con env DISABLE_SCHEDULER=1."""
+    """Avvia lo scheduler in background.
+
+    DISABLE_SCHEDULER=1 spegne tutto (test, sviluppo).
+    DISABLE_VINTED_SYNC=1 spegne solo la sync Vinted: in produzione Vinted
+    blocca l'IP del server (Cloudflare) e la sync gira dal Mac. Prima per
+    questo si usava DISABLE_SCHEDULER, che pero' spegneva anche backup,
+    controllo vendite e rivalutazione: da luglio non si facevano backup."""
     global _scheduler
     if os.getenv("DISABLE_SCHEDULER") == "1":
         LOGGER.info("Scheduler disabilitato da env DISABLE_SCHEDULER=1")
@@ -83,13 +89,16 @@ def start_scheduler() -> None:
     if _scheduler is not None:
         return
     _scheduler = BackgroundScheduler(timezone=APP_TZ)
-    # Job orario che decide internamente se eseguire (basato su sync_hour)
-    _scheduler.add_job(
-        _vinted_job,
-        CronTrigger(minute=5),
-        id="vinted_sync_hourly_check",
-        replace_existing=True,
-    )
+    if os.getenv("DISABLE_VINTED_SYNC") == "1":
+        LOGGER.info("Sync Vinted dal server spenta (DISABLE_VINTED_SYNC=1): gira dal Mac")
+    else:
+        # Job orario che decide internamente se eseguire (basato su sync_hour)
+        _scheduler.add_job(
+            _vinted_job,
+            CronTrigger(minute=5),
+            id="vinted_sync_hourly_check",
+            replace_existing=True,
+        )
     # Vendite su CardTrader/eBay ogni 15 minuti: una carta venduta li' non
     # deve restare in vendita sul sito e sull'altro marketplace.
     _scheduler.add_job(

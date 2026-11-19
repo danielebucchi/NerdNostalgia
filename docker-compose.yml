@@ -30,6 +30,8 @@ services:
       - APP_TIMEZONE=${APP_TIMEZONE:-Europe/Rome}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-change-me}
       - DISABLE_SCHEDULER=${DISABLE_SCHEDULER:-}
+      # Solo la sync Vinted (in produzione gira dal Mac): gli altri job restano.
+      - DISABLE_VINTED_SYNC=${DISABLE_VINTED_SYNC:-}
       # URL pubblico del sito, usato nei link delle email (avvisi nuovi
       # arrivi, inquiry). Riusa la stessa var del frontend.
       - SITE_PUBLIC_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3737}
