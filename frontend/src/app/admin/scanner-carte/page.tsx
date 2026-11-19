@@ -1079,6 +1079,17 @@ type Vista = "da_caricare" | "in_vendita" | "vendute" | "tutte";
 
 const NOMI_CANALI: Record<keyof Canali, string> = { site: "Sito", cardtrader: "CardTrader", ebay: "eBay" };
 
+type Ordine = "recenti" | "numero";
+
+/** Per espansione e poi per numero stampato, contando i numeri come numeri:
+ *  "9/191" prima di "10/191", come stanno nel raccoglitore. */
+function perNumero(a: PersonalCard, b: PersonalCard): number {
+  const set = (a.collection || "").localeCompare(b.collection || "", "it");
+  if (set) return set;
+  const num = (c: PersonalCard) => c.printed_code || c.card_number || "";
+  return num(a).localeCompare(num(b), "it", { numeric: true }) || a.id - b.id;
+}
+
 const VISTE: { id: Vista; label: string; filtro: (c: PersonalCard) => boolean }[] = [
   { id: "da_caricare", label: "Da mettere in vendita",
     filtro: (c) => c.status !== "SOLD" && c.status !== "ARCHIVED" && canali(c).length === 0 },
@@ -1114,7 +1125,18 @@ function Collezione({
     setSelezione(new Set());
     window.localStorage.setItem("nn_scanner_vista", v);
   }
-  const carte = tutte.filter(VISTE.find((x) => x.id === vista)!.filtro);
+  // Anche l'ordine resta quello scelto l'ultima volta.
+  const [ordine, setOrdineStato] = useState<Ordine>("recenti");
+  useEffect(() => {
+    if (window.localStorage.getItem("nn_scanner_ordine") === "numero") setOrdineStato("numero");
+  }, []);
+  function setOrdine(o: Ordine) {
+    setOrdineStato(o);
+    window.localStorage.setItem("nn_scanner_ordine", o);
+  }
+  const filtrate = tutte.filter(VISTE.find((x) => x.id === vista)!.filtro);
+  // "recenti": l'ordine del server.
+  const carte = ordine === "numero" ? [...filtrate].sort(perNumero) : filtrate;
   const [busy, setBusy] = useState(false);
   const [avanzamento, setAvanzamento] = useState<string | null>(null);
   const [esito, setEsito] = useState<string | null>(null);
@@ -1279,6 +1301,11 @@ function Collezione({
             </button>
           );
         })}
+        <select className="input text-sm !w-auto ml-auto py-1.5" value={ordine} aria-label="Ordine"
+          onChange={(e) => setOrdine(e.target.value as Ordine)}>
+          <option value="recenti">Più recenti</option>
+          <option value="numero">Per numero</option>
+        </select>
       </div>
 
       {/* Su telefono la barra resta in vista sotto l'intestazione mentre si

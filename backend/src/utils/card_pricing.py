@@ -96,7 +96,8 @@ def ebay_query(card: PersonalCard) -> str:
 def ebay_sold_url(card: PersonalCard) -> str:
     """Ricerca dei venduti su ebay.it, da aprire nel browser."""
     q = urllib.parse.quote_plus(ebay_query(card))
-    return f"https://www.ebay.it/sch/i.html?_nkw={q}&LH_Sold=1&LH_Complete=1&_sop=13"
+    # LH_PrefLoc=1: solo oggetti che si trovano in Italia, come la ricerca via API.
+    return f"https://www.ebay.it/sch/i.html?_nkw={q}&LH_Sold=1&LH_Complete=1&_sop=13&LH_PrefLoc=1"
 
 
 def summarize_sold(vendite: Iterable[dict], n: int = ULTIME_VENDITE) -> Optional[dict]:

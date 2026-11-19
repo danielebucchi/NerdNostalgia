@@ -344,7 +344,9 @@ def sold_items_search(query: str, limit: int = 50, category_id: Optional[str] = 
     """Vendite concluse negli ultimi 90 giorni che corrispondono alla
     ricerca. Ogni voce: title, lastSoldPrice{value,currency},
     lastSoldDate, itemWebUrl, totalSoldQuantity."""
-    params: Dict[str, Any] = {"q": query, "limit": limit}
+    # Solo venduti da venditori in Italia: i prezzi esteri (spedizione,
+    # mercato diverso) falsano la media di quello che qui si incassa.
+    params: Dict[str, Any] = {"q": query, "limit": limit, "filter": "itemLocationCountry:IT"}
     if category_id:
         params["category_ids"] = category_id
     url = f"{_api_base()}/buy/marketplace_insights/v1_beta/item_sales/search"

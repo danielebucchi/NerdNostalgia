@@ -199,6 +199,12 @@ def ebay_title(card: PersonalCard) -> str:
     parti = [card.name]
     if card.printed_code:
         parti.append(card.printed_code)
+    # Subito dopo il codice: reverse e prima edizione cambiano il prezzo,
+    # e chi le cerca scrive proprio questo.
+    if card.reverse:
+        parti.append("Reverse")
+    if card.first_edition:
+        parti.append("1a Edizione")
     if card.collection:
         parti.append(card.collection)
     lingua = LINGUE_EBAY.get((card.language or "").lower())
