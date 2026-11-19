@@ -37,8 +37,10 @@ const CONFIGS: Record<MarketplaceKey, MarketplaceConfig> = {
   },
 };
 
-// Cache module-level: la pagina articolo monta 2 SyncBox (Vinted + eBay),
-// una sola GET /api/settings/ basta per entrambe.
+// La pagina articolo monta 2 SyncBox (Vinted + eBay): la richiesta in
+// corso si condivide, ma finita si butta. Tenerla per tutta la sessione
+// faceva copiare il footer vecchio dopo averlo cambiato in Impostazioni
+// (nell'app installata la pagina non si ricarica quasi mai).
 let footersPromise: Promise<Record<string, string>> | null = null;
 function fetchFooters(): Promise<Record<string, string>> {
   if (!footersPromise) {
@@ -47,9 +49,9 @@ function fetchFooters(): Promise<Record<string, string>> {
       .then((entries) =>
         Object.fromEntries(entries.map((e) => [e.key, e.effective])),
       )
-      .catch(() => {
-        footersPromise = null; // ritenta al prossimo mount
-        return {};
+      .catch(() => ({}) as Record<string, string>)
+      .finally(() => {
+        footersPromise = null;
       });
   }
   return footersPromise;

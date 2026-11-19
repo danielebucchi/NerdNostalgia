@@ -119,7 +119,14 @@ export default function AdminSettingsPage() {
             </label>
           ))}
 
-          <div className="flex items-center gap-3 pt-2 border-t border-ink/10">
+          {/* Con modifiche in sospeso la barra resta in fondo allo schermo:
+              il pulsante sta sotto tutte le impostazioni e non si vedeva, e
+              una modifica non salvata sembrava presa. Su telefono sopra la
+              barra di navigazione del pannello. */}
+          <div className={
+            "flex items-center gap-3 pt-2 border-t border-ink/10 " +
+            (dirty ? "sticky bottom-16 md:bottom-0 z-10 -mx-5 px-5 sm:-mx-6 sm:px-6 py-3 bg-white/95 backdrop-blur shadow-[0_-4px_12px_rgba(0,0,0,0.06)]" : "")
+          }>
             <button
               type="button"
               onClick={handleSave}
@@ -132,7 +139,7 @@ export default function AdminSettingsPage() {
               <span className="text-sm text-mint-deep font-semibold">✓ Salvate</span>
             )}
             {dirty && !savedAt && (
-              <span className="text-xs text-ink-soft">Modifiche non salvate</span>
+              <span className="text-xs font-semibold text-pink-deep">Modifiche non salvate</span>
             )}
           </div>
         </div>
