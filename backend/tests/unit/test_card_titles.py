@@ -22,3 +22,9 @@ def test_ebay_title_without_flags_is_unchanged():
 
 def test_sold_search_only_looks_at_italy():
     assert "LH_PrefLoc=1" in ebay_sold_url(_carta())
+
+
+def test_site_title_starts_with_the_game():
+    from utils.card_listing import site_title
+    assert site_title(_carta()).startswith("Pokémon · Charizard · Base Set 004/102")
+    assert site_title(_carta(game_id=None)).startswith("Charizard ·")

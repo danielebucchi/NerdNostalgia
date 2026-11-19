@@ -1193,12 +1193,21 @@ function Collezione({
   // varianti (il compratore sceglie la carta da un menu). Nuova, o
   // aggiungendo le carte a una gia' pubblicata.
   const [ebayVarianti, setEbayVarianti] = useState(false);
-  const [titoloGruppo, setTitoloGruppo] = useState("Carte singole - scegli la tua carta");
+  const [titoloGruppo, setTitoloGruppo] = useState("");
   const [gruppoScelto, setGruppoScelto] = useState("");
   const [gruppi, setGruppi] = useState<GruppoEbay[]>([]);
   useEffect(() => {
     if (pannello && ebayVarianti) gruppiEbay().then(setGruppi).catch(() => setGruppi([]));
   }, [pannello, ebayVarianti]);
+  // Titolo proposto all'apertura del pannello: col gioco delle carte scelte,
+  // se sono tutte dello stesso.
+  useEffect(() => {
+    if (!pannello) return;
+    const giochi = new Set(scelte.map((c) => c.game_id));
+    const gioco = giochi.size === 1 ? GIOCHI.find((g) => g.id === scelte[0]?.game_id)?.label : undefined;
+    setTitoloGruppo(gioco ? `Carte ${gioco} singole - scegli la tua carta` : "Carte singole - scegli la tua carta");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pannello]);
   const conVarianti = ebayVarianti && canaliAttivi.includes("ebay");
 
   async function mettiInVendita() {

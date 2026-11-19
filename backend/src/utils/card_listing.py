@@ -468,8 +468,17 @@ def _categoria(db: Session, card: PersonalCard) -> Optional[int]:
     return None
 
 
+# Come si scrivono in vetrina (NOMI_GIOCO resta senza accenti: e' il valore
+# dell'item specific "Gioco" su eBay).
+GIOCHI_VETRINA = {5: "Pokémon", 1: "Magic", 4: "Yu-Gi-Oh!", 15: "One Piece"}
+
+
 def site_title(card: PersonalCard) -> str:
-    parti = [card.name, "·", card.collection or "", card.printed_code or card.card_number or ""]
+    """Es. "Pokémon · Durant ex · Surging Sparks 004/191 (IT)": il gioco in
+    testa, che nel catalogo del sito si cerca anche per quello."""
+    gioco = GIOCHI_VETRINA.get(card.game_id or 0)
+    parti = ([gioco, "·"] if gioco else []) + [
+        card.name, "·", card.collection or "", card.printed_code or card.card_number or ""]
     lingua = (card.language or "").upper()
     extra = [x for x in (lingua, "1ª ed." if card.first_edition else "",
                          "Reverse" if card.reverse else "") if x]
