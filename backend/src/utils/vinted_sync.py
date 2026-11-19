@@ -163,6 +163,14 @@ CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 
+# Le carte non arrivano piu' dal profilo Vinted: hanno il loro canale
+# (eBay/CardTrader). Un annuncio carta nuovo non diventa articolo; quelli
+# gia' a catalogo restano e si aggiornano (prezzo, venduto) come prima.
+CARD_SLUGS = frozenset({
+    "carte", "pokemon", "magic-the-gathering", "yu-gi-oh",
+    "dragon-ball", "one-piece",
+})
+
 # Sottocategorie di Giocattoli: le serie hanno anche i loro videogiochi.
 TOY_SLUGS = frozenset({"gormiti", "bakugan", "beyblade", "altri-giocattoli"})
 
@@ -253,8 +261,9 @@ def _apply_item_to_article(
     db: Session,
     item: VintedItem,
     user_id: int,
-) -> tuple[Article, str]:
-    """Ritorna (article, op) dove op = 'created' | 'updated' | 'skipped'."""
+) -> tuple[Optional[Article], str]:
+    """Ritorna (article, op) dove op = 'created' | 'updated' | 'skipped'
+    | 'card_skipped' (carta nuova, non importata: article e' None)."""
     existing = (
         db.query(Article)
         .filter(Article.vinted_item_id == item.item_id)
@@ -266,6 +275,8 @@ def _apply_item_to_article(
     detected_slug = _detect_category_slug(
         item.title, item.description, item.catalog_branch_title, item.brand,
     )
+    if existing is None and detected_slug in CARD_SLUGS:
+        return None, "card_skipped"
     if detected_slug:
         target_category_id = _resolve_category_id(db, detected_slug)
 
@@ -385,6 +396,7 @@ def persist_items(
     imported = 0
     updated = 0
     skipped = 0
+    cards_skipped = 0
 
     try:
         owner_user_id = _admin_user_id(db)
@@ -402,6 +414,11 @@ def persist_items(
                 updated += 1
             else:
                 skipped += 1
+                if op == "card_skipped":
+                    cards_skipped += 1
+        if cards_skipped:
+            LOGGER.info("Carte nuove non importate (canale carte separato): %d",
+                        cards_skipped)
 
         if update_last_run:
             settings = db.query(VintedSettings).order_by(VintedSettings.id.asc()).first()

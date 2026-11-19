@@ -297,18 +297,39 @@ def test_sold_rispetta_il_gate_server_side(auth_client, db_session, admin_user):
 
 
 # --------------------------- import senza filtro ---------------------------
-def test_import_porta_sul_sito_tutto_il_profilo(auth_client, db_session, monkeypatch):
+def test_import_porta_sul_sito_tutto_il_profilo_tranne_le_carte(
+    auth_client, db_session, admin_user, monkeypatch,
+):
     # Niente download foto in test.
     monkeypatch.setattr("utils.vinted_sync.download_photo", lambda url: b"")
+    # Una carta gia' a catalogo: resta e si aggiorna (qui: venduta su Vinted).
+    gia_online = _article(admin_user, 10313354869)
+    gia_online.title = "Machamp vmax 73 lucentezza siderale"
+    db_session.add(gia_online)
+    db_session.commit()
+
     items = [
         {"item_id": 10312549335, "title": "Dragonite v astro swsh236 swsh black star promos",
          "url": "https://www.vinted.it/items/10312549335", "price": 3, "brand": "Pokémon"},
+        {"item_id": 10636185855, "title": "Anguilla reale delle paludi crms-it086 cerimonia crisi yu gi oh",
+         "url": "https://www.vinted.it/items/10636185855", "price": 3},
+        {"item_id": 10313354869, "title": "Machamp vmax 73 lucentezza siderale",
+         "url": "https://www.vinted.it/items/10313354869", "price": 4, "brand": "Pokémon",
+         "status": "sold"},
         {"item_id": 10444176301, "title": "Glenn cooper la biblioteca dei morti",
          "url": "https://www.vinted.it/items/10444176301", "price": 5},
+        {"item_id": 10496864879, "title": "Mini playset Gormiti cupola teschio + 2 personaggi",
+         "url": "https://www.vinted.it/items/10496864879", "price": 15},
     ]
     r = _import(auth_client, seen=[i["item_id"] for i in items], items=items)
     assert r.status_code == 200
-    assert r.json()["items_imported"] == 2
+    body = r.json()
+    assert body["items_imported"] == 2
+    assert body["items_updated"] == 1
+
     rows = {a.vinted_item_id: a for a in db_session.query(Article).all()}
-    assert rows[10312549335].status == ArticleStatus.PUBLISHED
+    assert 10312549335 not in rows
+    assert 10636185855 not in rows
+    assert rows[10313354869].vinted_status == VintedStatus.SOLD
     assert rows[10444176301].status == ArticleStatus.PUBLISHED
+    assert rows[10496864879].status == ArticleStatus.PUBLISHED
