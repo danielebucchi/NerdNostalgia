@@ -1072,9 +1072,33 @@ function canali(c: PersonalCard): string[] {
   return [
     c.site_status === "PUBLISHED" && "Sito",
     c.cardtrader_product_id && "CardTrader",
-    c.ebay_listing_id && "eBay",
+    c.ebay_listing_id && (c.ebay_group_key ? "eBay (varianti)" : "eBay"),
   ].filter(Boolean) as string[];
 }
+
+const sulSito = (c: PersonalCard) => c.site_status === "PUBLISHED";
+const suCardTrader = (c: PersonalCard) => !!c.cardtrader_product_id;
+const suEbay = (c: PersonalCard) => !!c.ebay_listing_id;
+
+/* Filtro per canale: dove e' gia' caricata una carta, e su eBay come (da
+ * sola o come voce di un'inserzione con varianti). Le voci "non su" servono
+ * a trovare cosa manca da caricare. */
+type FiltroCanale =
+  | "tutti" | "sito" | "cardtrader" | "ebay" | "ebay_singola" | "ebay_varianti"
+  | "nessuno" | "no_sito" | "no_cardtrader" | "no_ebay";
+
+const FILTRI_CANALE: { id: FiltroCanale; label: string; filtro: (c: PersonalCard) => boolean }[] = [
+  { id: "tutti", label: "Tutti i canali", filtro: () => true },
+  { id: "sito", label: "Sul sito", filtro: sulSito },
+  { id: "cardtrader", label: "Su CardTrader", filtro: suCardTrader },
+  { id: "ebay", label: "Su eBay", filtro: suEbay },
+  { id: "ebay_singola", label: "eBay: inserzione singola", filtro: (c) => suEbay(c) && !c.ebay_group_key },
+  { id: "ebay_varianti", label: "eBay: con varianti", filtro: (c) => suEbay(c) && !!c.ebay_group_key },
+  { id: "nessuno", label: "Su nessun canale", filtro: (c) => !sulSito(c) && !suCardTrader(c) && !suEbay(c) },
+  { id: "no_sito", label: "Non sul sito", filtro: (c) => !sulSito(c) },
+  { id: "no_cardtrader", label: "Non su CardTrader", filtro: (c) => !suCardTrader(c) },
+  { id: "no_ebay", label: "Non su eBay", filtro: (c) => !suEbay(c) },
+];
 
 type Vista = "da_caricare" | "in_vendita" | "vendute" | "tutte";
 
@@ -1135,7 +1159,21 @@ function Collezione({
     setOrdineStato(o);
     window.localStorage.setItem("nn_scanner_ordine", o);
   }
-  const filtrate = tutte.filter(VISTE.find((x) => x.id === vista)!.filtro);
+  const [canale, setCanaleStato] = useState<FiltroCanale>("tutti");
+  useEffect(() => {
+    const v = window.localStorage.getItem("nn_scanner_canale") as FiltroCanale | null;
+    if (v && FILTRI_CANALE.some((f) => f.id === v)) setCanaleStato(v);
+  }, []);
+  function setCanale(c: FiltroCanale) {
+    setCanaleStato(c);
+    setSelezione(new Set()); // come per le viste: niente azioni su carte nascoste
+    window.localStorage.setItem("nn_scanner_canale", c);
+  }
+  const nellaVista = tutte.filter(VISTE.find((x) => x.id === vista)!.filtro);
+  const filtrate = nellaVista.filter(FILTRI_CANALE.find((f) => f.id === canale)!.filtro);
+  // Quante voci ha ogni inserzione con varianti: lo mostra la riga.
+  const vociGruppo: Record<string, number> = {};
+  for (const c of tutte) if (c.ebay_group_key && c.ebay_listing_id) vociGruppo[c.ebay_group_key] = (vociGruppo[c.ebay_group_key] || 0) + 1;
   // "recenti": l'ordine del server.
   const carte = ordine === "numero" ? [...filtrate].sort(perNumero) : filtrate;
   const [busy, setBusy] = useState(false);
@@ -1272,6 +1310,7 @@ function Collezione({
     onCambiata: sostituisci,
     onRicarica: () => onCerca(cerca),
     st,
+    vociGruppo: c.ebay_group_key ? vociGruppo[c.ebay_group_key] : undefined,
   });
 
   const valoreTotale = tutte
@@ -1330,7 +1369,15 @@ function Collezione({
             </button>
           );
         })}
-        <select className="input text-sm !w-auto ml-auto py-1.5" value={ordine} aria-label="Ordine"
+        <select className={"input text-sm !w-auto ml-auto py-1.5 " + (canale !== "tutti" ? "ring-2 ring-lilac-deep" : "")}
+          value={canale} aria-label="Canale" onChange={(e) => setCanale(e.target.value as FiltroCanale)}>
+          {FILTRI_CANALE.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.label} ({nellaVista.filter(f.filtro).length})
+            </option>
+          ))}
+        </select>
+        <select className="input text-sm !w-auto py-1.5" value={ordine} aria-label="Ordine"
           onChange={(e) => setOrdine(e.target.value as Ordine)}>
           <option value="recenti">Più recenti</option>
           <option value="numero">Per numero</option>
@@ -1565,6 +1612,7 @@ function RigaCarta({
   onCambiata,
   onRicarica,
   st,
+  vociGruppo,
 }: {
   layout: "riga" | "scheda";
   carta: PersonalCard;
@@ -1573,6 +1621,8 @@ function RigaCarta({
   onCambiata: (c: PersonalCard) => void;
   onRicarica: () => void;
   st: StatoScanner | null;
+  /** Carte nella stessa inserzione con varianti (se la carta ne fa parte). */
+  vociGruppo?: number;
 }) {
   const [busy, setBusy] = useState(false);
   const [nota, setNota] = useState<string | null>(null);
@@ -1741,7 +1791,10 @@ function RigaCarta({
         <div>
           {c.ebay_listing_id ? (
             <span className="text-xs text-ink-soft">
-              ✅ eBay ·{" "}
+              ✅ eBay{" "}
+              <span className="text-ink" title={c.ebay_group_key ? `Inserzione con varianti ${c.ebay_group_key}` : undefined}>
+                {c.ebay_group_key ? `(varianti${vociGruppo ? `, ${vociGruppo} carte` : ""})` : "(singola)"}
+              </span>{" "}·{" "}
               {c.ebay_url && (
                 <>
                   <a href={c.ebay_url} target="_blank" rel="noreferrer" className="underline">vedi</a>
