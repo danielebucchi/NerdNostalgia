@@ -58,6 +58,12 @@ def test_vinted_price_is_cardtrader_minimum_plus_two_rounded_up():
     assert vinted_price(_carta(cardtrader_price=Decimal("30.00"))) == 35.0
     assert vinted_price(_carta(cardtrader_price=Decimal("50.00"))) == 58.0
     assert vinted_price(_carta(cardtrader_price=Decimal("100.00"))) == 115.0
+    # Carte economiche: sotto 0,90 → 1 €; intorno all'euro (±0,10) → 2 €
+    assert vinted_price(_carta(cardtrader_price=Decimal("0.13"))) == 1.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("0.89"))) == 1.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("0.90"))) == 2.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("1.10"))) == 2.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("1.20"))) == 4.0
     # Senza minimo CardTrader: dal prezzo della carta
-    assert vinted_price(_carta(cardtrader_price=None, list_price=Decimal("1.50"))) == 4.0
+    assert vinted_price(_carta(cardtrader_price=None, list_price=Decimal("1.50"))) == 4.0  # 1,50 + 2 → 4
     assert vinted_price(_carta(cardtrader_price=None)) is None
