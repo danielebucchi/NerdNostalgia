@@ -163,6 +163,10 @@ class ArticleResponse(BaseModel):
     # Dove si compra anche fuori dal sito, per la pagina pubblica:
     # {"cardtrader": url, "ebay": url}, solo gli annunci attivi.
     marketplace_links: Dict[str, str] = {}
+    # Per le carte dello scanner: titolo e descrizione nel formato di Vinted
+    # (vedi card_listing.vinted_title). Solo nella pagina del singolo articolo.
+    vinted_title: Optional[str] = None
+    vinted_description: Optional[str] = None
     created_at: str
     updated_at: str
     published_at: Optional[str]

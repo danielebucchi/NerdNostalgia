@@ -815,3 +815,11 @@ def test_italian_card_uses_the_italian_names_in_titles(client, admin_headers, db
 
     card.language = "es"
     assert "Durant ex" in cl.ebay_title(card) and "Surging Sparks" in cl.site_title(card)
+
+
+def test_article_page_gives_the_vinted_title_of_the_card(client, admin_headers, db_session):
+    carta = _carta_confermata(client, admin_headers)
+    art_id = client.post(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers).json()["article_id"]
+    a = client.get(f"/api/articles/{art_id}").json()
+    assert a["vinted_title"] == "Durant ex 4 reverse surging sparks IT pokemon"  # la carta di prova e' reverse
+    assert a["vinted_description"].endswith("Lingua italiano")

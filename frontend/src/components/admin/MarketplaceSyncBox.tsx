@@ -213,10 +213,15 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
 
   async function copyField(field: "title" | "description" | "price") {
     let text = "";
+    // Carte dello scanner su Vinted: titolo e descrizione fatti per la
+    // ricerca di Vinted, non quelli del sito.
+    const vintedCarta = config.key === "vinted" && article.vinted_title;
     if (field === "title") {
-      text = article.title;
+      text = vintedCarta ? article.vinted_title! : article.title;
     } else if (field === "description") {
-      text = buildDescription(article, footer);
+      text = vintedCarta
+        ? [article.vinted_description, footer].filter(Boolean).join("\n")
+        : buildDescription(article, footer);
       // Anche la descrizione dell'articolo: quelle importate da Vinted
       // citano spesso il profilo o altri annunci.
       if (config.key === "ebay") text = withoutOffEbayContacts(text);

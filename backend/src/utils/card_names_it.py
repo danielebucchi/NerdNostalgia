@@ -76,9 +76,13 @@ def _set_pokemon(nome_inglese: str) -> Optional[str]:
     if not isinstance(elenco, list):
         return None
     cercato = _norm(nome_inglese)
-    for s in elenco:
-        if _norm(s.get("name")) == cercato:
-            return s.get("id")
+    # CardTrader chiama i set dell'era EX "EX Crystal Guardians", TCGdex
+    # "Crystal Guardians": se non c'e' il nome esatto, si riprova senza.
+    candidati = [cercato] + ([cercato[2:]] if cercato.startswith("ex") and len(cercato) > 2 else [])
+    for nome in candidati:
+        for s in elenco:
+            if _norm(s.get("name")) == nome:
+                return s.get("id")
     return None
 
 

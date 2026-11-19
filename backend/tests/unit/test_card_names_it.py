@@ -33,3 +33,14 @@ def test_a_source_down_leaves_the_english_names(monkeypatch):
     monkeypatch.setattr(cn, "_get", lambda url, params=None: None)
     assert cn.cerca(5, "Surging Sparks", "004/191") == (None, None)
     assert cn.cerca(15, "Romance Dawn", "OP01-001") == (None, None)
+
+
+def test_old_ex_sets_match_without_the_ex_prefix(monkeypatch):
+    """CardTrader dice "EX Crystal Guardians", TCGdex "Crystal Guardians"."""
+    cn._cache_set.clear()
+    risposte = {
+        "https://api.tcgdex.net/v2/en/sets": [{"id": "ex14", "name": "Crystal Guardians"}],
+        "https://api.tcgdex.net/v2/it/sets/ex14": {"name": "EX Guardiani dei Cristalli", "cards": []},
+    }
+    monkeypatch.setattr(cn, "_get", lambda url, params=None: risposte.get(url))
+    assert cn.cerca(5, "EX Crystal Guardians", "061/100") == (None, "EX Guardiani dei Cristalli")

@@ -93,6 +93,10 @@ export interface Article {
   cardtrader_product_id: number | null;
   /** Dove si compra anche fuori dal sito (solo nella pagina del singolo articolo). */
   marketplace_links?: { cardtrader?: string; ebay?: string };
+  /** Carte dello scanner: titolo e descrizione nel formato di Vinted
+   *  ("Spearow 61 ex guardiani dei cristalli IT pokemon"). */
+  vinted_title?: string | null;
+  vinted_description?: string | null;
   cardtrader_synced_at: string | null;
   created_at: string;
   updated_at: string;

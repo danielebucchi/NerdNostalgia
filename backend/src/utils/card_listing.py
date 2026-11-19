@@ -521,6 +521,38 @@ def site_title(card: PersonalCard) -> str:
     return titolo[:255]
 
 
+def _numero_breve(card: PersonalCard) -> Optional[str]:
+    """"061/100" → "61": come lo scrive chi cerca. I codici con lettere
+    ("TG05/TG30", "LOB-IT005") restano come sono, senza il totale."""
+    codice = (card.printed_code or card.card_number or "").split("/")[0].strip()
+    if codice.isdigit():
+        return codice.lstrip("0") or "0"
+    return codice or None
+
+
+def vinted_title(card: PersonalCard) -> str:
+    """Es. "Spearow 61 ex guardiani dei cristalli IT pokemon": nome, numero
+    corto, set in minuscolo, lingua, gioco. Le parole che si scrivono nella
+    ricerca di Vinted, senza la punteggiatura del titolo del sito."""
+    parti = [nome_vetrina(card), _numero_breve(card)]
+    if card.reverse:
+        parti.append("reverse")
+    if card.first_edition:
+        parti.append("1a edizione")
+    parti += [(set_vetrina(card) or "").lower(), (card.language or "").upper(),
+              NOMI_GIOCO.get(card.game_id or 0, "").lower()]
+    return " ".join(p for p in parti if p)
+
+
+def vinted_description(card: PersonalCard) -> str:
+    """Titolo e lingua; il footer Vinted lo aggiunge chi copia (impostazioni)."""
+    lingua = LINGUE_EBAY.get((card.language or "").lower(), card.language or "")
+    righe = [vinted_title(card)]
+    if lingua:
+        righe.append(f"Lingua {lingua.lower()}")
+    return "\n".join(righe)
+
+
 def site_description(card: PersonalCard) -> str:
     righe = [
         f"{nome_vetrina(card)} — {set_vetrina(card) or ''} {card.printed_code or card.card_number or ''}".strip(),

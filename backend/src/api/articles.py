@@ -90,6 +90,15 @@ def _calc_inventory_metrics(article: Article) -> dict:
 CARDTRADER_CARTA = "https://www.cardtrader.com/cards/{}"
 
 
+def _carta_collegata(article: Article):
+    """La carta della collezione (scanner) venduta tramite questo articolo."""
+    db = object_session(article)
+    if db is None:
+        return None
+    from models.db import PersonalCard
+    return db.query(PersonalCard).filter(PersonalCard.article_id == article.id).first()
+
+
 def _marketplace_links(article: Article) -> dict:
     """Gli annunci attivi dello stesso pezzo su CardTrader ed eBay. Per le
     carte dello scanner le inserzioni stanno sulla carta della collezione
@@ -99,11 +108,9 @@ def _marketplace_links(article: Article) -> dict:
         links["cardtrader"] = CARDTRADER_CARTA.format(article.cardtrader_blueprint_id)
     if article.ebay_url and article.ebay_status == EbayStatus.LISTED:
         links["ebay"] = article.ebay_url
-    db = object_session(article)
-    if db is not None and len(links) < 2:
-        from models.db import PersonalCard
+    if len(links) < 2:
         from utils.card_listing import ebay_listing_url
-        carta = db.query(PersonalCard).filter(PersonalCard.article_id == article.id).first()
+        carta = _carta_collegata(article)
         if carta is not None and carta.status != "SOLD":
             if carta.cardtrader_product_id and carta.cardtrader_blueprint_id:
                 links.setdefault("cardtrader", CARDTRADER_CARTA.format(carta.cardtrader_blueprint_id))
@@ -408,6 +415,11 @@ def get_article(
     # Solo qui e non nell'elenco: costa una query per articolo, e i link
     # servono alla pagina del singolo pezzo.
     risposta.marketplace_links = _marketplace_links(article)
+    carta = _carta_collegata(article)
+    if carta is not None:
+        from utils.card_listing import vinted_description, vinted_title
+        risposta.vinted_title = vinted_title(carta)
+        risposta.vinted_description = vinted_description(carta)
     return risposta
 
 
