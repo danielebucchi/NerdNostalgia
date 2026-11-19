@@ -4,7 +4,7 @@ Entities Pydantic per gli articoli.
 import enum
 from datetime import date
 from decimal import Decimal
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -160,6 +160,9 @@ class ArticleResponse(BaseModel):
     cardtrader_blueprint_id: Optional[int] = None
     cardtrader_product_id: Optional[int] = None
     cardtrader_synced_at: Optional[str] = None
+    # Dove si compra anche fuori dal sito, per la pagina pubblica:
+    # {"cardtrader": url, "ebay": url}, solo gli annunci attivi.
+    marketplace_links: Dict[str, str] = {}
     created_at: str
     updated_at: str
     published_at: Optional[str]

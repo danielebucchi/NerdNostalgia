@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import object_session
 
 from helpers.article import ArticleHelper, get_article_helper
 from helpers.auth import require_admin
@@ -84,6 +85,31 @@ def _calc_inventory_metrics(article: Article) -> dict:
         "profit": profit,
         "immobilizzato": immobilizzato,
     }
+
+
+CARDTRADER_CARTA = "https://www.cardtrader.com/cards/{}"
+
+
+def _marketplace_links(article: Article) -> dict:
+    """Gli annunci attivi dello stesso pezzo su CardTrader ed eBay. Per le
+    carte dello scanner le inserzioni stanno sulla carta della collezione
+    collegata all'articolo, non sull'articolo."""
+    links = {}
+    if article.cardtrader_product_id and article.cardtrader_blueprint_id:
+        links["cardtrader"] = CARDTRADER_CARTA.format(article.cardtrader_blueprint_id)
+    if article.ebay_url and article.ebay_status == EbayStatus.LISTED:
+        links["ebay"] = article.ebay_url
+    db = object_session(article)
+    if db is not None and len(links) < 2:
+        from models.db import PersonalCard
+        from utils.card_listing import ebay_listing_url
+        carta = db.query(PersonalCard).filter(PersonalCard.article_id == article.id).first()
+        if carta is not None and carta.status != "SOLD":
+            if carta.cardtrader_product_id and carta.cardtrader_blueprint_id:
+                links.setdefault("cardtrader", CARDTRADER_CARTA.format(carta.cardtrader_blueprint_id))
+            if carta.ebay_listing_id:
+                links.setdefault("ebay", ebay_listing_url(carta))
+    return links
 
 
 def _to_response(article: Article) -> ArticleResponse:
@@ -344,7 +370,11 @@ def get_article(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Articolo con ID {article_id} non trovato",
         )
-    return _to_response(article)
+    risposta = _to_response(article)
+    # Solo qui e non nell'elenco: costa una query per articolo, e i link
+    # servono alla pagina del singolo pezzo.
+    risposta.marketplace_links = _marketplace_links(article)
+    return risposta
 
 
 @router.get("/sku/{sku}", response_model=ArticleResponse)

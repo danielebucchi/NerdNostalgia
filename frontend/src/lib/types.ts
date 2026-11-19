@@ -91,6 +91,8 @@ export interface Article {
   ebay_price: string | null;
   cardtrader_blueprint_id: number | null;
   cardtrader_product_id: number | null;
+  /** Dove si compra anche fuori dal sito (solo nella pagina del singolo articolo). */
+  marketplace_links?: { cardtrader?: string; ebay?: string };
   cardtrader_synced_at: string | null;
   created_at: string;
   updated_at: string;

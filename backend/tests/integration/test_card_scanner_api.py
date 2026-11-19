@@ -776,3 +776,20 @@ def test_each_platform_can_have_its_own_price(client, admin_headers, db_session,
     assert r.status_code == 200, r.text
     assert r.json()["price_eur"] == 1.00
     assert aggiornate[-1]["pricingSummary"]["price"]["value"] == "1.00"
+
+
+def test_site_page_links_to_the_same_card_on_cardtrader_and_ebay(client, admin_headers, db_session, monkeypatch):
+    """La pagina dell'articolo sa dove la stessa carta e' in vendita anche
+    fuori dal sito; l'elenco no (costerebbe una query per articolo)."""
+    carta = _carta_confermata(client, admin_headers)
+    art_id = client.post(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers).json()["article_id"]
+    assert client.get(f"/api/articles/{art_id}").json()["marketplace_links"] == {}
+
+    client.post(f"/api/card-scanner/cards/{carta['id']}/cardtrader", headers=admin_headers)
+    card = db_session.get(PersonalCard, carta["id"])
+    card.ebay_listing_id = "800000000123"
+    db_session.commit()
+    links = client.get(f"/api/articles/{art_id}").json()["marketplace_links"]
+    assert links["cardtrader"] == "https://www.cardtrader.com/cards/10"
+    assert links["ebay"].endswith("/itm/800000000123")
+    assert all(a["marketplace_links"] == {} for a in client.get("/api/articles/").json()["items"])

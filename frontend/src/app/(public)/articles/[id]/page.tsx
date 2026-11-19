@@ -224,6 +224,8 @@ export default async function ArticleDetailPage({ params }: PageProps) {
             {article.dimensions_cm && <Row label="Dimensioni" value={article.dimensions_cm} />}
           </dl>
 
+          <MarketplaceLinks links={article.marketplace_links} />
+
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <WishlistButton articleId={article.id} variant="full" />
             <ShareButtons
@@ -263,6 +265,27 @@ export default async function ArticleDetailPage({ params }: PageProps) {
       <StickyCtaBar article={article} />
       <AdminArticleEditor articleId={article.id} />
     </article>
+  );
+}
+
+/** Lo stesso pezzo in vendita anche su CardTrader / eBay: chi preferisce
+ *  comprare li' (protezione acquisti, feedback) trova l'annuncio diretto. */
+function MarketplaceLinks({ links }: { links?: Article["marketplace_links"] }) {
+  const voci = [
+    links?.cardtrader && { url: links.cardtrader, label: "CardTrader" },
+    links?.ebay && { url: links.ebay, label: "eBay" },
+  ].filter(Boolean) as { url: string; label: string }[];
+  if (!voci.length) return null;
+  return (
+    <p className="mt-5 text-sm text-ink-soft flex flex-wrap items-center gap-2">
+      Lo trovi anche su
+      {voci.map((v) => (
+        <a key={v.label} href={v.url} target="_blank" rel="noopener noreferrer"
+          className="chip chip-sky hover:opacity-80">
+          {v.label} ↗
+        </a>
+      ))}
+    </p>
   );
 }
 
