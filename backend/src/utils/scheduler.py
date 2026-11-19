@@ -48,6 +48,20 @@ def _vinted_job():
         db.close()
 
 
+def _sales_job():
+    """Vendite su CardTrader/eBay: la carta si ritira dagli altri canali."""
+    from utils import sales_sync
+    db = SessionLocal()
+    try:
+        esito = sales_sync.run(db)
+        if esito["vendute"]:
+            LOGGER.info("Vendite fuori dal sito: %s", esito["vendute"])
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Controllo vendite fallito: %s", exc)
+    finally:
+        db.close()
+
+
 def start_scheduler() -> None:
     """Avvia lo scheduler in background. Disabilitabile con env DISABLE_SCHEDULER=1."""
     global _scheduler
@@ -63,6 +77,16 @@ def start_scheduler() -> None:
         CronTrigger(minute=5),
         id="vinted_sync_hourly_check",
         replace_existing=True,
+    )
+    # Vendite su CardTrader/eBay ogni 15 minuti: una carta venduta li' non
+    # deve restare in vendita sul sito e sull'altro marketplace.
+    _scheduler.add_job(
+        _sales_job,
+        CronTrigger(minute="*/15"),
+        id="marketplace_sales_sync",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     # Backup giornaliero (SQLite snapshot + tar uploads) alle 03:30 locali
     _scheduler.add_job(

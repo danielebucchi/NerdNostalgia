@@ -250,6 +250,13 @@ export interface GruppoEbay {
   count: number;
 }
 
+/** Vendite su CardTrader/eBay subito (il server lo fa da solo ogni 15 minuti). */
+export interface EsitoVendite {
+  vendute: { card_id: number; nome: string; piattaforma: string; prezzo: number | null; da_ritirare_a_mano: string[] }[];
+  errori: Record<string, string>;
+}
+export const controllaVendite = () => adminApi.post<EsitoVendite>(`${B}/sync-sales`);
+
 export const gruppiEbay = () => adminApi.get<GruppoEbay[]>(`${B}/ebay-groups`);
 
 /** Le carte in un'unica inserzione con varianti; con groupKey si aggiungono

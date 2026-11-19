@@ -28,6 +28,7 @@ import {
   pubblicaCardTrader,
   pubblicaEbay,
   pubblicaOvunque,
+  controllaVendite,
   gruppiEbay,
   pubblicaGruppoEbay,
   type GruppoEbay,
@@ -1293,6 +1294,25 @@ function Collezione({
           />
           <button type="button" className="btn btn-ghost text-sm" onClick={() => scaricaCsv().catch((e) => setEsito(msg(e)))}>
             📄 Esporta CSV
+          </button>
+          <button type="button" className="btn btn-ghost text-sm" disabled={busy}
+            title="Cerca vendite su CardTrader ed eBay e ritira le carte vendute dagli altri canali (lo fa anche da solo ogni 15 minuti)"
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const r = await controllaVendite();
+                const righe = r.vendute.map((v) =>
+                  `${v.nome}: venduta su ${v.piattaforma}${v.da_ritirare_a_mano.length ? ` (ritira a mano da ${v.da_ritirare_a_mano.join(", ")})` : ""}`);
+                Object.entries(r.errori).forEach(([k, e]) => righe.push(`${k} non risponde: ${e}`));
+                setEsito(righe.length ? righe.join("\n") : "Nessuna vendita nuova su CardTrader o eBay");
+                if (r.vendute.length) onCerca(cerca);
+              } catch (e) {
+                setEsito(msg(e));
+              } finally {
+                setBusy(false);
+              }
+            }}>
+            🔄 Controlla vendite
           </button>
         </div>
       </div>

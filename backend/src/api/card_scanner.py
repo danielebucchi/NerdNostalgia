@@ -755,6 +755,14 @@ def unpublish_site(card_id: int, db: Session = Depends(get_db), _admin: User = D
     return {"ok": True}
 
 
+@router.post("/sync-sales")
+def sync_sales(db: Session = Depends(get_db), _admin: User = Depends(require_admin)):
+    """Il controllo delle vendite su CardTrader/eBay subito, senza
+    aspettare il giro dei 15 minuti."""
+    from utils import sales_sync
+    return sales_sync.run(db)
+
+
 class EbayGroupRequest(BaseModel):
     card_ids: List[int]
     title: Optional[str] = None
