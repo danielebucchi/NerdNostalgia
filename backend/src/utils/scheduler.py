@@ -62,6 +62,18 @@ def _sales_job():
         db.close()
 
 
+def _price_watch_job():
+    """Rivalutazione settimanale: segnala i prezzi lontani dal mercato."""
+    from utils import price_watch
+    db = SessionLocal()
+    try:
+        price_watch.run(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Rivalutazione settimanale fallita: %s", exc)
+    finally:
+        db.close()
+
+
 def start_scheduler() -> None:
     """Avvia lo scheduler in background. Disabilitabile con env DISABLE_SCHEDULER=1."""
     global _scheduler
@@ -84,6 +96,16 @@ def start_scheduler() -> None:
         _sales_job,
         CronTrigger(minute="*/15"),
         id="marketplace_sales_sync",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    # Lunedi' alle 04:15: rivaluta le carte in vendita e segnala per email
+    # quelle il cui prezzo di mercato si e' spostato (i prezzi non li tocca).
+    _scheduler.add_job(
+        _price_watch_job,
+        CronTrigger(day_of_week="mon", hour=4, minute=15),
+        id="weekly_price_watch",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
