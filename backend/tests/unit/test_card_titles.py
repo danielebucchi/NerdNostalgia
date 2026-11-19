@@ -52,8 +52,12 @@ def test_vinted_price_is_cardtrader_minimum_plus_two_rounded_up():
     assert vinted_price(_carta(cardtrader_price=Decimal("2.60"))) == 5.0     # +2,40
     assert vinted_price(_carta(cardtrader_price=Decimal("12.10"))) == 15.0   # +2,90
     assert vinted_price(_carta(cardtrader_price=Decimal("3.00"))) == 5.0     # +2 esatti
-    # Sopra i 15 €: suggerito normale (+7%) all'euro superiore
-    assert vinted_price(_carta(cardtrader_price=Decimal("16.00"))) == 18.0   # 17,15 → 18
+    # Sopra i 15 € il ricarico cresce (+15% della parte sopra i 15), senza salti
+    assert vinted_price(_carta(cardtrader_price=Decimal("15.00"))) == 17.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("20.00"))) == 23.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("30.00"))) == 35.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("50.00"))) == 58.0
+    assert vinted_price(_carta(cardtrader_price=Decimal("100.00"))) == 115.0
     # Senza minimo CardTrader: dal prezzo della carta
     assert vinted_price(_carta(cardtrader_price=None, list_price=Decimal("1.50"))) == 4.0
     assert vinted_price(_carta(cardtrader_price=None)) is None

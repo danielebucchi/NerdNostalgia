@@ -580,16 +580,19 @@ def vinted_title(card: PersonalCard) -> str:
 
 VINTED_SOGLIA = 15.0
 VINTED_RICARICO = 2.0
+# Sopra la soglia il ricarico cresce: su Vinted si tratta (offerte di solito
+# 10-20% sotto), e sulle carte care 2-3 euro non lasciano margine.
+VINTED_QUOTA_SOPRA = 0.15
 
 
 def vinted_price(card: PersonalCard) -> Optional[float]:
     """Prezzo per Vinted, con la regola che usi su Vinted: minimo CardTrader
     + 2 euro arrotondato all'euro superiore, cioe' da +2 a +3 (2,60 → 5;
-    12,10 → 15). Sopra i 15 euro il suggerito normale (minimo + ricarico a
-    fasce), arrotondato all'euro. Senza minimo CardTrader si parte dal
-    prezzo della carta."""
+    12,10 → 15). Sopra i 15 euro in piu' il 15% della parte che supera i 15,
+    cosi' il ricarico cresce col prezzo senza salti (20 → 23, 30 → 35,
+    50 → 58, 100 → 115). Senza minimo CardTrader si parte dal prezzo della
+    carta."""
     import math
-    from utils.card_pricing import ricarico
     if card.cardtrader_price is not None and float(card.cardtrader_price) > 0:
         base = float(card.cardtrader_price)
     else:
@@ -597,9 +600,8 @@ def vinted_price(card: PersonalCard) -> Optional[float]:
             base = sale_price(card)
         except ValueError:
             return None
-    if base < VINTED_SOGLIA:
-        return float(math.ceil(round(base + VINTED_RICARICO, 6)))
-    return float(math.ceil(ricarico(base)))
+    extra = max(base - VINTED_SOGLIA, 0) * VINTED_QUOTA_SOPRA
+    return float(math.ceil(round(base + VINTED_RICARICO + extra, 6)))
 
 
 def vinted_description(card: PersonalCard) -> str:
