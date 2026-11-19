@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getPublicSettings, listAllArticles } from "@/lib/api";
+import { getCatalog, getPublicSettings, type CatalogPage } from "@/lib/api";
 import { CatalogSection } from "@/components/CatalogSection";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { LogoImage } from "@/components/LogoImage";
@@ -10,14 +10,13 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  let articles: Awaited<ReturnType<typeof listAllArticles>> = [];
+  let catalogo: CatalogPage | null = null;
   let error: string | null = null;
 
   try {
-    // Tutto il catalogo: ricerca, filtri e conteggi girano nel browser e
-    // devono vedere ogni articolo, non solo i 100 piu' recenti. Quando
-    // diventera' pesante servira' la ricerca lato server.
-    articles = await listAllArticles({ status: "PUBLISHED" });
+    // Solo la prima pagina e i conteggi dei filtri: il resto lo chiede il
+    // catalogo man mano (ricerca e filtri li fa il server).
+    catalogo = await getCatalog({ limit: 24 });
   } catch (err) {
     error = err instanceof Error ? err.message : "Errore sconosciuto";
   }
@@ -93,7 +92,7 @@ export default async function HomePage() {
           <h2 className="display text-2xl sm:text-3xl text-ink">Catalogo</h2>
         </div>
 
-        {error ? (
+        {error || !catalogo ? (
           <div className="card p-6 text-center">
             <p className="display text-lg text-pink-deep mb-1">
               Backend non raggiungibile
@@ -104,7 +103,7 @@ export default async function HomePage() {
             </p>
           </div>
         ) : (
-          <CatalogSection initialArticles={articles} />
+          <CatalogSection initial={catalogo} />
         )}
       </section>
     </>

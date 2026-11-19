@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArticleCard } from "@/components/ArticleCard";
+import { getCatalog, type CatalogFacets, type CatalogPage } from "@/lib/api";
 import type { Article, ArticleCondition } from "@/lib/types";
 
 // Persistenza preferenza aperto/chiuso del pannello filtri.
@@ -9,20 +10,6 @@ import type { Article, ArticleCondition } from "@/lib/types";
 // v2: bump della chiave quando e' cambiato il default aperto→chiuso,
 // cosi' anche i visitatori con la vecchia preferenza ripartono chiusi.
 const PANEL_STORAGE_KEY = "nn:catalog-filters-open:v2";
-
-/** Slug top-level di un articolo (sé stesso se categoria top, altrimenti il parent). */
-function topSlugOf(article: Article): string | null {
-  if (!article.category) return null;
-  if (article.category.parent_id == null) return article.category.slug;
-  return article.parent_category?.slug ?? null;
-}
-
-/** Slug della sottocategoria (null se l'articolo ha solo categoria top-level). */
-function subSlugOf(article: Article): string | null {
-  if (!article.category) return null;
-  if (article.category.parent_id == null) return null;
-  return article.category.slug;
-}
 
 const CONDITION_LABEL: Record<ArticleCondition, string> = {
   NEW: "Nuovo",
@@ -64,17 +51,28 @@ const SORT_LABEL: Record<SortKey, string> = {
   title: "Titolo A-Z",
 };
 
+const PAGE = 24;
+
 interface Props {
-  initialArticles: Article[];
+  /** Prima pagina e conteggi, gia' pronti dal server (SSR). */
+  initial: CatalogPage;
 }
 
-export function CatalogSection({ initialArticles }: Props) {
+export function CatalogSection({ initial }: Props) {
   const [filters, setFilters] = useState<FilterState>(EMPTY);
   const [sort, setSort] = useState<SortKey>("recent");
   // Pannello filtri: CHIUSO di default (si vede subito il catalogo),
   // preferenza persistita in localStorage. Vale per tutti i breakpoint.
   const [panelOpen, setPanelOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  // Ricerca, filtri e conteggi li fa il server: qui c'e' solo la pagina
+  // (o le pagine, con "Mostra altri") di quello che si sta guardando.
+  const [items, setItems] = useState<Article[]>(initial.items);
+  const [total, setTotal] = useState(initial.total);
+  const [facets, setFacets] = useState<CatalogFacets>(initial.facets);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const first = useRef(true);
 
   useEffect(() => {
     try {
@@ -108,6 +106,65 @@ export function CatalogSection({ initialArticles }: Props) {
     return () => window.removeEventListener("nn:catalog-search", onSearch);
   }, []);
 
+  function query(skip: number) {
+    return {
+      search: filters.search,
+      category: filters.category,
+      subcategory: filters.subcategory,
+      condition: filters.condition,
+      brand: filters.brand,
+      min_price: filters.minPrice,
+      max_price: filters.maxPrice,
+      sort,
+      skip,
+      limit: PAGE,
+    };
+  }
+
+  // Ogni cambio di filtri o ordine riparte dalla prima pagina. La ricerca
+  // aspetta che si smetta di scrivere; le richieste superate si annullano.
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return; // la prima pagina e' gia' arrivata dal server
+    }
+    const ctrl = new AbortController();
+    const t = window.setTimeout(() => {
+      setLoading(true);
+      setError(null);
+      getCatalog(query(0), ctrl.signal)
+        .then((r) => {
+          setItems(r.items);
+          setTotal(r.total);
+          setFacets(r.facets);
+        })
+        .catch((e) => {
+          if (!ctrl.signal.aborted) setError(e instanceof Error ? e.message : String(e));
+        })
+        .finally(() => {
+          if (!ctrl.signal.aborted) setLoading(false);
+        });
+    }, 250);
+    return () => {
+      window.clearTimeout(t);
+      ctrl.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, sort]);
+
+  async function loadMore() {
+    setLoading(true);
+    try {
+      const r = await getCatalog(query(items.length));
+      setItems((prev) => [...prev, ...r.items.filter((a) => !prev.some((p) => p.id === a.id))]);
+      setTotal(r.total);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function togglePanel() {
     setPanelOpen((v) => {
       const next = !v;
@@ -119,109 +176,6 @@ export function CatalogSection({ initialArticles }: Props) {
       return next;
     });
   }
-
-  /** Match completo, eventualmente escludendo una dimensione (per i counter). */
-  function matches(article: Article, exclude: Dim | null = null): boolean {
-    if (exclude !== "search" && filters.search.trim()) {
-      const q = filters.search.toLowerCase();
-      const hay = [
-        article.title,
-        article.description,
-        article.brand,
-        article.model,
-        article.category?.name,
-        article.parent_category?.name,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    if (exclude !== "category" && filters.category) {
-      if (topSlugOf(article) !== filters.category) return false;
-    }
-    if (exclude !== "subcategory" && filters.subcategory) {
-      if (subSlugOf(article) !== filters.subcategory) return false;
-    }
-    if (exclude !== "condition" && filters.condition) {
-      if (article.condition !== filters.condition) return false;
-    }
-    if (exclude !== "brand" && filters.brand) {
-      if (article.brand !== filters.brand) return false;
-    }
-    if (exclude !== "price") {
-      const p = Number(article.price);
-      if (filters.minPrice && p < Number(filters.minPrice)) return false;
-      if (filters.maxPrice && p > Number(filters.maxPrice)) return false;
-    }
-    return true;
-  }
-
-  /** Articoli che soddisfano TUTTI i filtri correnti, gia' ordinati. */
-  const filtered = useMemo(() => {
-    const arr = initialArticles.filter((a) => matches(a, null));
-    switch (sort) {
-      case "price_asc":
-        arr.sort((a, b) => Number(a.price) - Number(b.price));
-        break;
-      case "price_desc":
-        arr.sort((a, b) => Number(b.price) - Number(a.price));
-        break;
-      case "title":
-        arr.sort((a, b) => a.title.localeCompare(b.title, "it"));
-        break;
-      default:
-        break; // "recent": ordine del server (display_order, created desc)
-    }
-    return arr;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialArticles, filters, sort]);
-
-  /**
-   * Per ogni opzione di una dimensione (es. category=videogames) conta gli
-   * articoli che soddisfano TUTTI gli altri filtri + quella opzione.
-   * Questo dà il classico facet count: "Pokemon (3)", "Funko (1)"...
-   */
-  function countFor(dim: Dim, predicate: (a: Article) => boolean): number {
-    let n = 0;
-    for (const a of initialArticles) {
-      if (matches(a, dim) && predicate(a)) n++;
-    }
-    return n;
-  }
-
-  // Faccette ricavate dai dati. category = top-level slug → label.
-  const facets = useMemo(() => {
-    const categoryNames: Record<string, string> = {};
-    const conditions: Partial<Record<ArticleCondition, number>> = {};
-    const brands: Record<string, number> = {};
-    let minP = Infinity;
-    let maxP = 0;
-
-    for (const a of initialArticles) {
-      const slug = topSlugOf(a);
-      if (slug) {
-        const top = a.parent_category ?? a.category!;
-        categoryNames[slug] = top.name;
-      }
-      conditions[a.condition] = 0;
-      if (a.brand) brands[a.brand] = 0;
-      const p = Number(a.price);
-      if (Number.isFinite(p)) {
-        if (p < minP) minP = p;
-        if (p > maxP) maxP = p;
-      }
-    }
-
-    return {
-      categories: Object.keys(categoryNames).sort(),
-      categoryNames,
-      conditions: (Object.keys(conditions) as ArticleCondition[]).sort(),
-      brands: Object.keys(brands).sort(),
-      priceMin: Number.isFinite(minP) ? Math.floor(minP) : 0,
-      priceMax: maxP > 0 ? Math.ceil(maxP) : 0,
-    };
-  }, [initialArticles]);
 
   const hasAnyFilter =
     filters.search !== "" ||
@@ -256,71 +210,39 @@ export function CatalogSection({ initialArticles }: Props) {
     setFilters(EMPTY);
   }
 
-  // Pre-calcola i count per ogni opzione (così la UI è snella)
+  // Dai conteggi del server alle prop del pannello filtri (invariato).
+  const categoryNames: Record<string, string> = {};
   const catCounts: Record<string, number> = {};
-  for (const c of facets.categories) {
-    catCounts[c] = countFor("category", (a) => topSlugOf(a) === c);
+  for (const [slug, c] of Object.entries(facets.categories)) {
+    categoryNames[slug] = c.name;
+    catCounts[slug] = c.count;
   }
-
-  // Sottocategorie: solo se è attiva una top-level e ci sono sub presenti
-  // negli articoli che la appartengono.
-  const subSlugs = new Set<string>();
   const subNames: Record<string, string> = {};
-  if (filters.category) {
-    for (const a of initialArticles) {
-      if (topSlugOf(a) !== filters.category) continue;
-      const slug = subSlugOf(a);
-      if (slug && a.category) {
-        subSlugs.add(slug);
-        subNames[slug] = a.category.name;
-      }
-    }
-  }
   const subCounts: Record<string, number> = {};
-  for (const s of subSlugs) {
-    subCounts[s] = countFor("subcategory", (a) => subSlugOf(a) === s);
+  for (const [slug, c] of Object.entries(facets.subcategories)) {
+    subNames[slug] = c.name;
+    subCounts[slug] = c.count;
   }
-  const totalAllSubs = filters.category
-    ? countFor("subcategory", () => true)
-    : 0;
-
-  const condCounts: Partial<Record<ArticleCondition, number>> = {};
-  for (const c of facets.conditions) {
-    condCounts[c] = countFor("condition", (a) => a.condition === c);
-  }
-  const brandCounts: Record<string, number> = {};
-  for (const b of facets.brands) {
-    brandCounts[b] = countFor("brand", (a) => a.brand === b);
-  }
-  // Brand: ordino per count desc, mostro top 8
-  const topBrands = facets.brands
-    .filter((b) => brandCounts[b] > 0)
-    .sort((a, b) => brandCounts[b] - brandCounts[a])
-    .slice(0, 8);
-
-  // Conta totale "Tutte" (con ogni dimensione esclusa)
-  const totalAllCats = countFor("category", () => true);
-  const totalAllConds = countFor("condition", () => true);
-  const totalAllBrands = countFor("brand", () => true);
+  const conditions = Object.keys(facets.conditions) as ArticleCondition[];
 
   return (
     <>
       <Filters
         filters={filters}
         catCounts={catCounts}
-        categoryNames={facets.categoryNames}
+        categoryNames={categoryNames}
         subCounts={subCounts}
         subNames={subNames}
-        totalAllSubs={totalAllSubs}
-        condCounts={condCounts}
-        brandCounts={brandCounts}
-        topBrands={topBrands}
-        conditions={facets.conditions}
-        totalAllCats={totalAllCats}
-        totalAllConds={totalAllConds}
-        totalAllBrands={totalAllBrands}
-        priceMin={facets.priceMin}
-        priceMax={facets.priceMax}
+        totalAllSubs={facets.total_all_subcategories}
+        condCounts={facets.conditions as Partial<Record<ArticleCondition, number>>}
+        brandCounts={facets.brands}
+        topBrands={Object.keys(facets.brands)}
+        conditions={conditions}
+        totalAllCats={facets.total_all_categories}
+        totalAllConds={facets.total_all_conditions}
+        totalAllBrands={facets.total_all_brands}
+        priceMin={facets.price_min}
+        priceMax={facets.price_max}
         hasAnyFilter={hasAnyFilter}
         activeFilterCount={activeFilterCount}
         onUpdate={update}
@@ -328,12 +250,14 @@ export function CatalogSection({ initialArticles }: Props) {
         panelOpen={panelOpen}
         hydrated={hydrated}
         onTogglePanel={togglePanel}
-        resultsCount={filtered.length}
+        resultsCount={total}
         sort={sort}
         onSort={setSort}
       />
 
-      {filtered.length === 0 ? (
+      {error && <p className="text-pink-deep text-sm mb-4">⚠ {error}</p>}
+
+      {items.length === 0 && !loading ? (
         <div className="card p-10 text-center">
           <p className="display text-xl text-ink mb-2">Nessun articolo</p>
           <p className="text-ink-soft text-sm">
@@ -348,12 +272,26 @@ export function CatalogSection({ initialArticles }: Props) {
           )}
         </div>
       ) : (
-        // 2 colonne gia' da mobile (stile marketplace): densita' doppia
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
-          {filtered.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </div>
+        <>
+          {/* 2 colonne gia' da mobile (stile marketplace): densita' doppia */}
+          <div
+            className={
+              "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 transition-opacity " +
+              (loading ? "opacity-60" : "")
+            }
+          >
+            {items.map((article) => (
+              <ArticleCard key={article.id} article={article} />
+            ))}
+          </div>
+          {items.length < total && (
+            <div className="text-center mt-8">
+              <button type="button" className="btn btn-ghost" onClick={loadMore} disabled={loading}>
+                {loading ? "Carico…" : `Mostra altri (${total - items.length})`}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </>
   );

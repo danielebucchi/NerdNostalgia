@@ -77,6 +77,51 @@ export async function listAllArticles(
   return [...byId.values()];
 }
 
+/** Pagina del catalogo pubblico con i conteggi dei filtri, calcolati dal
+ *  server (backend/src/utils/catalog.py). */
+export interface CatalogFacets {
+  categories: Record<string, { name: string; count: number }>;
+  total_all_categories: number;
+  subcategories: Record<string, { name: string; count: number }>;
+  total_all_subcategories: number;
+  conditions: Record<string, number>;
+  total_all_conditions: number;
+  /** Le marche piu' presenti, gia' in ordine di conteggio. */
+  brands: Record<string, number>;
+  total_all_brands: number;
+  price_min: number;
+  price_max: number;
+}
+
+export interface CatalogPage {
+  items: Article[];
+  total: number;
+  facets: CatalogFacets;
+}
+
+export interface CatalogQuery {
+  search?: string;
+  category?: string | null;
+  subcategory?: string | null;
+  condition?: string | null;
+  brand?: string | null;
+  min_price?: string;
+  max_price?: string;
+  sort?: string;
+  skip?: number;
+  limit?: number;
+}
+
+export async function getCatalog(q: CatalogQuery = {}, signal?: AbortSignal): Promise<CatalogPage> {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(q)) {
+    if (v !== undefined && v !== null && String(v).trim() !== "") qs.set(k, String(v).trim());
+  }
+  const res = await fetch(`${API_BASE}/api/articles/catalog?${qs.toString()}`, { cache: "no-store", signal });
+  if (!res.ok) throw new Error(`Errore caricamento catalogo: ${res.status}`);
+  return res.json();
+}
+
 /** Settings pubbliche runtime (usabile anche server-side nei RSC). */
 export async function getPublicSettings(): Promise<Record<string, string>> {
   try {

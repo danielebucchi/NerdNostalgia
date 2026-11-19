@@ -358,6 +358,40 @@ def bulk_markup(
     }
 
 
+class CatalogResponse(BaseModel):
+    items: List[ArticleResponse]
+    total: int
+    facets: dict
+
+
+@router.get("/catalog", response_model=CatalogResponse)
+def catalog(
+    search: str = Query("", max_length=100),
+    category: Optional[str] = Query(None, description="slug della categoria principale"),
+    subcategory: Optional[str] = Query(None, description="slug della sottocategoria"),
+    condition: Optional[ArticleCondition] = None,
+    brand: Optional[str] = None,
+    min_price: Optional[Decimal] = Query(None, ge=0),
+    max_price: Optional[Decimal] = Query(None, ge=0),
+    sort: str = Query("recent", pattern="^(recent|price_asc|price_desc|title)$"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(24, ge=1, le=100),
+    article_helper: ArticleHelper = Depends(get_article_helper),
+):
+    """Catalogo pubblico: una pagina di articoli e i conteggi dei filtri,
+    calcolati qui invece che nel browser (vedi utils/catalog.py)."""
+    from utils import catalog as cat
+    esito = cat.cerca(
+        article_helper.db,
+        cat.Filtri(search=search, category=category, subcategory=subcategory,
+                   condition=condition.value if condition else None, brand=brand,
+                   min_price=min_price, max_price=max_price),
+        sort=sort, skip=skip, limit=limit,
+    )
+    return CatalogResponse(items=[_to_response(a) for a in esito["items"]],
+                           total=esito["total"], facets=esito["facets"])
+
+
 @router.get("/{article_id}", response_model=ArticleResponse)
 def get_article(
     article_id: int,
