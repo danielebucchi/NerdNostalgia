@@ -30,6 +30,7 @@ import {
   pubblicaOvunque,
   controllaVendite,
   gruppiEbay,
+  descriviGruppo,
   pubblicaGruppoEbay,
   type GruppoEbay,
   pubblicaSito,
@@ -1458,15 +1459,21 @@ function Collezione({
               </div>
               {ebayVarianti && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <select className="input text-sm max-w-xs" value={gruppoScelto}
-                    onChange={(e) => setGruppoScelto(e.target.value)}>
+                  <select className="input text-sm w-full md:w-auto md:max-w-xl" value={gruppoScelto}
+                    onChange={(e) => setGruppoScelto(e.target.value)} aria-label="Inserzione con varianti">
                     <option value="">Nuova inserzione</option>
                     {gruppi.map((g) => (
                       <option key={g.group_key} value={g.group_key}>
-                        Aggiungi a {g.listing_id ?? g.group_key} ({g.count} carte)
+                        Aggiungi a: {descriviGruppo(g)}
                       </option>
                     ))}
                   </select>
+                  {gruppoScelto && gruppi.find((g) => g.group_key === gruppoScelto)?.url && (
+                    <a className="text-xs underline text-lilac-deep" target="_blank" rel="noreferrer"
+                      href={gruppi.find((g) => g.group_key === gruppoScelto)!.url!}>
+                      vedi su eBay ↗
+                    </a>
+                  )}
                   {!gruppoScelto && (
                     <input className="input text-sm flex-1 min-w-48" maxLength={80} value={titoloGruppo}
                       onChange={(e) => setTitoloGruppo(e.target.value)} placeholder="Titolo dell'inserzione" />

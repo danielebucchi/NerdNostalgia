@@ -247,7 +247,29 @@ export const ritiraEbay = (cardId: number) => adminApi.delete<{ ok: boolean }>(`
 export interface GruppoEbay {
   group_key: string;
   listing_id: string | null;
+  /** Carte ancora in vendita nell'inserzione (le vendute sono in `sold`). */
   count: number;
+  /** Titolo su eBay; null se eBay non ha risposto. */
+  title?: string | null;
+  url?: string | null;
+  sold?: number;
+  /** Set delle carte in vendita (in italiano dove si conosce). */
+  sets?: string[];
+  updated_at?: string | null;
+}
+
+/** Come si legge l'inserzione nel menu: titolo, set, carte, data. */
+export function descriviGruppo(g: GruppoEbay): string {
+  const set = g.sets?.length
+    ? g.sets.slice(0, 2).join(", ") + (g.sets.length > 2 ? ` +${g.sets.length - 2}` : "")
+    : null;
+  const quando = g.updated_at ? new Date(g.updated_at).toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : null;
+  return [
+    g.title || (set ? `Inserzione ${set}` : `Inserzione ${g.listing_id ?? g.group_key}`),
+    `${g.count} carte${g.sold ? ` (+${g.sold} vendute)` : ""}`,
+    g.title && set ? set : null,
+    quando && `agg. ${quando}`,
+  ].filter(Boolean).join(" · ");
 }
 
 /** Vendite su CardTrader/eBay subito (il server lo fa da solo ogni 15 minuti). */

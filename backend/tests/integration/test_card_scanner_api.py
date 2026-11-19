@@ -690,7 +690,12 @@ def test_cards_can_join_an_existing_listing(client, admin_headers, ebay_finto):
     assert r.json()["count"] == 3
     assert ebay_finto["groups"][chiave]["title"] == "Carte Pokemon"
     gruppi = client.get("/api/card-scanner/ebay-groups", headers=admin_headers).json()
-    assert gruppi == [{"group_key": chiave, "listing_id": "800000000001", "count": 3}]
+    assert len(gruppi) == 1
+    g = gruppi[0]
+    # Quanto serve per riconoscerla nel menu
+    assert (g["group_key"], g["listing_id"], g["count"], g["sold"]) == (chiave, "800000000001", 3, 0)
+    assert g["title"] == "Carte Pokemon" and g["sets"] == ["Surging Sparks"]
+    assert g["url"].endswith("/itm/800000000001") and g["updated_at"]
 
 
 def test_refused_variations_leave_the_cards_free(client, admin_headers, db_session, ebay_finto, monkeypatch):

@@ -16,7 +16,7 @@ import csv
 import io
 import logging
 import zipfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -787,14 +787,35 @@ def publish_ebay_group(payload: EbayGroupRequest, db: Session = Depends(get_db),
 
 @router.get("/ebay-groups")
 def list_ebay_groups(db: Session = Depends(get_db), _admin: User = Depends(require_admin)):
-    """Le inserzioni con varianti in corso, per aggiungerci carte."""
-    righe = (db.query(PersonalCard.ebay_group_key, PersonalCard.ebay_listing_id)
-             .filter(PersonalCard.ebay_group_key.isnot(None)).all())
+    """Le inserzioni con varianti pubblicate, per aggiungerci carte. Per
+    riconoscerle nel menu: titolo (da eBay), set e numero delle carte in
+    vendita, ultimo aggiornamento e link."""
+    carte = (db.query(PersonalCard)
+             .filter(PersonalCard.ebay_group_key.isnot(None), PersonalCard.ebay_listing_id.isnot(None))
+             .all())
     gruppi: Dict[str, dict] = {}
-    for chiave, listing_id in righe:
-        g = gruppi.setdefault(chiave, {"group_key": chiave, "listing_id": listing_id, "count": 0})
+    for c in carte:
+        g = gruppi.setdefault(c.ebay_group_key, {
+            "group_key": c.ebay_group_key, "listing_id": c.ebay_listing_id,
+            "url": cl.ebay_listing_url(c), "title": None, "count": 0, "sold": 0,
+            "sets": [], "updated_at": None,
+        })
+        if c.status == PersonalCardStatus.SOLD:
+            g["sold"] += 1
+            continue
         g["count"] += 1
-    return list(gruppi.values())
+        nome_set = cl.set_vetrina(c)
+        if nome_set and nome_set not in g["sets"]:
+            g["sets"].append(nome_set)
+        if c.ebay_synced_at and (g["updated_at"] is None or c.ebay_synced_at > g["updated_at"]):
+            g["updated_at"] = c.ebay_synced_at
+    for g in gruppi.values():
+        # Il titolo sta su eBay: se non risponde, il menu usa set e numero.
+        try:
+            g["title"] = (eb.get_inventory_item_group(g["group_key"]) or {}).get("title")
+        except eb.EbayError:
+            pass
+    return sorted(gruppi.values(), key=lambda g: g["updated_at"] or datetime.min, reverse=True)
 
 
 @router.post("/cards/{card_id}/ebay")
