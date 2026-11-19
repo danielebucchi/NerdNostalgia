@@ -15,6 +15,7 @@ gradate (PSA/BGS/CGC), lotti, proxy — perche' un PSA 10 nella media fa
 sembrare d'oro una carta da due euro.
 """
 import logging
+import math
 import re
 import statistics
 import urllib.parse
@@ -29,7 +30,11 @@ from utils import ebay_client as eb
 LOGGER = logging.getLogger("card_pricing")
 
 ULTIME_VENDITE = 10
-POSIZIONE_CARDTRADER = 2  # come il carico rapido: secondo piu' basso
+# Il riferimento e' il minimo CardTrader fra le offerte comparabili: il
+# suggerito ci aggiunge poco (vedi ricarico). Prima era il secondo piu'
+# basso mediato con i venduti eBay, che lo tiravano su: Scambio con minimo
+# 2,60 usciva a 7,14.
+POSIZIONE_CARDTRADER = 1
 
 # Titoli che non sono "la carta sciolta" e falsano la media.
 RE_ESCLUSI = re.compile(
@@ -151,11 +156,38 @@ def parse_manual_prices(testo: str) -> List[float]:
 
 # ── Insieme ───────────────────────────────────────────────────────
 
+# Ricarico sul minimo CardTrader, decrescente col prezzo: sulle carte da
+# pochi euro qualche decina di centesimi, sulle care pochi punti percentuali
+# (li' anche il 3% sono euro veri, e piu' su si esce dal mercato).
+RICARICHI = (
+    (1.0, None, 0.10),    # fino a 1 €: +0,10 € fissi
+    (5.0, 0.10, None),    # fino a 5 €: +10%
+    (20.0, 0.07, None),   # fino a 20 €: +7%
+    (50.0, 0.05, None),   # fino a 50 €: +5%
+    (None, 0.03, None),   # oltre: +3%
+)
+
+
+def ricarico(minimo: float) -> float:
+    """Il minimo CardTrader piu' il ricarico della sua fascia, arrotondato
+    ai 5 centesimi superiori (2,60 → 2,90)."""
+    for soglia, percentuale, fisso in RICARICHI:
+        if soglia is None or minimo <= soglia:
+            prezzo = minimo * (1 + percentuale) if percentuale else minimo + fisso
+            break
+    centesimi = math.ceil(round(prezzo * 100, 6) / 5) * 5
+    return round(centesimi / 100, 2)
+
+
 def suggested(cardtrader_eur: Optional[float], ebay_avg: Optional[float]) -> Optional[float]:
-    valori = [v for v in (cardtrader_eur, ebay_avg) if v]
-    if not valori:
-        return None
-    return round(sum(valori) / len(valori), 2)
+    """Minimo CardTrader + ricarico. I venduti eBay solo se su CardTrader
+    non c'e' nessuna offerta: sono pochi, spesso esteri o gradati, e
+    tiravano su il prezzo."""
+    if cardtrader_eur:
+        return ricarico(cardtrader_eur)
+    if ebay_avg:
+        return round(ebay_avg, 2)
+    return None
 
 
 def apply_ebay(card: PersonalCard, riepilogo: Optional[dict], fonte: str) -> None:
@@ -171,6 +203,7 @@ def apply_ebay(card: PersonalCard, riepilogo: Optional[dict], fonte: str) -> Non
 
 
 def refresh_suggested(card: PersonalCard) -> None:
+    precedente = card.estimated_value
     sug = suggested(
         float(card.cardtrader_price) if card.cardtrader_price is not None else None,
         float(card.ebay_sold_avg) if card.ebay_sold_avg is not None else None,
@@ -178,9 +211,11 @@ def refresh_suggested(card: PersonalCard) -> None:
     card.estimated_value = _eur(sug)
     card.estimated_value_updated_at = _now().date()
     card.prices_updated_at = _now()
-    # Il prezzo di vendita lo si sceglie una volta: se non e' ancora
-    # stato scelto, parte dal suggerito.
-    if card.list_price is None and sug is not None:
+    # Il prezzo di vendita parte dal suggerito, e lo segue finche' non lo si
+    # cambia a mano (cioe' finche' e' uguale al suggerito di prima). Un
+    # prezzo scritto da te non si tocca.
+    mai_toccato = card.list_price is None or (precedente is not None and card.list_price == precedente)
+    if mai_toccato and sug is not None:
         card.list_price = _eur(sug)
 
 

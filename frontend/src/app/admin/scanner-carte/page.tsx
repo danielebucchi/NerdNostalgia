@@ -192,8 +192,8 @@ export default function ScannerCartePage() {
         <h1 className="display text-2xl sm:text-3xl text-ink">Scanner carte</h1>
         <p className="text-ink-soft text-sm mt-1 leading-snug">
           Carica gli scan: la carta si riconosce da numero e simbolo dell&apos;espansione. Confermi
-          tu, e la carta entra nella collezione con il prezzo CardTrader e la media delle ultime
-          vendite eBay.
+          tu, e la carta entra nella collezione con il prezzo suggerito: il minimo CardTrader piu&apos; un
+          piccolo ricarico (+0,10 € sotto 1 €, +10% fino a 5 €, poi a scendere fino al +3%).
         </p>
       </div>
 
@@ -1545,9 +1545,9 @@ function Collezione({
                 </th>
                 <th className="py-2 pr-2"></th>
                 <th className="py-2 pr-2">Carta</th>
-                <th className="py-2 pr-2 text-right">CardTrader</th>
+                <th className="py-2 pr-2 text-right" title="Prezzo piu' basso fra le offerte comparabili">CardTrader min</th>
                 <th className="py-2 pr-2 text-right">Venduti eBay</th>
-                <th className="py-2 pr-2 text-right">Suggerito</th>
+                <th className="py-2 pr-2 text-right" title="Minimo CardTrader + ricarico (senza offerte CardTrader: venduti eBay)">Suggerito</th>
                 <th className="py-2 pr-2">Prezzo e vendita per canale</th>
                 <th className="py-2 text-right">Azioni</th>
               </tr>
@@ -1862,7 +1862,7 @@ function RigaCarta({
         </div>
         <dl className="grid grid-cols-3 gap-2 mt-3 text-center text-sm">
           <div className="rounded-lg bg-ink/5 py-1.5">
-            <dt className="text-[10px] uppercase tracking-wide text-ink-soft">CardTrader</dt>
+            <dt className="text-[10px] uppercase tracking-wide text-ink-soft">CardTrader min</dt>
             <dd>{eur(c.cardtrader_price)}</dd>
           </div>
           <div className="rounded-lg bg-ink/5 py-1.5">

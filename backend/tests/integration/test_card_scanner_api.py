@@ -103,9 +103,10 @@ def test_confirmed_scan_enters_the_collection_priced(client, admin_headers, db_s
     assert float(carta["cardtrader_price"]) == 4.0
     assert float(carta["ebay_sold_avg"]) == 6.0
     assert carta["ebay_sold_count"] == 10
-    # Suggerito = in mezzo, e diventa il prezzo di vendita di partenza
-    assert float(carta["estimated_value"]) == 5.0
-    assert float(carta["list_price"]) == 5.0
+    # Suggerito = minimo CardTrader + 10% (fascia 1-5 €), e diventa il
+    # prezzo di vendita di partenza. I venduti eBay non lo tirano su.
+    assert float(carta["estimated_value"]) == 4.40
+    assert float(carta["list_price"]) == 4.40
 
     assert db_session.get(CardScan, scan["id"]).status == "CONFIRMED"
     assert client.get("/api/card-scanner/scans", headers=admin_headers).json() == []
@@ -167,7 +168,8 @@ def test_manual_ebay_prices_replace_the_api(client, admin_headers, db_session):
                     json={"prices": "8,00 10 12"}, headers=admin_headers)
     assert r.status_code == 200, r.text
     assert float(r.json()["card"]["ebay_sold_avg"]) == 10.0
-    assert float(r.json()["card"]["estimated_value"]) == 7.0
+    # C'e' CardTrader: il suggerito resta il suo minimo + ricarico
+    assert float(r.json()["card"]["estimated_value"]) == 4.40
     # Una nuova valutazione non cancella i venduti scritti a mano
     r = client.post(f"/api/card-scanner/cards/{carta['id']}/price", headers=admin_headers)
     assert r.json()["card"]["ebay_sold_source"] == "manuale"
@@ -219,7 +221,7 @@ def test_csv_export(client, admin_headers):
     righe = r.text.lstrip("﻿").splitlines()
     assert righe[0].startswith("id;nome;espansione;numero")
     assert "Durant ex;Surging Sparks;004/191;it;Slightly Played;1;;si;" in righe[1]
-    assert ";5,00;" in righe[1]
+    assert ";4,40;" in righe[1]
 
 
 def test_folder_uploads_follow_the_session_chosen_in_the_page(client, admin_headers, db_session):
@@ -274,7 +276,7 @@ def test_card_goes_on_the_site_with_the_scan_photos(client, admin_headers, db_se
     assert r.status_code == 200, r.text
     art = db_session.get(Article, r.json()["article_id"])
     assert art.status == ArticleStatus.PUBLISHED
-    assert float(art.price) == 5.0
+    assert float(art.price) == 4.40
     assert "Durant ex" in art.title and "004/191" in art.title
     assert len(art.images) == 1 and "/static/articles/" in art.images[0]
     assert art.card_language == "it"
@@ -767,13 +769,13 @@ def test_each_platform_can_have_its_own_price(client, admin_headers, db_session,
     client.post(f"/api/card-scanner/cards/{carta['id']}/cardtrader", headers=admin_headers)
     assert mondo_finto[-1]["price_eur"] == 2.50
     assert client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers).json()["price_eur"] == 4.20
-    # Il sito resta al prezzo della carta (5 €), qualunque cosa si scriva per gli altri
+    # Il sito resta al prezzo della carta (4,40 €), qualunque cosa si scriva per gli altri
     sito = _carta_confermata(client, admin_headers)
     client.patch(f"/api/personal-cards/{sito['id']}", headers=admin_headers,
                  json={"list_price_cardtrader": "2.50", "list_price_ebay": "4.20"})
     r = client.post(f"/api/card-scanner/cards/{sito['id']}/site", headers=admin_headers)
     assert r.status_code == 200, r.text
-    assert float(db_session.get(Article, r.json()["article_id"]).price) == 5.00
+    assert float(db_session.get(Article, r.json()["article_id"]).price) == 4.40
 
     # Anche scritto a mano, su eBay mai sotto 1 €
     from utils import ebay_client as eb
@@ -847,3 +849,21 @@ def test_existing_cards_get_italian_names_and_site_titles(client, admin_headers,
     assert "Durant-ex · Scintille Folgoranti" in titolo
     # Seconda passata: niente da rifare
     assert cl.aggiorna_nomi_italiani(db_session, pausa=0)["carte"] == 0
+
+
+def test_selling_price_follows_the_suggestion_until_changed_by_hand(client, admin_headers, db_session, monkeypatch):
+    """Rivalutando, un prezzo mai toccato segue il nuovo suggerito (le carte
+    valutate col vecchio calcolo si sistemano); uno scritto a mano resta."""
+    from utils import cardtrader_client as ct
+    carta = _carta_confermata(client, admin_headers)                   # 4,40
+    monkeypatch.setattr(ct, "suggested_price_cents", lambda bp, pos, **kw: {
+        "cents": 260, "position": 1, "total": 9, "all_cents": [], "filtered": True})
+    r = client.post(f"/api/card-scanner/cards/{carta['id']}/price", headers=admin_headers).json()
+    assert float(r["card"]["list_price"]) == 2.90                      # seguito
+
+    client.patch(f"/api/personal-cards/{carta['id']}", json={"list_price": "3.50"}, headers=admin_headers)
+    monkeypatch.setattr(ct, "suggested_price_cents", lambda bp, pos, **kw: {
+        "cents": 500, "position": 1, "total": 9, "all_cents": [], "filtered": True})
+    r = client.post(f"/api/card-scanner/cards/{carta['id']}/price", headers=admin_headers).json()
+    assert float(r["card"]["estimated_value"]) == 5.50
+    assert float(r["card"]["list_price"]) == 3.50                      # scritto a mano: resta

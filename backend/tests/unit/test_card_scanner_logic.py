@@ -159,9 +159,18 @@ def test_ex_in_card_name_is_not_excluded():
 
 
 def test_suggested_is_between_the_two():
-    assert cp.suggested(4.0, 6.0) == 5.0
+    # Minimo CardTrader + ricarico; eBay solo senza offerte CardTrader
+    assert cp.suggested(4.0, 6.0) == 4.40
     assert cp.suggested(None, 6.0) == 6.0
     assert cp.suggested(None, None) is None
+
+
+def test_markup_shrinks_as_the_price_grows():
+    assert cp.ricarico(2.60) == 2.90       # Scambio: non 7,14
+    assert cp.ricarico(0.50) == 0.60       # sotto 1 €: +0,10
+    assert cp.ricarico(10.00) == 10.70     # +7%
+    assert cp.ricarico(30.00) == 31.50     # +5%
+    assert cp.ricarico(100.00) == 103.00   # +3%
 
 
 def test_manual_prices_accept_italian_decimals():
