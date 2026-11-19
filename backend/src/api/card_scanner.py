@@ -57,6 +57,16 @@ def _guard_cardtrader():
         )
 
 
+def _nomi_italiani(db: Session, card: PersonalCard) -> None:
+    """Best-effort: una fonte giu' non deve fermare conferma o valutazione."""
+    try:
+        if cl.riempi_nomi_italiani(db, card):
+            db.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        LOGGER.warning("Nomi italiani per la carta %s non trovati: %s", card.id, exc)
+
+
 def _card_or_404(db: Session, card_id: int) -> PersonalCard:
     card = db.query(PersonalCard).filter(PersonalCard.id == card_id).first()
     if not card:
@@ -453,6 +463,7 @@ def confirm_scan(
     )
     db.add(card)
     db.commit()
+    _nomi_italiani(db, card)
     scan.status = CardScanStatus.CONFIRMED
     scan.personal_card_id = card.id
     db.commit()
@@ -609,6 +620,9 @@ class PricedResponse(BaseModel):
 def price_card(card_id: int, db: Session = Depends(get_db), _admin: User = Depends(require_admin)):
     card = _card_or_404(db, card_id)
     avvisi = cp.price_card(card)
+    # Rivalutare riempie anche i nomi italiani mancanti: e' il modo di
+    # sistemare le carte confermate prima che ci fossero.
+    _nomi_italiani(db, card)
     db.commit()
     db.refresh(card)
     return PricedResponse(card=_to_response(card), warnings=avvisi, ebay_sold_url=cp.ebay_sold_url(card))

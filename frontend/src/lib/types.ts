@@ -312,6 +312,9 @@ export interface PersonalCard {
   ebay_sold_source?: "api" | "manuale" | null;
   prices_updated_at?: string | null;
   list_price?: string | null;
+  /** Nome della carta e del set in italiano, dove una fonte li ha. */
+  name_it?: string | null;
+  collection_it?: string | null;
   /** Prezzo scritto per CardTrader / eBay; null = calcolato (vedi *_auto). */
   list_price_cardtrader?: string | null;
   list_price_ebay?: string | null;

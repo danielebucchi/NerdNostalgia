@@ -42,7 +42,9 @@ class PersonalCardHelper(BaseHelper):
             like = f"%{search.lower()}%"
             query = query.filter(
                 (PersonalCard.name.ilike(like))
+                | (PersonalCard.name_it.ilike(like))
                 | (PersonalCard.collection.ilike(like))
+                | (PersonalCard.collection_it.ilike(like))
                 | (PersonalCard.card_number.ilike(like))
                 | (PersonalCard.bulk_source.ilike(like))
                 | (PersonalCard.notes.ilike(like))

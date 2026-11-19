@@ -1584,11 +1584,15 @@ function RigaCarta({
   }
 
   const scan = c.images?.[0];
+  // In italiano dove lo si conosce; l'inglese di CardTrader sotto, piccolo.
+  const nome = c.name_it || c.name;
+  const inglese = c.name_it && c.name_it !== c.name ? c.name : null;
 
   const dettagli = (
     <>
+      {inglese && <span className="block text-[11px] text-ink-soft italic">{inglese}</span>}
       <span className="block text-xs text-ink-soft">
-        {c.collection} · {c.printed_code || c.card_number}
+        {c.collection_it || c.collection} · {c.printed_code || c.card_number}
       </span>
       <span className="block text-xs text-ink-soft">
         {(c.language || "").toUpperCase()} · {c.condition}
@@ -1761,7 +1765,7 @@ function RigaCarta({
             </a>
           )}
           <div className="min-w-0 flex-1">
-            <strong className="text-ink block leading-tight">{c.name}</strong>
+            <strong className="text-ink block leading-tight">{nome}</strong>
             {dettagli}
           </div>
         </div>
@@ -1806,7 +1810,7 @@ function RigaCarta({
         )}
       </td>
       <td className="py-2 pr-2 min-w-[12rem]">
-        <strong className="text-ink">{c.name}</strong>
+        <strong className="text-ink">{nome}</strong>
         {dettagli}
       </td>
       <td className="py-2 pr-2 text-right whitespace-nowrap">

@@ -35,7 +35,7 @@ MAX_TITOLO = 80
 def etichetta(card: PersonalCard) -> str:
     """Voce del menu: cosa distingue questa carta dalle altre a colpo
     d'occhio (nome, numero, condizione)."""
-    parti = [card.name, card.printed_code or card.card_number, card.condition]
+    parti = [cl.nome_vetrina(card), card.printed_code or card.card_number, card.condition]
     return " ".join(p for p in parti if p)[:MAX_VALORE].strip()
 
 

@@ -42,6 +42,9 @@ def mondo_finto(monkeypatch, tmp_path, db_session):
     aggiornati = []
     monkeypatch.setattr(ct, "update_product", lambda pid, **kw: aggiornati.append((pid, kw)))
     monkeypatch.setattr(eb, "has_app_credentials", lambda: True)
+    # Nomi italiani: niente rete nei test
+    from utils import card_names_it as cn
+    monkeypatch.setattr(cn, "cerca", lambda *a, **kw: (None, None))
     monkeypatch.setattr(eb, "sold_items_search", lambda q, **kw: [
         {"title": f"Durant ex 004/191 #{i}", "lastSoldPrice": {"value": "6.00", "currency": "EUR"},
          "lastSoldDate": f"2026-11-{i + 1:02d}T10:00:00Z"} for i in range(12)
@@ -793,3 +796,22 @@ def test_site_page_links_to_the_same_card_on_cardtrader_and_ebay(client, admin_h
     assert links["cardtrader"] == "https://www.cardtrader.com/cards/10"
     assert links["ebay"].endswith("/itm/800000000123")
     assert all(a["marketplace_links"] == {} for a in client.get("/api/articles/").json()["items"])
+
+
+def test_italian_card_uses_the_italian_names_in_titles(client, admin_headers, db_session, monkeypatch):
+    """Carta italiana: titoli col nome stampato ("Scintille Folgoranti"),
+    non quello inglese di CardTrader. Una spagnola resta in inglese."""
+    from models.db import Article
+    from utils import card_listing as cl, card_names_it as cn
+    monkeypatch.setattr(cn, "cerca", lambda *a, **kw: ("Durant-ex", "Scintille Folgoranti"))
+    carta = _carta_confermata(client, admin_headers)
+    card = db_session.get(PersonalCard, carta["id"])
+    db_session.refresh(card)
+    assert (card.name_it, card.collection_it) == ("Durant-ex", "Scintille Folgoranti")
+
+    art_id = client.post(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers).json()["article_id"]
+    assert "Durant-ex · Scintille Folgoranti 004/191" in db_session.get(Article, art_id).title
+    assert "Durant-ex 004/191" in cl.ebay_title(card) and "Scintille Folgoranti" in cl.ebay_title(card)
+
+    card.language = "es"
+    assert "Durant ex" in cl.ebay_title(card) and "Surging Sparks" in cl.site_title(card)

@@ -44,6 +44,10 @@ class PersonalCard(BaseModel):
 
     name = Column(String(200), nullable=False)
     collection = Column(String(100), index=True)
+    # In italiano, dove una fonte li ha (utils/card_names_it): i titoli delle
+    # carte italiane usano questi.
+    name_it = Column(String(200))
+    collection_it = Column(String(100))
     card_number = Column(String(50))
     finish = Column(String(50))
     language = Column(String(20), default="IT")

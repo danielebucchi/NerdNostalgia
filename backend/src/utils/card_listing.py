@@ -21,8 +21,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from models.db import (
-    Article, ArticleCondition, ArticleStatus, Category, MarketplaceFee, PersonalCard, PersonalCardStatus,
+    Article, ArticleCondition, ArticleStatus, CardBlueprint, Category, MarketplaceFee, PersonalCard, PersonalCardStatus,
 )
+from utils import card_names_it as cn
 from utils import cardtrader_client as ct
 from utils import ebay_client as eb
 from utils.card_pricing import NOMI_GIOCO
@@ -51,6 +52,38 @@ LINGUE_EBAY = {
     "it": "Italiano", "en": "Inglese", "fr": "Francese", "de": "Tedesco",
     "es": "Spagnolo", "pt": "Portoghese", "jp": "Giapponese",
 }
+
+
+def nome_vetrina(card: PersonalCard) -> str:
+    """Il nome come e' stampato: italiano per le carte italiane, se lo si
+    conosce (vedi riempi_nomi_italiani), se no quello di CardTrader."""
+    if (card.language or "").lower() == "it" and card.name_it:
+        return card.name_it
+    return card.name
+
+
+def set_vetrina(card: PersonalCard) -> Optional[str]:
+    if (card.language or "").lower() == "it" and card.collection_it:
+        return card.collection_it
+    return card.collection
+
+
+def riempi_nomi_italiani(db: Session, card: PersonalCard) -> bool:
+    """Cerca nome della carta e del set in italiano se mancano. True se ne
+    ha trovato almeno uno. Non tocca quelli gia' scritti (anche a mano)."""
+    if card.name_it and (card.collection_it or card.game_id != cn.POKEMON):
+        return False
+    bp = (db.query(CardBlueprint).filter(CardBlueprint.id == card.cardtrader_blueprint_id).first()
+          if card.cardtrader_blueprint_id else None)
+    nome, nome_set = cn.cerca(card.game_id, card.collection, card.printed_code or card.card_number,
+                              codice_set=bp.expansion_code if bp else None,
+                              numero=(bp.collector_number if bp else None) or card.card_number)
+    trovato = False
+    if nome and not card.name_it:
+        card.name_it, trovato = nome[:200], True
+    if nome_set and not card.collection_it:
+        card.collection_it, trovato = nome_set[:100], True
+    return trovato
 
 
 def _now() -> datetime:
@@ -210,7 +243,7 @@ def _offerta_bloccata(exc: "eb.EbayError") -> bool:
 def ebay_title(card: PersonalCard) -> str:
     """Massimo 80 caratteri: prima cio' che si cerca (nome, codice),
     poi cio' che rassicura (lingua, condizione)."""
-    parti = [card.name]
+    parti = [nome_vetrina(card)]
     if card.printed_code:
         parti.append(card.printed_code)
     # Subito dopo il codice: reverse e prima edizione cambiano il prezzo,
@@ -219,8 +252,8 @@ def ebay_title(card: PersonalCard) -> str:
         parti.append("Reverse")
     if card.first_edition:
         parti.append("1a Edizione")
-    if card.collection:
-        parti.append(card.collection)
+    if set_vetrina(card):
+        parti.append(set_vetrina(card))
     lingua = LINGUE_EBAY.get((card.language or "").lower())
     if lingua:
         parti.append(lingua.upper()[:3])
@@ -253,7 +286,7 @@ def senza_contatti_esterni(testo: str) -> str:
 def _descrizione(db: Session, card: PersonalCard) -> str:
     righe = [f"<p><b>{ebay_title(card)}</b></p>", "<ul>"]
     for etichetta, valore in (
-        ("Espansione", card.collection),
+        ("Espansione", set_vetrina(card)),
         ("Numero", card.printed_code or card.card_number),
         ("Lingua", LINGUE_EBAY.get((card.language or "").lower(), card.language)),
         ("Condizione", card.condition),
@@ -294,9 +327,9 @@ def _aspetti(card: PersonalCard) -> Dict[str, List[str]]:
     """Item specifics della carta."""
     aspetti = {"Gioco": [NOMI_GIOCO.get(card.game_id or 0, "Altro")]}
     if card.name:
-        aspetti["Nome carta"] = [card.name]
-    if card.collection:
-        aspetti["Set"] = [card.collection]
+        aspetti["Nome carta"] = [nome_vetrina(card)]
+    if set_vetrina(card):
+        aspetti["Set"] = [set_vetrina(card)]
     if card.printed_code or card.card_number:
         aspetti["Numero carta"] = [card.printed_code or card.card_number]
     lingua = LINGUE_EBAY.get((card.language or "").lower())
@@ -478,7 +511,7 @@ def site_title(card: PersonalCard) -> str:
     testa, che nel catalogo del sito si cerca anche per quello."""
     gioco = GIOCHI_VETRINA.get(card.game_id or 0)
     parti = ([gioco, "·"] if gioco else []) + [
-        card.name, "·", card.collection or "", card.printed_code or card.card_number or ""]
+        nome_vetrina(card), "·", set_vetrina(card) or "", card.printed_code or card.card_number or ""]
     lingua = (card.language or "").upper()
     extra = [x for x in (lingua, "1ª ed." if card.first_edition else "",
                          "Reverse" if card.reverse else "") if x]
@@ -490,7 +523,7 @@ def site_title(card: PersonalCard) -> str:
 
 def site_description(card: PersonalCard) -> str:
     righe = [
-        f"{card.name} — {card.collection or ''} {card.printed_code or card.card_number or ''}".strip(),
+        f"{nome_vetrina(card)} — {set_vetrina(card) or ''} {card.printed_code or card.card_number or ''}".strip(),
         "",
         f"Lingua: {LINGUE_EBAY.get((card.language or '').lower(), card.language or '—')}",
         f"Condizione: {CONDIZIONI_IT.get(card.condition or '', card.condition or '—')}",

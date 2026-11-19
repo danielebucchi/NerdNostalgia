@@ -77,6 +77,8 @@ class PersonalCardUpdate(BaseModel):
     reverse: Optional[bool] = None
     first_edition: Optional[bool] = None
     list_price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
+    name_it: Optional[str] = Field(None, max_length=200)
+    collection_it: Optional[str] = Field(None, max_length=100)
     # Prezzo per piattaforma; null = quello calcolato
     list_price_cardtrader: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
     list_price_ebay: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
@@ -143,6 +145,8 @@ class PersonalCardResponse(BaseModel):
     ebay_url: Optional[str] = None
     list_price_cardtrader: Optional[Decimal] = None
     list_price_ebay: Optional[Decimal] = None
+    name_it: Optional[str] = None
+    collection_it: Optional[str] = None
     # A quanto va su ogni piattaforma senza un prezzo scritto a mano
     # (eBay: commissioni + minimo 1 euro). Null se la carta non ha prezzo.
     cardtrader_price_auto: Optional[float] = None
