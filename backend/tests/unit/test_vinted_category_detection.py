@@ -70,3 +70,12 @@ def test_brand_alone_picks_the_category():
 def test_brand_title_shapes(raw, brand):
     from utils.vinted_client import _brand_title
     assert _brand_title(raw) == brand
+
+
+@pytest.mark.parametrize("title", [
+    "Amuleto di quoz magic era glaciale rara near mint",
+    "Urza's tower magic chronicles white border",
+])
+def test_magic_brand_goes_to_magic(title):
+    # Vinted scrive il brand coi due punti: "Magic: The Gathering".
+    assert _detect_category_slug(title, None, None, "Magic: The Gathering") == "magic-the-gathering"

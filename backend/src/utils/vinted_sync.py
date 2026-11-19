@@ -136,7 +136,7 @@ CATEGORY_RULES: list[tuple[str, tuple[str, ...]]] = [
     # ─── PRIORITA' 5: Carte (franchise specifico nel titolo)
     ("pokemon",             ("pokemon", "pokémon", "pokeball", "pikachu",
                              "charizard", "eevee", "mew", "mewtwo")),
-    ("magic-the-gathering", ("magic the gathering", " mtg",)),
+    ("magic-the-gathering", ("magic the gathering", "magic: the gathering", " mtg",)),
     ("yu-gi-oh",            ("yu-gi-oh", "yugioh", "yu gi oh")),
     ("dragon-ball",         ("dragon ball", "dragonball")),
     ("one-piece",           ("one piece", "onepiece")),
