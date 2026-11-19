@@ -134,9 +134,9 @@ def _scrivi_gruppo(db: Session, chiave: str, titolo: str, carte: List[PersonalCa
     try:
         _pubblica_gruppo(db, chiave, titolo, carte, voci, comuni, foto_gruppo)
     except eb.EbayError as exc:
-        # Il motivo vero e' nel corpo della risposta: senza, nei log resta
-        # solo un 502 e non si capisce cosa eBay non accetta.
-        LOGGER.warning("eBay rifiuta l'inserzione con varianti %s: %s %s", chiave, exc, exc.body)
+        # La risposta di eBay e' gia' nei log (EbayError la scrive sempre):
+        # qui solo quale gruppo.
+        LOGGER.warning("eBay rifiuta l'inserzione con varianti %s", chiave)
         if not any(c.ebay_listing_id for c in carte):
             # Mai pubblicata: le carte tornano libere, se no restano agganciate
             # a un gruppo che non esiste e non si vendono piu' nemmeno da sole.

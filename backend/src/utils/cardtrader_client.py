@@ -30,6 +30,10 @@ class CardTraderError(Exception):
         super().__init__(message)
         self.status = status
         self.body = body
+        # Come per eBay: il motivo nei log, anche quando chi chiama lo
+        # trasforma in un 502. 404 spesso atteso (prodotto gia' tolto).
+        LOGGER.log(logging.INFO if status == 404 else logging.WARNING,
+                   "CardTrader: %s %s", message, body if body is not None else "")
 
 
 def _jwt() -> str:

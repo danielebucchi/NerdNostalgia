@@ -42,6 +42,11 @@ class EbayError(Exception):
         super().__init__(message)
         self.status = status
         self.body = body
+        # Sempre nei log, con la risposta di eBay: chi chiama spesso la
+        # trasforma in un 502 e il motivo vero spariva. Il 404 e' spesso
+        # atteso (offerta che non esiste ancora): solo informativo.
+        LOGGER.log(logging.INFO if status == 404 else logging.WARNING,
+                   "eBay: %s %s", message, body if body is not None else "")
 
 
 def _env() -> str:
