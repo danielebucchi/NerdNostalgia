@@ -73,6 +73,7 @@ class LetturaCarta:
     # espansioni vere, vedi card_index.
     set_codes: List[str] = field(default_factory=list)
     language: Optional[str] = None      # codice CardTrader: "it", "en", ...
+    language_read: Optional[str] = None  # quella letta, se la pagina ne ha forzata un'altra
     printed_code: Optional[str] = None  # cosi' com'e' stampato: "025/165", "LOB-EN001"
     name_text: str = ""                 # testo della fascia alta (il nome, piu' rumore)
     full_text: str = ""

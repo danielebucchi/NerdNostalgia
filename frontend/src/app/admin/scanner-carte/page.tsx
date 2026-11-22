@@ -97,6 +97,32 @@ export default function ScannerCartePage() {
   const [carte, setCarte] = useState<PersonalCard[]>([]);
   const [errore, setErrore] = useState<string | null>(null);
 
+  // Condizione e lingua forzate restano anche ricaricando la pagina: la
+  // conferma arriva spesso dopo, e ripartire dalla stima le perderebbe.
+  const impLette = useRef(false);
+  useEffect(() => {
+    try {
+      const v = JSON.parse(window.localStorage.getItem("nn_scanner_impostazioni") || "null");
+      if (v && typeof v === "object") {
+        setImp((i) => ({
+          ...i,
+          condizione: typeof v.condizione === "string" ? v.condizione : i.condizione,
+          lingua: typeof v.lingua === "string" ? v.lingua : i.lingua,
+          valutaSubito: typeof v.valutaSubito === "boolean" ? v.valutaSubito : i.valutaSubito,
+        }));
+      }
+    } catch {
+      // impostazioni salvate illeggibili: si riparte dai valori di default
+    }
+    impLette.current = true;
+  }, []);
+  useEffect(() => {
+    if (!impLette.current) return;
+    window.localStorage.setItem("nn_scanner_impostazioni", JSON.stringify({
+      condizione: imp.condizione, lingua: imp.lingua, valutaSubito: imp.valutaSubito,
+    }));
+  }, [imp.condizione, imp.lingua, imp.valutaSubito]);
+
   const ricaricaStato = useCallback(async () => {
     try {
       setSt(await stato());
@@ -516,7 +542,7 @@ function Caricamento({
       try {
         const fronte = nomeDelFronte(f.name);
         if (fronte === null) {
-          const s = await caricaScan(f, impRef.current.gameId, impRef.current.expansionId);
+          const s = await caricaScan(f, impRef.current.gameId, impRef.current.expansionId, impRef.current.lingua);
           perNome.current.set(base(f.name), s.id);
           onScan(s);
         } else {

@@ -146,12 +146,14 @@ export async function caricaScan(
   file: File,
   gameId: number,
   expansionId?: number | null,
+  language?: string | null,
 ): Promise<Scan> {
   const fd = new FormData();
   const nome = file.name.replace(/\.[^.]+$/, "") + ".jpg";
   fd.append("file", new File([await riduci(file)], nome, { type: "image/jpeg" }));
   fd.append("game_id", String(gameId));
   if (expansionId) fd.append("expansion_id", String(expansionId));
+  if (language) fd.append("language", language);
   return adminApi.postForm<Scan>(`${B}/scans`, fd);
 }
 

@@ -80,6 +80,24 @@ def _carica(client, admin_headers):
     )
 
 
+def test_language_chosen_at_upload_wins_over_ocr_and_reaches_the_card(client, admin_headers):
+    """La lingua forzata nella pagina resta nello scan: la conferma, anche
+    dopo un ricaricamento che l'ha dimenticata, la ritrova li'."""
+    buf = io.BytesIO()
+    Image.new("RGB", (630, 880), "white").save(buf, format="PNG")
+    r = client.post("/api/card-scanner/scans",
+                    files={"file": ("scan002.png", buf.getvalue(), "image/png")},
+                    data={"game_id": "5", "language": "en"}, headers=admin_headers)
+    assert r.status_code == 201, r.text
+    scan = r.json()
+    assert scan["ocr"]["language"] == "en"
+    assert scan["ocr"]["language_read"] == "it"
+    carta = client.post(f"/api/card-scanner/scans/{scan['id']}/confirm",
+                        json={"blueprint_id": 10, "language": scan["ocr"]["language"], "price_now": False},
+                        headers=admin_headers).json()
+    assert carta["language"] == "en"
+
+
 def test_scan_proposes_the_card(client, admin_headers):
     r = _carica(client, admin_headers)
     assert r.status_code == 201, r.text

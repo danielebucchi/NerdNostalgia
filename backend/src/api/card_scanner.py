@@ -247,11 +247,15 @@ def upload_scan(
     file: UploadFile = File(...),
     game_id: Optional[int] = Form(None),
     expansion_id: Optional[int] = Form(None),
+    language: Optional[str] = Form(None, max_length=5),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
     """Uno scan → ritaglio, OCR, candidati. Si salva la carta ritagliata e
-    raddrizzata: e' quella che finisce in collezione e nelle inserzioni."""
+    raddrizzata: e' quella che finisce in collezione e nelle inserzioni.
+
+    La lingua scelta nella pagina vale piu' di quella letta e resta nello
+    scan: la conferma puo' arrivare dopo un ricaricamento della pagina."""
     _guard_cardtrader()
     if not card_ocr.is_available():
         raise HTTPException(503, "Tesseract non installato sul server")
@@ -272,6 +276,9 @@ def upload_scan(
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Immagine non leggibile: {exc}") from exc
 
+    if language and language.strip() and language.strip().lower() != lettura.language:
+        lettura.language_read = lettura.language
+        lettura.language = language.strip().lower()
     scan = CardScan(
         image_url="", original_filename=(file.filename or "")[:255],
         game_id=game_id, expansion_id=expansion_id,
