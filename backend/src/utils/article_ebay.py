@@ -231,6 +231,14 @@ def _offerta_ebay(db: Session, article: Article, conf: Dict[str, str], sku: str,
     }
 
 
+def cosa_va_su_ebay(article: Article) -> tuple:
+    """Quello dell'articolo che finisce nell'inserzione: se cambia
+    salvando, l'inserzione si riallinea."""
+    return (article.title, article.description, str(article.price), str(article.ebay_price),
+            tuple(article.images or []), article.condition, article.quantity, article.quantity_sold,
+            article.card_condition, article.brand, article.model)
+
+
 def _controlli(db: Session, article: Article) -> None:
     if not eb.is_configured():
         raise ValueError("eBay non collegato: completa il collegamento dalla pagina eBay del pannello")

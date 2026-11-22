@@ -1048,3 +1048,19 @@ def test_sold_card_is_not_corrected(client, admin_headers, db_session):
     db_session.commit()
     r = client.patch(f"/api/card-scanner/cards/{carta['id']}", headers=admin_headers, json={"condition": "Poor"})
     assert r.status_code == 400
+
+
+def test_new_price_in_the_collection_reaches_the_listings(client, admin_headers, db_session, mondo_finto, monkeypatch):
+    from models.db import Article
+    from utils import cardtrader_client as ct
+    aggiornati = []
+    monkeypatch.setattr(ct, "update_product", lambda pid, **kw: aggiornati.append((pid, kw)))
+    carta = _carta_confermata(client, admin_headers)
+    client.post(f"/api/card-scanner/cards/{carta['id']}/cardtrader", headers=admin_headers)
+    art_id = client.post(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers).json()["article_id"]
+
+    r = client.patch(f"/api/personal-cards/{carta['id']}", headers=admin_headers,
+                     json={"list_price": "9.00", "list_price_cardtrader": "8.50"})
+    assert r.status_code == 200, r.text
+    assert aggiornati[-1] == (777, {"price": 8.5, "quantity": 1})
+    assert float(db_session.get(Article, art_id).price) == 9.0

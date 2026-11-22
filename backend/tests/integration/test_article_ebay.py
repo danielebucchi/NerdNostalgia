@@ -157,3 +157,20 @@ def test_price_chosen_before_publishing_wins_and_stays(client, admin_headers, db
     assert client.post(f"/api/articles/{art.id}/ebay/publish", headers=admin_headers).json()["price_eur"] == 22.0
     r = client.post(f"/api/articles/{art.id}/ebay/publish", json={"price": None}, headers=admin_headers)
     assert r.json()["price_eur"] == 26.0
+
+
+def test_saving_a_new_price_updates_the_ebay_listing(client, admin_headers, db_session, admin_user, ebay_finto):
+    art = _articolo(db_session, admin_user, price=7)
+    client.post(f"/api/articles/{art.id}/ebay/publish", headers=admin_headers)
+    r = client.patch(f"/api/articles/{art.id}", json={"price": "10.00"}, headers=admin_headers)
+    assert r.status_code == 200, r.text
+    # 10 / 0,89 = 11,24, +2 → 14
+    assert ebay_finto["updated"][-1][1]["pricingSummary"]["price"]["value"] == "14.00"
+
+
+def test_saving_without_changes_for_ebay_leaves_the_listing_alone(client, admin_headers, db_session, admin_user,
+                                                                  ebay_finto):
+    art = _articolo(db_session, admin_user)
+    client.post(f"/api/articles/{art.id}/ebay/publish", headers=admin_headers)
+    client.patch(f"/api/articles/{art.id}", json={"cost": "3.00"}, headers=admin_headers)
+    assert ebay_finto["updated"] == []

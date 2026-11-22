@@ -1,6 +1,7 @@
 """
 API endpoint personal_cards (carte sciolte: bulk-buy, single-sell). Admin only.
 """
+import logging
 from decimal import Decimal
 from typing import Optional
 
@@ -20,6 +21,7 @@ from models.entities.personal_card import (
 )
 from utils.session import get_db
 
+logger = logging.getLogger("personal_cards")
 router = APIRouter(prefix="/api/personal-cards", tags=["personal-cards"])
 
 
@@ -136,7 +138,18 @@ def update_card(
     card = helper.get(card_id)
     if not card:
         raise HTTPException(404, f"Card {card_id} non trovata")
+    prezzi = ("list_price", "list_price_cardtrader", "list_price_ebay")
+    prima = [getattr(card, k) for k in prezzi]
+    from utils import ebay_variations
+    voci_prima = ebay_variations.stato_voci(helper.db, card)
     helper.update(payload, card)
+    # Prezzo cambiato con la carta gia' in vendita: le inserzioni (sito,
+    # CardTrader, eBay) si riallineano. Best effort: il salvataggio resta.
+    if card.status != PersonalCardStatus.SOLD and [getattr(card, k) for k in prezzi] != prima:
+        from utils import card_listing as cl
+        avvisi = cl.riallinea_canali(helper.db, card, {"prezzo"}, _admin.id, voci_prima)
+        if avvisi:
+            logger.warning("Carta %s: prezzo salvato ma non riallineato su %s", card.id, avvisi)
     return _to_response(card)
 
 

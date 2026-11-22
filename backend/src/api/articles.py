@@ -469,7 +469,17 @@ def update_article(
             )
 
     was_published = article.status == ArticleStatus.PUBLISHED
+    prima_su_ebay = article_ebay.cosa_va_su_ebay(article)
     article_helper.update(article_data, article)
+    # Gia' su eBay e cambiato quello che ci va (prezzo, testi, foto...):
+    # l'inserzione si riallinea. Best effort: il salvataggio resta.
+    if (article.ebay_listing_id and article.status != ArticleStatus.SOLD
+            and article_ebay.cosa_va_su_ebay(article) != prima_su_ebay):
+        try:
+            article_ebay.publish(article_helper.db, article)
+        except Exception as exc:  # noqa: BLE001
+            article_helper.db.rollback()
+            logger.warning("Articolo %s salvato ma inserzione eBay non aggiornata: %s", article.id, exc)
 
     # Alla transizione a PUBLISHED: avvisi iscritti + auto-push CardTrader
     # (solo carte abbinate); entrambi best-effort. Se torna SOLD, togli da CT.
