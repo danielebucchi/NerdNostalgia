@@ -43,7 +43,7 @@ def test_sold_on_ebay_leaves_the_site_and_cardtrader(client, admin_headers, db_s
     assert canali_finti["ritirate_ct"] == [777]
     assert canali_finti["ritirate_ebay"] == []  # venduta li': niente da ritirare
     assert db_session.get(Article, art_id).status == ArticleStatus.ARCHIVED
-    assert "venduta su ebay" in canali_finti["email"][0]["text_body"]
+    assert "venduto su ebay" in canali_finti["email"][0]["text_body"]
 
 
 def test_sold_on_cardtrader_leaves_ebay_and_the_site(client, admin_headers, db_session, canali_finti):
@@ -77,3 +77,52 @@ def test_one_marketplace_down_does_not_stop_the_other(client, admin_headers, db_
     canali_finti["offerte"][card.ebay_sku] = [{"listing": {"soldQuantity": 1}}]
     esito = client.post("/api/card-scanner/sync-sales", headers=admin_headers).json()
     assert "cardtrader" in esito["errori"] and len(esito["vendute"]) == 1
+
+
+# --- articoli del sito (non carte della collezione) ----------------------
+
+
+def _articolo_su_ebay_e_cardtrader(db_session, admin_user, **kw):
+    from models.db import ArticleCondition
+    from models.db.articles import EbayStatus, VintedStatus
+    art = Article(user_id=admin_user.id, title="Magneton set base 9 holo poor pokemon", price=10,
+                  condition=ArticleCondition.USED, status=ArticleStatus.PUBLISHED,
+                  ebay_sku="NN-ART-1", ebay_offer_id="OA1", ebay_listing_id="800952341340",
+                  ebay_status=EbayStatus.LISTED, cardtrader_blueprint_id=5, cardtrader_product_id=888,
+                  vinted_status=VintedStatus.LISTED, **kw)
+    db_session.add(art)
+    db_session.commit()
+    return art
+
+
+def test_article_sold_on_ebay_is_sold_on_the_site_and_leaves_cardtrader(
+        client, admin_headers, db_session, admin_user, canali_finti):
+    from models.db.articles import EbayStatus
+    art = _articolo_su_ebay_e_cardtrader(db_session, admin_user)
+    canali_finti["offerte"]["NN-ART-1"] = [{"listing": {"soldQuantity": 1},
+                                           "pricingSummary": {"price": {"value": "14.00"}}}]
+    r = client.post("/api/card-scanner/sync-sales", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    db_session.refresh(art)
+    assert art.status == ArticleStatus.SOLD and art.ebay_status == EbayStatus.SOLD
+    assert canali_finti["ritirate_ct"] == [888] and canali_finti["ritirate_ebay"] == []
+    testo = canali_finti["email"][0]["text_body"]
+    assert "Magneton" in testo and "venduto su ebay a 14.00" in testo and "vinted" in testo
+
+
+def test_article_sold_on_cardtrader_leaves_ebay(client, admin_headers, db_session, admin_user, canali_finti):
+    art = _articolo_su_ebay_e_cardtrader(db_session, admin_user)
+    canali_finti["ordini"] = [{"state": "paid", "order_items": [
+        {"product_id": 888, "quantity": 1, "seller_price": {"cents": 900, "currency": "EUR"}}]}]
+    client.post("/api/card-scanner/sync-sales", headers=admin_headers)
+    db_session.refresh(art)
+    assert art.status == ArticleStatus.SOLD
+    assert canali_finti["ritirate_ebay"] == ["OA1"]
+
+
+def test_unsold_article_stays_on_sale(client, admin_headers, db_session, admin_user, canali_finti):
+    art = _articolo_su_ebay_e_cardtrader(db_session, admin_user)
+    canali_finti["offerte"]["NN-ART-1"] = [{"listing": {"soldQuantity": 0}}]
+    client.post("/api/card-scanner/sync-sales", headers=admin_headers)
+    db_session.refresh(art)
+    assert art.status == ArticleStatus.PUBLISHED and canali_finti["email"] == []
