@@ -128,7 +128,16 @@ def test_collection_card_article_goes_through_the_scanner(client, admin_headers,
     db_session.commit()
     r = client.post(f"/api/articles/{art.id}/ebay/publish", headers=admin_headers)
     assert r.status_code == 400 and "scanner" in r.json()["detail"]
-    assert client.get(f"/api/articles/{art.id}/ebay/preview", headers=admin_headers).json()["collection_card"]
+    anteprima = client.get(f"/api/articles/{art.id}/ebay/preview", headers=admin_headers).json()
+    assert anteprima["collection_card"] and anteprima["collection_ebay_url"] is None
+
+    # Su eBay con le varianti: il link e' quello dell'inserzione della carta
+    carta = db_session.query(PersonalCard).filter(PersonalCard.article_id == art.id).one()
+    carta.ebay_listing_id, carta.ebay_group_key = "800952062857", "NN-GRP-x"
+    db_session.commit()
+    anteprima = client.get(f"/api/articles/{art.id}/ebay/preview", headers=admin_headers).json()
+    assert anteprima["collection_ebay_url"].endswith("/itm/800952062857")
+    assert anteprima["collection_ebay_variations"] is True
 
 
 def test_preview_shows_the_price_before_publishing(client, admin_headers, db_session, admin_user, ebay_finto):

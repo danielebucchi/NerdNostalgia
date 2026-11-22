@@ -53,8 +53,12 @@ def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _carta(db: Session, article: Article) -> Optional[PersonalCard]:
+    return db.query(PersonalCard).filter(PersonalCard.article_id == article.id).first()
+
+
 def carta_della_collezione(db: Session, article: Article) -> bool:
-    return db.query(PersonalCard.id).filter(PersonalCard.article_id == article.id).first() is not None
+    return _carta(db, article) is not None
 
 
 def ebay_price_auto(db: Session, article: Article) -> float:
@@ -251,6 +255,10 @@ def anteprima(db: Session, article: Article) -> Dict[str, Any]:
     except ValueError:
         prezzo = None
     meta = article.article_metadata or {}
+    carta = _carta(db, article)
+    # Le carte dello scanner stanno su eBay come carte della collezione:
+    # l'inserzione (singola o con varianti) e' registrata sulla carta.
+    in_vendita = carta is not None and carta.status != "SOLD" and carta.ebay_listing_id
     return {
         "price_eur": prezzo,
         "price_manual": article.ebay_price is not None and float(article.ebay_price) > 0,
@@ -258,7 +266,9 @@ def anteprima(db: Session, article: Article) -> Dict[str, Any]:
         "category_name": meta.get("ebay_category_name"),
         "listing_id": article.ebay_listing_id,
         "url": listing_url(article),
-        "collection_card": carta_della_collezione(db, article),
+        "collection_card": carta is not None,
+        "collection_ebay_url": cl.ebay_listing_url(carta) if in_vendita else None,
+        "collection_ebay_variations": bool(in_vendita and carta.ebay_group_key),
     }
 
 

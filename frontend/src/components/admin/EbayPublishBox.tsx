@@ -17,6 +17,9 @@ interface Anteprima {
   listing_id: string | null;
   url: string | null;
   collection_card: boolean;
+  /** Carta dello scanner: la sua inserzione eBay (null se non e' su eBay). */
+  collection_ebay_url: string | null;
+  collection_ebay_variations: boolean;
 }
 
 const eur = (v: number | null) => (v == null ? "—" : `${v.toFixed(0)} €`);
@@ -66,15 +69,28 @@ export function EbayPublishBox({
     <div className="card p-5">
       <div className="flex items-baseline justify-between mb-3 gap-2 flex-wrap">
         <h2 className="display text-lg text-ink">🤖 eBay automatico</h2>
-        {online && (
+        {(online || info?.collection_ebay_url) && (
           <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-mint text-mint-deep">in vendita</span>
         )}
       </div>
 
       {info?.collection_card ? (
-        <p className="text-sm text-ink-soft">
-          È una carta della collezione: si mette su eBay dallo scanner carte (Collezione), anche con varianti.
-        </p>
+        <div className="text-sm space-y-2">
+          {info.collection_ebay_url ? (
+            <p className="text-ink">
+              ✅ In vendita su eBay come carta della collezione
+              {info.collection_ebay_variations ? " (inserzione con varianti)" : ""}:{" "}
+              <a href={info.collection_ebay_url} target="_blank" rel="noreferrer" className="underline text-lilac-deep">
+                vedi su eBay ↗
+              </a>
+            </p>
+          ) : (
+            <p className="text-ink-soft">Non è su eBay.</p>
+          )}
+          <p className="text-ink-soft">
+            È una carta della collezione: su eBay si mette, si aggiorna e si ritira dallo scanner carte (Collezione).
+          </p>
+        </div>
       ) : (
         <div className="space-y-3 text-sm">
           <div className="grid grid-cols-2 gap-3">
