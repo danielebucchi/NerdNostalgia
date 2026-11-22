@@ -746,3 +746,86 @@ def is_collection_article(db: Session, article: Article) -> bool:
         return db.query(PersonalCard.id).filter(PersonalCard.article_id == article.id).first() is not None
     except Exception:  # noqa: BLE001 — nel dubbio non si blocca niente
         return False
+
+
+# ── Correzione di una carta in collezione ─────────────────────────
+#
+# Lo scanner a volte conferma la carta sbagliata (versione, numero) o con
+# condizione e lingua sbagliate. Si corregge dalla collezione, e dove la
+# carta e' gia' in vendita l'inserzione si riallinea.
+
+# Cosa cambia la carta in vendita: su CardTrader non si modifica, si ritira
+# e si ripubblica.
+CAMBI_DI_CARTA = {"carta", "condition", "language", "reverse", "first_edition"}
+
+
+def correggi_carta(db: Session, card: PersonalCard, *, blueprint_id: Optional[int] = None,
+                   condition: Optional[str] = None, language: Optional[str] = None,
+                   reverse: Optional[bool] = None, first_edition: Optional[bool] = None,
+                   quantity: Optional[int] = None) -> set:
+    """Applica la correzione e ritorna cosa e' cambiato. Cambiando carta
+    nome, set e numero vengono dal blueprint, e i prezzi di mercato (che
+    erano della carta sbagliata) si rifanno."""
+    cambiati = set()
+    if blueprint_id and blueprint_id != card.cardtrader_blueprint_id:
+        bp = db.query(CardBlueprint).filter(CardBlueprint.id == blueprint_id).first()
+        if bp is None:
+            raise ValueError(f"Carta {blueprint_id} non trovata nell'indice")
+        card.name = bp.name
+        card.collection = bp.expansion_name
+        card.card_number = bp.collector_number
+        card.printed_code = bp.collector_number
+        card.game_id = bp.game_id
+        card.cardtrader_blueprint_id = bp.id
+        card.cardtrader_expansion_id = bp.expansion_id
+        card.name_it = None
+        card.collection_it = None
+        cambiati.add("carta")
+    for campo, valore in (("condition", condition), ("language", (language or "").lower() or None),
+                          ("reverse", reverse), ("first_edition", first_edition), ("quantity", quantity)):
+        if valore is not None and getattr(card, campo) != valore:
+            setattr(card, campo, valore)
+            cambiati.add(campo)
+    db.commit()
+    if "carta" in cambiati:
+        from utils import card_pricing as cp
+        try:
+            cp.price_card(card)
+            riempi_nomi_italiani(db, card)
+            db.commit()
+        except Exception as exc:  # noqa: BLE001 — la correzione resta, il prezzo si rifa' a mano
+            db.rollback()
+            LOGGER.warning("Prezzi o nomi della carta %s dopo la correzione: %s", card.id, exc)
+    return cambiati
+
+
+def riallinea_canali(db: Session, card: PersonalCard, cambiati: set, admin_id: int,
+                     voci_prima=None) -> Dict[str, str]:
+    """Riporta la correzione dove la carta e' in vendita. Ogni canale va per
+    conto suo: ritorna gli errori per canale, da mostrare."""
+    from utils import ebay_variations
+    avvisi: Dict[str, str] = {}
+    if not cambiati:
+        return avvisi
+
+    def prova(canale, fn):
+        try:
+            fn()
+        except (ValueError, ct.CardTraderError, eb.EbayError) as exc:
+            db.rollback()
+            avvisi[canale] = str(exc)
+
+    if card.cardtrader_product_id:
+        def cardtrader():
+            if cambiati & CAMBI_DI_CARTA:
+                unpublish_cardtrader(db, card)
+            publish_cardtrader(db, card)
+        prova("cardtrader", cardtrader)
+    if card.ebay_listing_id:
+        if card.ebay_group_key and voci_prima is not None:
+            prova("ebay", lambda: ebay_variations.aggiorna_voce(db, card, voci_prima))
+        elif not card.ebay_group_key:
+            prova("ebay", lambda: publish_ebay(db, card))
+    if card.article is not None and card.article.status == ArticleStatus.PUBLISHED:
+        prova("sito", lambda: publish_site(db, card, admin_id))
+    return avvisi

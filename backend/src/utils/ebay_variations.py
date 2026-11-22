@@ -14,7 +14,7 @@ l'inserzione resta la stessa.
 """
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -224,6 +224,49 @@ def publish_group(db: Session, carte: List[PersonalCard], titolo: Optional[str] 
     if len(tutte) > MAX_VARIANTI:
         raise ValueError(f"eBay accetta al massimo {MAX_VARIANTI} carte per inserzione")
     return _scrivi_gruppo(db, chiave or f"NN-GRP-{uuid.uuid4().hex[:10]}", titolo, tutte)
+
+
+def _in_gruppo(db: Session, chiave: str) -> List[PersonalCard]:
+    return (db.query(PersonalCard)
+            .filter(PersonalCard.ebay_group_key == chiave, PersonalCard.status != "SOLD")
+            .order_by(PersonalCard.id)
+            .all())
+
+
+def stato_voci(db: Session, card: PersonalCard) -> Optional[Tuple[Dict[int, str], Dict[str, List[str]]]]:
+    """Voci del menu e aspetti comuni del gruppo della carta, com'erano
+    prima di correggerla: servono ad aggiorna_voce per capire cosa cambia."""
+    if not (card.ebay_group_key and card.ebay_listing_id):
+        return None
+    carte = _in_gruppo(db, card.ebay_group_key)
+    return _etichette_uniche(carte), _aspetti_comuni(carte)
+
+
+def aggiorna_voce(db: Session, card: PersonalCard,
+                  prima: Tuple[Dict[int, str], Dict[str, List[str]]]) -> None:
+    """La carta del gruppo e' stata corretta (carta, condizione, lingua...):
+    si riscrive la sua voce e si ripubblica il gruppo. Le altre si
+    riscrivono solo se cambia la loro voce o gli aspetti comuni a tutte."""
+    chiave = card.ebay_group_key
+    titolo = _titolo_attuale(chiave)
+    if not titolo:
+        raise ValueError(f"Inserzione con varianti {chiave} non trovata su eBay")
+    voci_prima, comuni_prima = prima
+    carte = _in_gruppo(db, chiave)
+    voci = _etichette_uniche(carte)
+    comuni = _aspetti_comuni(carte)
+    conf = cl._ebay_config(db)
+    for c in carte:
+        if c.id != card.id and comuni == comuni_prima and voci[c.id] == voci_prima.get(c.id):
+            continue
+        sku = cl.ebay_sku(c)
+        eb.put_inventory_item(sku, cl._articolo_ebay(db, c, {**comuni, ASPETTO_VARIANTE: [voci[c.id]]},
+                                                     cl._immagini(c)))
+        if c.id == card.id:
+            c.ebay_offer_id = _salva_offerta(c, sku, cl._offerta_ebay(db, c, conf, sku, cl.ebay_price(db, c)))
+    db.commit()
+    foto_gruppo = [f[0] for f in (cl._immagini(c) for c in carte) if f][:12]
+    _pubblica_gruppo(db, chiave, titolo, carte, voci, comuni, foto_gruppo)
 
 
 def _togli_voce(db: Session, chiave: str, card: PersonalCard, restano: List[PersonalCard]) -> None:

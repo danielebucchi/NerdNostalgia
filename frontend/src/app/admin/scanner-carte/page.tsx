@@ -21,6 +21,7 @@ import {
   cercaNellIndice,
   collezione,
   conferma,
+  correggiCarta,
   costruisciIndice,
   eliminaCarta,
   doppioniInCoda,
@@ -1749,6 +1750,134 @@ function useMobile(): boolean {
   return mobile;
 }
 
+/* Correzione di una carta confermata male: la carta (versione, numero),
+ * condizione, lingua, reverse, 1ª edizione, quantità. Dove è già in vendita
+ * il server riallinea le inserzioni. */
+function CorreggiCarta({
+  carta: c,
+  onFatto,
+  onChiudi,
+}: {
+  carta: PersonalCard;
+  onFatto: (c: PersonalCard, avvisi: string[]) => void;
+  onChiudi: () => void;
+}) {
+  const [cerca, setCerca] = useState("");
+  const [ovunque, setOvunque] = useState(false);
+  const [trovate, setTrovate] = useState<Candidato[]>([]);
+  const [nuova, setNuova] = useState<Candidato | null>(null);
+  const [condizione, setCondizione] = useState(c.condition || "Near Mint");
+  const [lingua, setLingua] = useState(c.language || "it");
+  const [reverse, setReverse] = useState(!!c.reverse);
+  const [primaEd, setPrimaEd] = useState(!!c.first_edition);
+  const [qty, setQty] = useState(c.quantity || 1);
+  const [busy, setBusy] = useState(false);
+  const [errore, setErrore] = useState<string | null>(null);
+
+  async function cercaCarta() {
+    if (cerca.trim().length < 2 || !c.game_id) return;
+    setBusy(true);
+    setErrore(null);
+    try {
+      const r = await cercaNellIndice(c.game_id, cerca.trim(), ovunque ? null : c.cardtrader_expansion_id);
+      setTrovate(r);
+      if (!r.length) setErrore("Nessuna carta trovata: prova in tutte le espansioni");
+    } catch (e) {
+      setErrore(msg(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function salva() {
+    const dati: Parameters<typeof correggiCarta>[1] = {};
+    if (nuova && nuova.blueprint_id !== c.cardtrader_blueprint_id) dati.blueprint_id = nuova.blueprint_id;
+    if (condizione !== c.condition) dati.condition = condizione;
+    if (lingua !== c.language) dati.language = lingua;
+    if (reverse !== !!c.reverse) dati.reverse = reverse;
+    if (primaEd !== !!c.first_edition) dati.first_edition = primaEd;
+    if (qty !== c.quantity) dati.quantity = qty;
+    if (!Object.keys(dati).length) return onChiudi();
+    const inVendita = c.cardtrader_product_id || c.ebay_listing_id || c.site_status === "PUBLISHED";
+    if (inVendita && !window.confirm("La carta è in vendita: aggiorno anche le inserzioni (su CardTrader si ripubblica). Procedo?")) return;
+    setBusy(true);
+    setErrore(null);
+    try {
+      const r = await correggiCarta(c.id, dati);
+      onFatto(r.card, Object.entries(r.warnings).map(([canale, e]) => `${canale}: ${e}`));
+    } catch (e) {
+      setErrore(msg(e));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 p-3 rounded-xl border border-lilac-deep/40 bg-lilac/10 text-sm space-y-2 whitespace-normal">
+      <div>
+        <span className="text-xs text-ink-soft">Carta: </span>
+        <strong className="text-ink">{nuova ? nuova.name : c.name}</strong>{" "}
+        <span className="text-xs text-ink-soft">
+          {nuova ? `${nuova.expansion_name ?? ""} ${nuova.number ?? ""}${nuova.version ? ` · ${nuova.version}` : ""}`
+            : `${c.collection ?? ""} ${c.printed_code || c.card_number || ""}`}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <input className="input py-1 text-sm !w-48" placeholder="nome o numero (es. 47)" value={cerca}
+          onChange={(e) => setCerca(e.target.value)} onKeyDown={(e) => e.key === "Enter" && cercaCarta()}
+          aria-label="Cerca la carta giusta" />
+        <label className="flex items-center gap-1 text-xs text-ink-soft">
+          <input type="checkbox" className="accent-lilac-deep" checked={ovunque} onChange={(e) => setOvunque(e.target.checked)} />
+          tutte le espansioni
+        </label>
+        <button type="button" className="btn btn-ghost text-xs" disabled={busy || cerca.trim().length < 2} onClick={cercaCarta}>
+          🔎 Cerca
+        </button>
+      </div>
+      {trovate.length > 0 && (
+        <ul className="max-h-48 overflow-y-auto space-y-1">
+          {trovate.map((t) => (
+            <li key={t.blueprint_id}>
+              <button type="button"
+                className={"w-full text-left px-2 py-1 rounded " + (nuova?.blueprint_id === t.blueprint_id ? "bg-lilac/30" : "hover:bg-ink/5")}
+                onClick={() => setNuova(t)}>
+                {t.name} <span className="text-xs text-ink-soft">{t.expansion_name} {t.number}{t.version ? ` · ${t.version}` : ""}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <select className="input py-1 text-sm w-auto" value={condizione} onChange={(e) => setCondizione(e.target.value)} aria-label="Condizione">
+          {CONDIZIONI.map((x) => <option key={x}>{x}</option>)}
+        </select>
+        <select className="input py-1 text-sm w-auto" value={lingua} onChange={(e) => setLingua(e.target.value)} aria-label="Lingua">
+          {LINGUE.filter((l) => l.code).map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+        </select>
+        <label className="flex items-center gap-1 text-ink-soft">
+          Qtà
+          <input type="number" min={1} className="input py-1 !w-16" value={qty}
+            onChange={(e) => setQty(Math.max(1, Number(e.target.value)))} />
+        </label>
+        <label className="flex items-center gap-1 text-ink-soft">
+          <input type="checkbox" className="accent-lilac-deep" checked={reverse} onChange={(e) => setReverse(e.target.checked)} />
+          Reverse/foil
+        </label>
+        <label className="flex items-center gap-1 text-ink-soft">
+          <input type="checkbox" className="accent-lilac-deep" checked={primaEd} onChange={(e) => setPrimaEd(e.target.checked)} />
+          1ª ed.
+        </label>
+      </div>
+      {errore && <p className="text-xs text-pink-deep">{errore}</p>}
+      <div className="flex gap-2 justify-end">
+        <button type="button" className="btn btn-ghost text-xs" disabled={busy} onClick={onChiudi}>Annulla</button>
+        <button type="button" className="btn btn-primary text-xs" disabled={busy} onClick={salva}>
+          {busy ? "…" : "Salva"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RigaCarta({
   layout,
   carta: c,
@@ -1773,6 +1902,7 @@ function RigaCarta({
   const [nota, setNota] = useState<string | null>(null);
   const [aMano, setAMano] = useState(false);
   const [prezziEbay, setPrezziEbay] = useState("");
+  const [correggi, setCorreggi] = useState(false);
 
 
   async function azione(fn: () => Promise<unknown>, ok?: string) {
@@ -1825,6 +1955,17 @@ function RigaCarta({
         </span>
       )}
       {nota && <span className="block text-xs text-pink-deep">{nota}</span>}
+      {correggi && (
+        <CorreggiCarta
+          carta={c}
+          onChiudi={() => setCorreggi(false)}
+          onFatto={(nuova, avvisi) => {
+            onCambiata(nuova);
+            setCorreggi(false);
+            setNota(avvisi.length ? `⚠ corretta, ma non riallineata su ${avvisi.join(" · ")}` : "corretta");
+          }}
+        />
+      )}
     </>
   );
 
@@ -1973,6 +2114,13 @@ function RigaCarta({
   );
 
   const azioni = (
+    <span className="inline-flex gap-3">
+    {c.status !== "SOLD" && (
+      <button type="button" className="text-xs underline text-lilac-deep disabled:opacity-50" disabled={busy}
+        onClick={() => setCorreggi((v) => !v)} aria-expanded={correggi}>
+        ✏️ correggi
+      </button>
+    )}
     <button type="button" className="text-xs underline text-pink-deep disabled:opacity-50" disabled={busy}
       onClick={() => {
         const inVendita = c.cardtrader_product_id || c.ebay_listing_id || c.site_status === "PUBLISHED";
@@ -1981,6 +2129,7 @@ function RigaCarta({
       }}>
       🗑 elimina
     </button>
+    </span>
   );
 
   if (layout === "scheda") {

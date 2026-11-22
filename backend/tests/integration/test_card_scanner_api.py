@@ -964,3 +964,78 @@ def test_selling_price_follows_the_suggestion_until_changed_by_hand(client, admi
     r = client.post(f"/api/card-scanner/cards/{carta['id']}/price", headers=admin_headers).json()
     assert float(r["card"]["estimated_value"]) == 5.50
     assert float(r["card"]["list_price"]) == 3.50                      # scritto a mano: resta
+
+
+# --- correzione dalla collezione ----------------------------------------
+
+
+def _altro_blueprint(db_session):
+    db_session.add(CardBlueprint(
+        id=11, game_id=5, expansion_id=1, expansion_code="ssp", expansion_name="Surging Sparks",
+        name="Pikachu ex", collector_number="057", number_norm="57", dhash="0" * 64,
+        editable="first_edition,pokemon_language:en|it,pokemon_reverse",
+    ))
+    db_session.commit()
+
+
+def test_wrong_card_is_corrected_and_its_listings_follow(client, admin_headers, db_session, mondo_finto, monkeypatch):
+    from models.db import Article
+    from utils import cardtrader_client as ct
+    ritirate = []
+    monkeypatch.setattr(ct, "delete_product", lambda pid: ritirate.append(pid))
+    _altro_blueprint(db_session)
+    carta = _carta_confermata(client, admin_headers)
+    client.post(f"/api/card-scanner/cards/{carta['id']}/cardtrader", headers=admin_headers)
+    art_id = client.post(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers).json()["article_id"]
+
+    r = client.patch(f"/api/card-scanner/cards/{carta['id']}", headers=admin_headers,
+                     json={"blueprint_id": 11, "condition": "Poor"})
+    assert r.status_code == 200, r.text
+    esito = r.json()
+    assert esito["warnings"] == {}
+    assert esito["card"]["name"] == "Pikachu ex" and esito["card"]["printed_code"] == "057"
+    assert esito["card"]["condition"] == "Poor"
+    # CardTrader non si modifica: la vecchia inserzione via, una nuova giusta
+    assert ritirate == [777]
+    assert mondo_finto[-1]["blueprint_id"] == 11 and mondo_finto[-1]["condition"] == "Poor"
+    art = db_session.get(Article, art_id)
+    db_session.refresh(art)
+    assert "Pikachu ex" in art.title and "PO" in art.title
+
+
+def test_only_quantity_changes_the_cardtrader_listing_in_place(client, admin_headers, mondo_finto, monkeypatch):
+    from utils import cardtrader_client as ct
+    ritirate, aggiornati = [], []
+    monkeypatch.setattr(ct, "delete_product", lambda pid: ritirate.append(pid))
+    monkeypatch.setattr(ct, "update_product", lambda pid, **kw: aggiornati.append((pid, kw)))
+    carta = _carta_confermata(client, admin_headers)
+    client.post(f"/api/card-scanner/cards/{carta['id']}/cardtrader", headers=admin_headers)
+
+    r = client.patch(f"/api/card-scanner/cards/{carta['id']}", headers=admin_headers, json={"quantity": 3})
+    assert r.status_code == 200, r.text
+    assert ritirate == [] and aggiornati and aggiornati[-1][1]["quantity"] == 3
+
+
+def test_correcting_a_card_in_a_variations_listing_rewrites_only_its_entry(
+        client, admin_headers, db_session, ebay_finto):
+    a, b, c = (_carta_confermata(client, admin_headers) for _ in range(3))
+    chiave = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
+                         json={"card_ids": [a["id"], b["id"], c["id"]], "title": "Carte"}).json()["group_key"]
+    ebay_finto["items"].clear()
+
+    r = client.patch(f"/api/card-scanner/cards/{b['id']}", headers=admin_headers, json={"condition": "Poor"})
+    assert r.status_code == 200, r.text
+    assert r.json()["warnings"] == {}
+    voci = ebay_finto["groups"][chiave]["variesBy"]["specifications"][0]["values"]
+    assert voci[1] == "Durant ex 004/191 Poor"
+    assert list(ebay_finto["items"]) == [f"NN-PC-{b['id']}"]
+    assert ebay_finto["published"][-1] == chiave
+
+
+def test_sold_card_is_not_corrected(client, admin_headers, db_session):
+    carta = _carta_confermata(client, admin_headers)
+    card = db_session.get(PersonalCard, carta["id"])
+    card.status = "SOLD"
+    db_session.commit()
+    r = client.patch(f"/api/card-scanner/cards/{carta['id']}", headers=admin_headers, json={"condition": "Poor"})
+    assert r.status_code == 400

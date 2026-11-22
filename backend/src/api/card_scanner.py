@@ -627,6 +627,45 @@ def delete_card(card_id: int, db: Session = Depends(get_db), _admin: User = Depe
     return None
 
 
+class CorrectRequest(BaseModel):
+    """Correzione di una carta confermata male. Solo i campi da cambiare."""
+    blueprint_id: Optional[int] = Field(None, ge=1)
+    condition: Optional[str] = Field(None, max_length=20)
+    language: Optional[str] = Field(None, max_length=5)
+    reverse: Optional[bool] = None
+    first_edition: Optional[bool] = None
+    quantity: Optional[int] = Field(None, ge=1, le=999)
+
+
+class CorrectResponse(BaseModel):
+    card: PersonalCardResponse
+    # Canali in cui la correzione non e' arrivata: canale → errore
+    warnings: Dict[str, str] = {}
+
+
+@router.patch("/cards/{card_id}", response_model=CorrectResponse)
+def correct_card(card_id: int, payload: CorrectRequest, db: Session = Depends(get_db),
+                 _admin: User = Depends(require_admin)):
+    """Corregge la carta in collezione e la riallinea dove e' in vendita
+    (sito, CardTrader, eBay singola o con varianti)."""
+    card = _card_or_404(db, card_id)
+    if card.status == PersonalCardStatus.SOLD:
+        raise HTTPException(400, "La carta e' gia' venduta: non si corregge piu'")
+    if payload.condition and payload.condition not in CONDIZIONI:
+        raise HTTPException(400, f"Condizione sconosciuta: {payload.condition}")
+    voci_prima = ebay_variations.stato_voci(db, card)
+    try:
+        cambiati = cl.correggi_carta(
+            db, card, blueprint_id=payload.blueprint_id, condition=payload.condition,
+            language=payload.language, reverse=payload.reverse,
+            first_edition=payload.first_edition, quantity=payload.quantity)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    avvisi = cl.riallinea_canali(db, card, cambiati, _admin.id, voci_prima)
+    db.refresh(card)
+    return CorrectResponse(card=_to_response(card), warnings=avvisi)
+
+
 # ── Collezione: prezzi ────────────────────────────────────────────
 
 class PricedResponse(BaseModel):

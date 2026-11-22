@@ -215,6 +215,20 @@ export const collezione = (search?: string) => {
 
 export const eliminaCarta = (cardId: number) => adminApi.delete<void>(`${B}/cards/${cardId}`);
 
+/** Correzione di una carta confermata male: cambia solo i campi passati e
+ * la riallinea dove e' in vendita. `warnings`: canali non riallineati. */
+export const correggiCarta = (
+  cardId: number,
+  dati: {
+    blueprint_id?: number;
+    condition?: string;
+    language?: string;
+    reverse?: boolean;
+    first_edition?: boolean;
+    quantity?: number;
+  },
+) => adminApi.patch<{ card: PersonalCard; warnings: Record<string, string> }>(`${B}/cards/${cardId}`, dati);
+
 export const valuta = (cardId: number) => adminApi.post<Valutazione>(`${B}/cards/${cardId}/price`);
 
 export const vendutiAMano = (cardId: number, prices: string) =>
