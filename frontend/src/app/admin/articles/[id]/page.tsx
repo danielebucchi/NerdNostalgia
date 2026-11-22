@@ -313,16 +313,11 @@ export default function AdminArticleEditPage({ params }: PageProps) {
             </p>
           </div>
 
-          {/* Marketplace sync (Vinted + eBay) */}
+          {/* Marketplace: Vinted (manuale), eBay e CardTrader (API) */}
           <div className="grid gap-4 lg:grid-cols-2 mb-6">
             <MarketplaceSyncBox
               article={article}
               marketplace="vinted"
-              onUpdated={(a) => setArticle(a)}
-            />
-            <MarketplaceSyncBox
-              article={article}
-              marketplace="ebay"
               onUpdated={(a) => setArticle(a)}
             />
             <EbayPublishBox article={article} onUpdated={reload} />

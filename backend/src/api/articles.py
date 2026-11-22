@@ -647,14 +647,23 @@ def ebay_preview(
     return article_ebay.anteprima(article_helper.db, _article_or_404(article_helper, article_id))
 
 
+class EbayPublishRequest(BaseModel):
+    """Prezzo scelto per eBay (all'euro sopra); null = il suggerito."""
+    price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
+
+
 @router.post("/{article_id}/ebay/publish")
 def ebay_publish(
     article_id: int,
+    payload: Optional[EbayPublishRequest] = None,
     article_helper: ArticleHelper = Depends(get_article_helper),
     _admin: User = Depends(require_admin),
 ):
-    """Mette l'articolo su eBay (Inventory API), o aggiorna l'inserzione."""
+    """Mette l'articolo su eBay (Inventory API), o aggiorna l'inserzione.
+    Con il body si sceglie anche il prezzo (null = il suggerito)."""
     article = _article_or_404(article_helper, article_id)
+    if payload is not None:
+        article_ebay.imposta_prezzo(article_helper.db, article, payload.price)
     try:
         return article_ebay.publish(article_helper.db, article)
     except ValueError as exc:

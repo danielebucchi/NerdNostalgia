@@ -173,12 +173,6 @@ export function ArticleForm({ initial, onSaved, onCancel }: Props) {
     url: "",
     price: "",
   });
-  const [ebay, setEbay] = useState<MarketplaceSeed>({
-    enabled: false,
-    status: "LISTED",
-    url: "",
-    price: "",
-  });
 
   const isEdit = Boolean(initial);
 
@@ -276,7 +270,7 @@ export function ArticleForm({ initial, onSaved, onCancel }: Props) {
         setPendingFiles([]);
       }
 
-      // Sync iniziale Vinted / eBay (solo in create)
+      // Sync iniziale Vinted (solo in create; eBay si pubblica dalla scheda)
       if (!isEdit) {
         if (vinted.enabled) {
           setUploadProgress("Sincronizzo Vinted…");
@@ -286,17 +280,6 @@ export function ArticleForm({ initial, onSaved, onCancel }: Props) {
               vinted_status: vinted.status,
               vinted_url: vinted.url.trim() || null,
               vinted_price: vinted.price.trim() ? Number(vinted.price) : null,
-            },
-          );
-        }
-        if (ebay.enabled) {
-          setUploadProgress("Sincronizzo eBay…");
-          result = await adminApi.patch<Article>(
-            `/api/articles/${result.id}/ebay`,
-            {
-              ebay_status: ebay.status,
-              ebay_url: ebay.url.trim() || null,
-              ebay_price: ebay.price.trim() ? Number(ebay.price) : null,
             },
           );
         }
@@ -743,7 +726,8 @@ export function ArticleForm({ initial, onSaved, onCancel }: Props) {
           <p className="text-xs text-ink-soft mb-4">
             Spunta solo se hai già pubblicato (o stai per pubblicare) l&apos;annuncio
             altrove. Cliccando <strong>Apri ↗</strong> da mobile si apre direttamente
-            l&apos;app Vinted / eBay (se installata).
+            l&apos;app Vinted (se installata). Su eBay si pubblica dalla scheda
+            dell&apos;articolo, dopo averlo creato (eBay automatico).
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4">
@@ -751,13 +735,6 @@ export function ArticleForm({ initial, onSaved, onCancel }: Props) {
               marketplace="vinted"
               state={vinted}
               onChange={setVinted}
-              basePrice={state.price}
-              categoryId={state.category_id}
-            />
-            <MarketplacePicker
-              marketplace="ebay"
-              state={ebay}
-              onChange={setEbay}
               basePrice={state.price}
               categoryId={state.category_id}
             />
@@ -774,7 +751,7 @@ export function ArticleForm({ initial, onSaved, onCancel }: Props) {
             ? uploadProgress ?? "Salvataggio…"
             : isEdit
               ? "Salva modifiche"
-              : buildCreateLabel(pendingFiles.length, vinted.enabled, ebay.enabled)}
+              : buildCreateLabel(pendingFiles.length, vinted.enabled)}
         </button>
         <button
           type="button"
@@ -839,12 +816,10 @@ function Field({
 function buildCreateLabel(
   fileCount: number,
   vintedOn: boolean,
-  ebayOn: boolean,
 ): string {
   const extras: string[] = [];
   if (fileCount > 0) extras.push(`+${fileCount} foto`);
   if (vintedOn) extras.push("Vinted");
-  if (ebayOn) extras.push("eBay");
   return extras.length > 0
     ? `Crea articolo (${extras.join(" · ")})`
     : "Crea articolo";

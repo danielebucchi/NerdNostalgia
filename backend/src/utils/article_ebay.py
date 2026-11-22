@@ -252,8 +252,9 @@ def anteprima(db: Session, article: Article) -> Dict[str, Any]:
     """Cosa andrebbe su eBay, senza pubblicare: prezzo e categoria."""
     try:
         prezzo: Optional[float] = ebay_price(db, article)
+        suggerito: Optional[float] = ebay_price_auto(db, article)
     except ValueError:
-        prezzo = None
+        prezzo = suggerito = None
     meta = article.article_metadata or {}
     carta = _carta(db, article)
     # Le carte dello scanner stanno su eBay come carte della collezione:
@@ -261,6 +262,7 @@ def anteprima(db: Session, article: Article) -> Dict[str, Any]:
     in_vendita = carta is not None and carta.status != "SOLD" and carta.ebay_listing_id
     return {
         "price_eur": prezzo,
+        "price_suggested": suggerito,
         "price_manual": article.ebay_price is not None and float(article.ebay_price) > 0,
         "category_id": meta.get("ebay_category_id"),
         "category_name": meta.get("ebay_category_name"),
@@ -270,6 +272,13 @@ def anteprima(db: Session, article: Article) -> Dict[str, Any]:
         "collection_ebay_url": cl.ebay_listing_url(carta) if in_vendita else None,
         "collection_ebay_variations": bool(in_vendita and carta.ebay_group_key),
     }
+
+
+def imposta_prezzo(db: Session, article: Article, prezzo: Optional[Decimal]) -> None:
+    """Il prezzo scelto per eBay resta nell'articolo (anche per gli
+    aggiornamenti dopo); None = torna al suggerito."""
+    article.ebay_price = prezzo if prezzo is not None and prezzo > 0 else None
+    db.commit()
 
 
 def publish(db: Session, article: Article) -> Dict[str, Any]:

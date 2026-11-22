@@ -145,3 +145,15 @@ def test_preview_shows_the_price_before_publishing(client, admin_headers, db_ses
     r = client.get(f"/api/articles/{art.id}/ebay/preview", headers=admin_headers)
     assert r.status_code == 200, r.text
     assert r.json()["price_eur"] == 26.0 and r.json()["listing_id"] is None
+
+
+def test_price_chosen_before_publishing_wins_and_stays(client, admin_headers, db_session, admin_user, ebay_finto):
+    art = _articolo(db_session, admin_user)
+    assert client.get(f"/api/articles/{art.id}/ebay/preview", headers=admin_headers).json()["price_suggested"] == 26.0
+    r = client.post(f"/api/articles/{art.id}/ebay/publish", json={"price": "21.50"}, headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["price_eur"] == 22.0  # all'euro sopra
+    # Aggiornando senza dire niente resta quello scelto; con null torna il suggerito
+    assert client.post(f"/api/articles/{art.id}/ebay/publish", headers=admin_headers).json()["price_eur"] == 22.0
+    r = client.post(f"/api/articles/{art.id}/ebay/publish", json={"price": None}, headers=admin_headers)
+    assert r.json()["price_eur"] == 26.0

@@ -11,6 +11,7 @@ import type { Article } from "@/lib/types";
 
 interface Anteprima {
   price_eur: number | null;
+  price_suggested: number | null;
   price_manual: boolean;
   category_id: string | null;
   category_name: string | null;
@@ -35,6 +36,11 @@ export function EbayPublishBox({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nota, setNota] = useState<string | null>(null);
+  // Prezzo da mandare: parte da quello in uso (scritto o suggerito).
+  const [prezzo, setPrezzo] = useState("");
+  useEffect(() => {
+    if (info?.price_eur != null) setPrezzo(String(info.price_eur));
+  }, [info?.price_eur]);
 
   const carica = useCallback(() => {
     adminApi
@@ -60,6 +66,14 @@ export function EbayPublishBox({
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Il body della pubblicazione: il prezzo scritto, o null = il suggerito
+   * (che segue la regola se cambia il prezzo dell'articolo). */
+  function corpo() {
+    const v = Number(prezzo.replace(",", "."));
+    const scelto = prezzo.trim() && Number.isFinite(v) && v > 0 ? v : null;
+    return { price: scelto != null && scelto !== info?.price_suggested ? scelto : null };
   }
 
   const online = !!info?.listing_id;
@@ -94,13 +108,23 @@ export function EbayPublishBox({
       ) : (
         <div className="space-y-3 text-sm">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <span className="block text-xs font-bold uppercase tracking-wider text-ink-soft">Prezzo eBay</span>
-              <span className="text-2xl display text-ink leading-tight">{eur(info?.price_eur ?? null)}</span>
-              <span className="block text-[11px] text-ink-soft">
-                {info?.price_manual ? "scritto a mano (all'euro sopra)" : "con commissione eBay e regola delle carte"}
+            <label className="block">
+              <span className="block text-xs font-bold uppercase tracking-wider text-ink-soft">Prezzo eBay (€)</span>
+              <input type="number" min={1} step={1} inputMode="numeric" className="input mt-1 !w-28 text-lg"
+                value={prezzo} onChange={(e) => setPrezzo(e.target.value)}
+                placeholder={info?.price_suggested != null ? String(info.price_suggested) : "€"} aria-label="Prezzo eBay" />
+              <span className="block text-[11px] text-ink-soft mt-1">
+                Suggerito {eur(info?.price_suggested ?? null)} (commissione eBay e regola delle carte)
+                {info?.price_suggested != null && Number(prezzo) !== info.price_suggested && (
+                  <>
+                    {" · "}
+                    <button type="button" className="underline" onClick={() => setPrezzo(String(info.price_suggested))}>
+                      usa il suggerito
+                    </button>
+                  </>
+                )}
               </span>
-            </div>
+            </label>
             <div>
               <span className="block text-xs font-bold uppercase tracking-wider text-ink-soft">Categoria eBay</span>
               <span className="text-ink">
@@ -117,7 +141,7 @@ export function EbayPublishBox({
                 </a>
               )}
               <button type="button" className="btn btn-primary text-sm" disabled={busy || venduto}
-                onClick={() => esegui(() => adminApi.post(`/api/articles/${article.id}/ebay/publish`), "inserzione aggiornata")}>
+                onClick={() => esegui(() => adminApi.post(`/api/articles/${article.id}/ebay/publish`, corpo()), "inserzione aggiornata")}>
                 {busy ? "…" : "Aggiorna su eBay"}
               </button>
               <button type="button" className="btn btn-ghost text-sm" disabled={busy}
@@ -127,12 +151,12 @@ export function EbayPublishBox({
             </div>
           ) : (
             <button type="button" className="btn btn-primary text-sm w-full" disabled={busy || venduto || info?.price_eur == null}
-              onClick={() => esegui(() => adminApi.post(`/api/articles/${article.id}/ebay/publish`), "in vendita su eBay")}>
+              onClick={() => esegui(() => adminApi.post(`/api/articles/${article.id}/ebay/publish`, corpo()), "in vendita su eBay")}>
               {busy ? "Pubblico…" : "Pubblica su eBay"}
             </button>
           )}
           <p className="text-[11px] text-ink-soft">
-            Venduto sul sito o su Vinted, archiviato o eliminato: l&apos;inserzione eBay si ritira da sola.
+            Su eBay i prezzi sono senza centesimi: quello scritto va all&apos;euro sopra. Venduto sul sito o su Vinted, archiviato o eliminato: l&apos;inserzione eBay si ritira da sola.
           </p>
         </div>
       )}
