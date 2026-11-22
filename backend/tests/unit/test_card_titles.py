@@ -78,3 +78,15 @@ def test_vinted_price_is_cardtrader_minimum_plus_two_rounded_up():
     # Senza minimo CardTrader: dal prezzo della carta
     assert vinted_price(_carta(cardtrader_price=None, list_price=Decimal("1.50"))) == 3.0  # scalino 1,11-1,90
     assert vinted_price(_carta(cardtrader_price=None)) is None
+
+
+def test_variations_menu_is_ordered_by_set_and_printed_number():
+    from utils.ebay_variations import ordina_per_numero
+    carte = [
+        _carta(id=1, printed_code="102/102"),
+        _carta(id=2, printed_code="4/102"),
+        _carta(id=3, printed_code="033"),
+        _carta(id=4, printed_code="028"),
+        _carta(id=5, printed_code="004/102"),  # seconda copia del 4: dopo l'altra
+    ]
+    assert [c.id for c in ordina_per_numero(carte)] == [2, 5, 4, 3, 1]

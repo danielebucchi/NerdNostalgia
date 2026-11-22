@@ -365,3 +365,17 @@ export function doppioniInCoda<T extends { id: number }>(
     return false;
   });
 }
+
+/** Titolo proposto per l'inserzione eBay con varianti: "Carte Pokémon
+ * singole - Base Set - scegli la tua carta". L'espansione solo se le carte
+ * sono tutte della stessa; il gioco solo se e' uno. eBay accetta 80
+ * caratteri: se l'espansione non ci sta, il titolo di sempre. */
+export function titoloGruppoProposto(carte: { game_id?: number | null; collection?: string | null }[]): string {
+  const giochi = new Set(carte.map((c) => c.game_id));
+  const gioco = giochi.size === 1 ? GIOCHI.find((g) => g.id === carte[0]?.game_id)?.label : undefined;
+  const base = gioco ? `Carte ${gioco} singole` : "Carte singole";
+  const set = new Set(carte.map((c) => (c.collection || "").trim()));
+  const espansione = set.size === 1 ? [...set][0] : "";
+  const conSet = `${base} - ${espansione} - scegli la tua carta`;
+  return espansione && conSet.length <= 80 ? conSet : `${base} - scegli la tua carta`;
+}

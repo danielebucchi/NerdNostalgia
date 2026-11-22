@@ -45,6 +45,7 @@ import {
   scaricaCsv,
   scaricaKitWindows,
   scarta,
+  titoloGruppoProposto,
   stato,
   urlVendutiEbay,
   valuta,
@@ -1370,13 +1371,11 @@ function Collezione({
   useEffect(() => {
     if (pannello && ebayVarianti) gruppiEbay().then(setGruppi).catch(() => setGruppi([]));
   }, [pannello, ebayVarianti]);
-  // Titolo proposto all'apertura del pannello: col gioco delle carte scelte,
-  // se sono tutte dello stesso.
+  // Titolo proposto all'apertura del pannello: col gioco e l'espansione
+  // delle carte scelte, se sono tutte dello stesso.
   useEffect(() => {
     if (!pannello) return;
-    const giochi = new Set(scelte.map((c) => c.game_id));
-    const gioco = giochi.size === 1 ? GIOCHI.find((g) => g.id === scelte[0]?.game_id)?.label : undefined;
-    setTitoloGruppo(gioco ? `Carte ${gioco} singole - scegli la tua carta` : "Carte singole - scegli la tua carta");
+    setTitoloGruppo(titoloGruppoProposto(scelte));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pannello]);
   const conVarianti = ebayVarianti && canaliAttivi.includes("ebay");

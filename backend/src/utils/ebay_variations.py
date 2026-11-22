@@ -13,6 +13,7 @@ carte a un gruppo esistente lo riscrive con tutte le voci e lo ripubblica:
 l'inserzione resta la stessa.
 """
 import logging
+import re
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -37,6 +38,22 @@ def etichetta(card: PersonalCard) -> str:
     d'occhio (nome, numero, condizione)."""
     parti = [cl.nome_vetrina(card), card.printed_code or card.card_number, card.condition]
     return " ".join(p for p in parti if p)[:MAX_VALORE].strip()
+
+
+def _chiave_numero(card: PersonalCard):
+    """"004/102" → 4, "TG05/TG30" → 5: il numero stampato come lo si conta.
+    Prima l'espansione, poi il numero, poi l'id (stabile fra due copie)."""
+    codice = (card.printed_code or card.card_number or "").split("/")[0]
+    cifre = re.search(r"\d+", codice)
+    lettere = re.sub(r"[\d\s]", "", codice)  # "TG" di "TG05": "004" e "4" sono lo stesso numero
+    return (card.collection or "", int(cifre.group()) if cifre else 10**9, lettere, card.id)
+
+
+def ordina_per_numero(carte: List[PersonalCard]) -> List[PersonalCard]:
+    """Le voci del menu nell'ordine del raccoglitore: per espansione e
+    numero. Lo stesso ordine ovunque si riscrive il gruppo: il suffisso
+    "#id" dei doppioni dipende da chi viene prima."""
+    return sorted(carte, key=_chiave_numero)
 
 
 def _etichette_uniche(carte: List[PersonalCard]) -> Dict[int, str]:
@@ -218,7 +235,7 @@ def publish_group(db: Session, carte: List[PersonalCard], titolo: Optional[str] 
     if problemi:
         raise ValueError("Non posso metterle insieme: " + "; ".join(problemi))
 
-    tutte = gia_dentro + [c for c in carte if c.id not in {g.id for g in gia_dentro}]
+    tutte = ordina_per_numero(gia_dentro + [c for c in carte if c.id not in {g.id for g in gia_dentro}])
     if len(tutte) < 2:
         raise ValueError("Un'inserzione con varianti vuole almeno 2 carte")
     if len(tutte) > MAX_VARIANTI:
@@ -227,10 +244,9 @@ def publish_group(db: Session, carte: List[PersonalCard], titolo: Optional[str] 
 
 
 def _in_gruppo(db: Session, chiave: str) -> List[PersonalCard]:
-    return (db.query(PersonalCard)
-            .filter(PersonalCard.ebay_group_key == chiave, PersonalCard.status != "SOLD")
-            .order_by(PersonalCard.id)
-            .all())
+    return ordina_per_numero(db.query(PersonalCard)
+                             .filter(PersonalCard.ebay_group_key == chiave, PersonalCard.status != "SOLD")
+                             .all())
 
 
 def stato_voci(db: Session, card: PersonalCard) -> Optional[Tuple[Dict[int, str], Dict[str, List[str]]]]:
@@ -278,7 +294,7 @@ def _togli_voce(db: Session, chiave: str, card: PersonalCard, restano: List[Pers
     titolo = _titolo_attuale(chiave)
     if not titolo:
         raise ValueError(f"Inserzione con varianti {chiave} non trovata su eBay")
-    prima = _etichette_uniche(sorted(restano + [card], key=lambda c: c.id))
+    prima = _etichette_uniche(ordina_per_numero(restano + [card]))
     voci = _etichette_uniche(restano)
     comuni = _aspetti_comuni(restano)
     for c in restano:
@@ -299,10 +315,9 @@ def remove_card(db: Session, card: PersonalCard) -> None:
     ritirata). Le altre restano in vendita; se ne resta una sola il gruppo
     non ha piu' senso e l'inserzione si chiude."""
     chiave = card.ebay_group_key
-    altre = (db.query(PersonalCard)
-             .filter(PersonalCard.ebay_group_key == chiave, PersonalCard.id != card.id)
-             .order_by(PersonalCard.id)
-             .all())
+    altre = ordina_per_numero(db.query(PersonalCard)
+                              .filter(PersonalCard.ebay_group_key == chiave, PersonalCard.id != card.id)
+                              .all())
     restano = [c for c in altre if c.status != "SOLD"]
     if len(restano) >= 2:
         _togli_voce(db, chiave, card, restano)

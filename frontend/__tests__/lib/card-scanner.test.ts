@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { descriviGruppo, doppioniInCoda } from "@/lib/card-scanner";
+import { descriviGruppo, doppioniInCoda, titoloGruppoProposto } from "@/lib/card-scanner";
 
 describe("descriviGruppo", () => {
   it("titolo, carte, set e data: si capisce quale inserzione e'", () => {
@@ -37,5 +37,23 @@ describe("doppioniInCoda", () => {
   it("gli scan senza carta scelta non sono mai doppioni", () => {
     const coda = [{ id: 1 }, { id: 2 }];
     expect(doppioniInCoda(coda, { 1: null })).toEqual([]);
+  });
+});
+
+describe("titoloGruppoProposto", () => {
+  it("con l'espansione quando le carte sono tutte della stessa", () => {
+    expect(titoloGruppoProposto([{ game_id: 5, collection: "Base Set" }, { game_id: 5, collection: "Base Set" }]))
+      .toBe("Carte Pokémon singole - Base Set - scegli la tua carta");
+  });
+
+  it("espansioni diverse: il titolo di sempre", () => {
+    expect(titoloGruppoProposto([{ game_id: 5, collection: "Base Set" }, { game_id: 5, collection: "Jungle" }]))
+      .toBe("Carte Pokémon singole - scegli la tua carta");
+  });
+
+  it("oltre gli 80 caratteri di eBay: il titolo di sempre", () => {
+    const lunga = "Scarlet & Violet—Paldea Evolved Special Illustration Collection";
+    expect(titoloGruppoProposto([{ game_id: 5, collection: lunga }]))
+      .toBe("Carte Pokémon singole - scegli la tua carta");
   });
 });
