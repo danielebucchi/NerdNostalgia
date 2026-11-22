@@ -54,6 +54,8 @@ export interface Lettura {
   set_code?: string | null;
   set_codes?: string[];
   language?: string | null;
+  language_read?: string | null;
+  condition_forced?: string | null;
   printed_code?: string | null;
   name_text?: string;
   notes?: string[];
@@ -147,6 +149,7 @@ export async function caricaScan(
   gameId: number,
   expansionId?: number | null,
   language?: string | null,
+  condition?: string | null,
 ): Promise<Scan> {
   const fd = new FormData();
   const nome = file.name.replace(/\.[^.]+$/, "") + ".jpg";
@@ -154,6 +157,7 @@ export async function caricaScan(
   fd.append("game_id", String(gameId));
   if (expansionId) fd.append("expansion_id", String(expansionId));
   if (language) fd.append("language", language);
+  if (condition) fd.append("condition", condition);
   return adminApi.postForm<Scan>(`${B}/scans`, fd);
 }
 

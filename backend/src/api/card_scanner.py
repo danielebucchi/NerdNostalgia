@@ -48,6 +48,9 @@ LOGGER = logging.getLogger("card_scanner")
 
 router = APIRouter(prefix="/api/card-scanner", tags=["card-scanner"])
 
+# Le condizioni che si possono scegliere nella pagina (le stesse di CardTrader).
+CONDIZIONI = {"Mint", "Near Mint", "Slightly Played", "Moderately Played", "Played", "Poor"}
+
 
 def _guard_cardtrader():
     if not ct.is_configured():
@@ -248,17 +251,22 @@ def upload_scan(
     game_id: Optional[int] = Form(None),
     expansion_id: Optional[int] = Form(None),
     language: Optional[str] = Form(None, max_length=5),
+    condition: Optional[str] = Form(None, max_length=20),
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
     """Uno scan → ritaglio, OCR, candidati. Si salva la carta ritagliata e
     raddrizzata: e' quella che finisce in collezione e nelle inserzioni.
 
-    La lingua scelta nella pagina vale piu' di quella letta e resta nello
-    scan: la conferma puo' arrivare dopo un ricaricamento della pagina."""
+    Lingua e condizione scelte nella pagina valgono piu' di quelle lette e
+    stimate, e restano nello scan: la conferma puo' arrivare dopo un
+    ricaricamento della pagina."""
     _guard_cardtrader()
     if not card_ocr.is_available():
         raise HTTPException(503, "Tesseract non installato sul server")
+    condition = (condition or "").strip() or None
+    if condition and condition not in CONDIZIONI:
+        raise HTTPException(400, f"Condizione sconosciuta: {condition}")
     if not game_id:
         # Dalla cartella osservata: valgono le scelte fatte nella pagina.
         sessione = _sessione(db)
@@ -279,6 +287,7 @@ def upload_scan(
     if language and language.strip() and language.strip().lower() != lettura.language:
         lettura.language_read = lettura.language
         lettura.language = language.strip().lower()
+    lettura.condition_forced = condition
     scan = CardScan(
         image_url="", original_filename=(file.filename or "")[:255],
         game_id=game_id, expansion_id=expansion_id,
@@ -446,7 +455,8 @@ def confirm_scan(
     def dall_analisi(chiave):
         return bool((analisi.get(chiave) or {}).get("value"))
 
-    condizione = payload.condition or (analisi.get("condition") or {}).get("value") or "Near Mint"
+    condizione = (payload.condition or letto.get("condition_forced")
+                  or (analisi.get("condition") or {}).get("value") or "Near Mint")
     reverse = payload.reverse if payload.reverse is not None else dall_analisi("reverse")
     prima = payload.first_edition if payload.first_edition is not None else dall_analisi("first_edition")
 

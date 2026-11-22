@@ -542,7 +542,8 @@ function Caricamento({
       try {
         const fronte = nomeDelFronte(f.name);
         if (fronte === null) {
-          const s = await caricaScan(f, impRef.current.gameId, impRef.current.expansionId, impRef.current.lingua);
+          const s = await caricaScan(f, impRef.current.gameId, impRef.current.expansionId,
+            impRef.current.lingua, impRef.current.condizione);
           perNome.current.set(base(f.name), s.id);
           onScan(s);
         } else {
@@ -745,9 +746,11 @@ function datiConferma(s: Scan, c: Candidato, imp: Impostazioni) {
 }
 
 /** Valori iniziali dei controlli della riga, dall'analisi della carta. */
-function dallAnalisi(a: Analisi | undefined, imp: Impostazioni) {
+function dallAnalisi(a: Analisi | undefined, imp: Impostazioni, forzata?: string | null) {
   return {
-    condizione: imp.condizione || a?.condition?.value || "Near Mint",
+    // Quella scelta ora nella pagina, poi quella forzata al caricamento,
+    // solo alla fine la stima dello scan.
+    condizione: imp.condizione || forzata || a?.condition?.value || "Near Mint",
     reverse: a?.reverse?.value === true,
     primaEd: a?.first_edition?.value === true,
   };
@@ -803,7 +806,7 @@ function RigaScan({
   const [collezione, setCollezione] = useState("");
   const [collezioneId, setCollezioneId] = useState<number | null>(scan.expansion_id ?? null);
   const [qty, setQty] = useState(1);
-  const iniziali = dallAnalisi(scan.features, imp);
+  const iniziali = dallAnalisi(scan.features, imp, scan.ocr.condition_forced);
   const [condizione, setCondizione] = useState(iniziali.condizione);
   const [reverse, setReverse] = useState(iniziali.reverse);
   const [primaEd, setPrimaEd] = useState(iniziali.primaEd);
@@ -830,7 +833,7 @@ function RigaScan({
   // La condizione scelta nelle impostazioni vale anche per le righe gia' in
   // coda, se non la si e' cambiata a mano.
   useEffect(() => {
-    if (!toccati.has("condition")) setCondizione(dallAnalisi(scan.features, imp).condizione);
+    if (!toccati.has("condition")) setCondizione(dallAnalisi(scan.features, imp, scan.ocr.condition_forced).condizione);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imp.condizione]);
 
@@ -852,7 +855,7 @@ function RigaScan({
   // Quando arriva l'analisi giusta, i controlli ripartono da lì.
   useEffect(() => {
     if (!analisiValida) return;
-    const v = dallAnalisi(scan.features, imp);
+    const v = dallAnalisi(scan.features, imp, scan.ocr.condition_forced);
     if (!toccati.has("condition")) setCondizione(v.condizione);
     if (!toccati.has("reverse")) setReverse(v.reverse);
     if (!toccati.has("first_edition")) setPrimaEd(v.primaEd);

@@ -98,6 +98,31 @@ def test_language_chosen_at_upload_wins_over_ocr_and_reaches_the_card(client, ad
     assert carta["language"] == "en"
 
 
+def test_condition_chosen_at_upload_wins_over_the_estimate(client, admin_headers):
+    """"Conferma le sicure" dopo un ricaricamento non manda la condizione:
+    vale quella forzata al caricamento, non la stima dello scan."""
+    buf = io.BytesIO()
+    Image.new("RGB", (630, 880), "white").save(buf, format="PNG")
+    r = client.post("/api/card-scanner/scans",
+                    files={"file": ("scan003.png", buf.getvalue(), "image/png")},
+                    data={"game_id": "5", "condition": "Poor"}, headers=admin_headers)
+    assert r.status_code == 201, r.text
+    scan = r.json()
+    assert scan["ocr"]["condition_forced"] == "Poor"
+    carta = client.post(f"/api/card-scanner/scans/{scan['id']}/confirm",
+                        json={"blueprint_id": 10, "price_now": False}, headers=admin_headers).json()
+    assert carta["condition"] == "Poor"
+
+
+def test_unknown_condition_at_upload_is_refused(client, admin_headers):
+    buf = io.BytesIO()
+    Image.new("RGB", (630, 880), "white").save(buf, format="PNG")
+    r = client.post("/api/card-scanner/scans",
+                    files={"file": ("scan004.png", buf.getvalue(), "image/png")},
+                    data={"game_id": "5", "condition": "Rovinata"}, headers=admin_headers)
+    assert r.status_code == 400
+
+
 def test_scan_proposes_the_card(client, admin_headers):
     r = _carica(client, admin_headers)
     assert r.status_code == 201, r.text
