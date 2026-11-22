@@ -62,6 +62,20 @@ def _sales_job():
         db.close()
 
 
+def _ebay_watch_job():
+    """Inserzioni eBay chiuse o nascoste da eBay: email."""
+    from utils import ebay_watch
+    db = SessionLocal()
+    try:
+        esito = ebay_watch.run(db)
+        if esito["sparite"]:
+            LOGGER.info("Inserzioni eBay non piu' attive: %s", esito["sparite"])
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Controllo inserzioni eBay fallito: %s", exc)
+    finally:
+        db.close()
+
+
 def _price_watch_job():
     """Rivalutazione settimanale: segnala i prezzi lontani dal mercato."""
     from utils import price_watch
@@ -117,6 +131,16 @@ def start_scheduler() -> None:
         _sales_job,
         CronTrigger(minute="*/15"),
         id="marketplace_sales_sync",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    # Ogni ora: inserzioni eBay che eBay ha chiuso o nascosto (es. per una
+    # regola) mentre la carta o l'articolo risultano in vendita.
+    _scheduler.add_job(
+        _ebay_watch_job,
+        CronTrigger(minute=40),
+        id="ebay_listings_watch",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
