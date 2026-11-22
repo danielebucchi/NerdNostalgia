@@ -648,13 +648,17 @@ function CodaConferma({
   const [busy, setBusy] = useState(false);
   const [avanzamento, setAvanzamento] = useState<string | null>(null);
   const sicure = coda.filter((s) => s.confidence === "alta" && s.candidates.length && !s.note);
+  const scelte = useRef<Record<number, SceltaRiga>>({});
+  const onScelte = useCallback((scanId: number, s: SceltaRiga) => {
+    scelte.current[scanId] = s;
+  }, []);
 
   async function confermaSicure() {
     setBusy(true);
     const { errori } = await inFila(
       sicure,
       async (s) => {
-        const c = await conferma(s.id, datiConferma(s, s.candidates[0], imp));
+        const c = await conferma(s.id, { ...datiConferma(s, s.candidates[0], imp), ...scelte.current[s.id] });
         onConfermata(s.id, c);
       },
       (n) => setAvanzamento(`Confermo ${n}/${sicure.length}…`),
@@ -693,6 +697,7 @@ function CodaConferma({
               onConfermata={onConfermata}
               onAggiornata={onAggiornata}
               onScartata={onScartata}
+              onScelte={onScelte}
             />
           ))}
         </ul>
@@ -740,18 +745,30 @@ const COLORE_CONFIDENZA = {
   bassa: "bg-pink-soft text-pink-deep",
 };
 
+/** Le scelte fatte a mano su una riga: "Conferma le sicure" le usa al
+ * posto della stima, come il pulsante della riga. */
+type SceltaRiga = {
+  blueprint_id?: number;
+  condition?: string;
+  quantity?: number;
+  reverse?: boolean;
+  first_edition?: boolean;
+};
+
 function RigaScan({
   scan,
   imp,
   onConfermata,
   onAggiornata,
   onScartata,
+  onScelte,
 }: {
   scan: Scan;
   imp: Impostazioni;
   onConfermata: (scanId: number, c: PersonalCard) => void;
   onAggiornata: (s: Scan) => void;
   onScartata: (id: number) => void;
+  onScelte: (scanId: number, s: SceltaRiga) => void;
 }) {
   const [scelto, setScelto] = useState<Candidato | null>(scan.candidates[0] ?? null);
   const [extra, setExtra] = useState<Candidato[]>([]);
@@ -767,8 +784,29 @@ function RigaScan({
   const [busy, setBusy] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
   const retro = useRef<HTMLInputElement>(null);
+  // Campi cambiati a mano: né l'analisi né le impostazioni li sovrascrivono.
+  const [toccati, setToccati] = useState<Set<keyof SceltaRiga>>(new Set());
+  const tocca = (k: keyof SceltaRiga) => setToccati((t) => (t.has(k) ? t : new Set(t).add(k)));
 
   useEffect(() => setScelto(scan.candidates[0] ?? null), [scan.candidates]);
+
+  useEffect(() => {
+    const s: SceltaRiga = {};
+    if (scelto && scelto.blueprint_id !== scan.candidates[0]?.blueprint_id) s.blueprint_id = scelto.blueprint_id;
+    if (toccati.has("condition")) s.condition = condizione;
+    if (toccati.has("quantity")) s.quantity = qty;
+    if (toccati.has("reverse")) s.reverse = reverse;
+    if (toccati.has("first_edition")) s.first_edition = primaEd;
+    onScelte(scan.id, s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scelto, condizione, qty, reverse, primaEd, toccati]);
+
+  // La condizione scelta nelle impostazioni vale anche per le righe gia' in
+  // coda, se non la si e' cambiata a mano.
+  useEffect(() => {
+    if (!toccati.has("condition")) setCondizione(dallAnalisi(scan.features, imp).condizione);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imp.condizione]);
 
   // L'analisi è fatta sulla carta in testa: scegliendone un'altra la si
   // rifà (reverse e timbro si misurano rispetto alla SUA immagine).
@@ -789,9 +827,9 @@ function RigaScan({
   useEffect(() => {
     if (!analisiValida) return;
     const v = dallAnalisi(scan.features, imp);
-    setCondizione(v.condizione);
-    setReverse(v.reverse);
-    setPrimaEd(v.primaEd);
+    if (!toccati.has("condition")) setCondizione(v.condizione);
+    if (!toccati.has("reverse")) setReverse(v.reverse);
+    if (!toccati.has("first_edition")) setPrimaEd(v.primaEd);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analisiValida, scan.features]);
 
@@ -1021,7 +1059,7 @@ function RigaScan({
 
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <select className="input py-1 text-sm w-auto" value={condizione}
-            onChange={(e) => setCondizione(e.target.value)} aria-label="Condizione">
+            onChange={(e) => { setCondizione(e.target.value); tocca("condition"); }} aria-label="Condizione">
             {CONDIZIONI.map((c) => (
               <option key={c}>{c}</option>
             ))}
@@ -1033,18 +1071,18 @@ function RigaScan({
               min={1}
               className="input py-1 !w-16"
               value={qty}
-              onChange={(e) => setQty(Math.max(1, Number(e.target.value)))}
+              onChange={(e) => { setQty(Math.max(1, Number(e.target.value))); tocca("quantity"); }}
             />
           </label>
           {(!analisiValida || scan.features.supports?.reverse) && (
             <label className="flex items-center gap-1 text-ink-soft">
-              <input type="checkbox" className="accent-lilac-deep" checked={reverse} onChange={(e) => setReverse(e.target.checked)} />
+              <input type="checkbox" className="accent-lilac-deep" checked={reverse} onChange={(e) => { setReverse(e.target.checked); tocca("reverse"); }} />
               Reverse/foil
             </label>
           )}
           {(!analisiValida || scan.features.supports?.first_edition) && (
             <label className="flex items-center gap-1 text-ink-soft">
-              <input type="checkbox" className="accent-lilac-deep" checked={primaEd} onChange={(e) => setPrimaEd(e.target.checked)} />
+              <input type="checkbox" className="accent-lilac-deep" checked={primaEd} onChange={(e) => { setPrimaEd(e.target.checked); tocca("first_edition"); }} />
               1ª ed.
             </label>
           )}
