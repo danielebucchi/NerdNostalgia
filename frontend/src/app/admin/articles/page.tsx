@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { BulkMarkupPanel } from "@/components/admin/BulkMarkupPanel";
+import { BulkPublishPanel } from "@/components/admin/BulkPublishPanel";
 import { Sortable } from "@/components/admin/Sortable";
 import { SwipeRow } from "@/components/admin/SwipeRow";
 import { useUndo } from "@/components/admin/useUndo";
@@ -101,7 +102,23 @@ function ArticlesListContent() {
   }, [items, debouncedQuery]);
 
   const visible = debouncedQuery ? extraFiltered : items;
-  const reorderEnabled = !debouncedQuery && !status;
+  // Selezione per la pubblicazione in blocco: riordino e swipe si spengono.
+  const [seleziona, setSeleziona] = useState(false);
+  const [scelti, setScelti] = useState<Set<number>>(new Set());
+  const articoliScelti = useMemo(() => {
+    // Con la ricerca attiva gli articoli mostrati vengono da extraFiltered.
+    const perId = new Map([...items, ...extraFiltered].map((a) => [a.id, a]));
+    return [...perId.values()].filter((a) => scelti.has(a.id));
+  }, [items, extraFiltered, scelti]);
+  const reorderEnabled = !debouncedQuery && !status && !seleziona;
+  function scegli(id: number, si: boolean) {
+    setScelti((s) => {
+      const n = new Set(s);
+      if (si) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+  }
 
   // Azioni swipe (mobile): ← elimina, → segna venduto. Ottimistiche con
   // ANNULLA (5s): piu' veloci e piu' sicure dei confirm.
@@ -157,10 +174,37 @@ function ArticlesListContent() {
               : `${total} totali`}
           </p>
         </div>
-        <Link href="/admin/articles/new" className="btn btn-primary">
-          ➕ Nuovo
-        </Link>
+        <div className="flex gap-2">
+          <button type="button" className={`btn text-sm ${seleziona ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => {
+              setSeleziona((v) => !v);
+              setScelti(new Set());
+            }}>
+            {seleziona ? "Fine" : "☑️ Seleziona"}
+          </button>
+          <Link href="/admin/articles/new" className="btn btn-primary">
+            ➕ Nuovo
+          </Link>
+        </div>
       </div>
+
+      {seleziona && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-ink">{scelti.size} selezionat{scelti.size === 1 ? "o" : "i"}</span>
+          <button type="button" className="underline text-lilac-deep"
+            onClick={() => setScelti(new Set(visible.map((a) => a.id)))}>
+            tutti quelli visibili ({visible.length})
+          </button>
+          {scelti.size > 0 && (
+            <button type="button" className="underline text-ink-soft" onClick={() => setScelti(new Set())}>
+              nessuno
+            </button>
+          )}
+        </div>
+      )}
+      {seleziona && articoliScelti.length > 0 && (
+        <BulkPublishPanel articoli={articoliScelti} onFinito={() => setReloadBump((b) => b + 1)} />
+      )}
 
       {/* Rincaro di listino: pannello chiuso di default, si apre al bisogno */}
       <div className="mb-4">
@@ -228,7 +272,13 @@ function ArticlesListContent() {
         </p>
       )}
 
-      {reorderEnabled ? (
+      {seleziona ? (
+        <div className="space-y-3">
+          {visible.map((a) => (
+            <ArticleRow key={a.id} article={a} scelto={scelti.has(a.id)} onScelto={(v) => scegli(a.id, v)} />
+          ))}
+        </div>
+      ) : reorderEnabled ? (
         <Sortable
           items={visible}
           getKey={(a) => String(a.id)}
@@ -308,11 +358,59 @@ function ArticleRow({
   article: a,
   isDragging,
   dragProps,
+  scelto,
+  onScelto,
 }: {
   article: Article;
   isDragging?: boolean;
   dragProps?: DragProps;
+  /** In modalità selezione: la casella al posto del link alla scheda. */
+  scelto?: boolean;
+  onScelto?: (v: boolean) => void;
 }) {
+  const contenuto = (
+    <>
+      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl ring-1 ring-ink/8 overflow-hidden bg-white/60 flex-shrink-0">
+        {a.images?.[0] && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={a.images[0]} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="display text-base text-ink truncate">{a.title}</p>
+        <p className="text-xs text-ink-soft truncate">
+          #{a.id} · {a.category?.name ?? "—"} · {a.condition}
+          {a.sku ? ` · ${a.sku}` : ""}
+        </p>
+      </div>
+      {(a.ebay_status === "LISTED" || a.cardtrader_product_id) && (
+        <span className="hidden sm:inline-flex gap-1 text-[10px] font-semibold">
+          {a.ebay_status === "LISTED" && <span className="chip chip-sky" title="In vendita su eBay">eBay</span>}
+          {a.cardtrader_product_id && <span className="chip chip-sky" title="In vendita su CardTrader">CT</span>}
+        </span>
+      )}
+      {a.reserved && (
+        <span
+          className="chip chip-lilac hidden sm:inline-flex whitespace-nowrap"
+          title="Ordine in attesa su questo pezzo: non è in vendita sul sito finché non confermi o annulli l'ordine"
+        >
+          ⏳ RISERVATO
+        </span>
+      )}
+      <span className={`chip ${STATUS_CHIP[a.status] ?? ""} hidden sm:inline-flex`}>{a.status}</span>
+      <span className="display text-lg text-pink-deep w-20 sm:w-24 text-right flex-shrink-0">{formatPrice(a)}</span>
+    </>
+  );
+  if (onScelto) {
+    return (
+      <label className={"card p-3 sm:p-4 flex items-center gap-3 sm:gap-4 cursor-pointer " +
+        (scelto ? "ring-2 ring-lilac-deep/50" : "")}>
+        <input type="checkbox" className="h-5 w-5 accent-lilac-deep flex-shrink-0" checked={!!scelto}
+          onChange={(e) => onScelto(e.target.checked)} aria-label={`Seleziona ${a.title}`} />
+        {contenuto}
+      </label>
+    );
+  }
   return (
     <div
       className={
@@ -336,35 +434,7 @@ function ArticleRow({
         href={`/admin/articles/${a.id}`}
         className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0"
       >
-        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl ring-1 ring-ink/8 overflow-hidden bg-white/60 flex-shrink-0">
-          {a.images?.[0] && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={a.images[0]} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="display text-base text-ink truncate">{a.title}</p>
-          <p className="text-xs text-ink-soft truncate">
-            #{a.id} · {a.category?.name ?? "—"} · {a.condition}
-            {a.sku ? ` · ${a.sku}` : ""}
-          </p>
-        </div>
-        {a.reserved && (
-          <span
-            className="chip chip-lilac hidden sm:inline-flex whitespace-nowrap"
-            title="Ordine in attesa su questo pezzo: non è in vendita sul sito finché non confermi o annulli l'ordine"
-          >
-            ⏳ RISERVATO
-          </span>
-        )}
-        <span
-          className={`chip ${STATUS_CHIP[a.status] ?? ""} hidden sm:inline-flex`}
-        >
-          {a.status}
-        </span>
-        <span className="display text-lg text-pink-deep w-20 sm:w-24 text-right flex-shrink-0">
-          {formatPrice(a)}
-        </span>
+        {contenuto}
       </Link>
     </div>
   );
