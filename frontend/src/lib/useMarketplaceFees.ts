@@ -148,6 +148,8 @@ export function getFeesFor(
 
 /** eBay non accetta inserzioni a prezzo fisso sotto 1 euro. */
 const MINIMO: Record<string, number> = { ebay: 1 };
+/** Su eBay i prezzi sono senza centesimi: all'euro sopra. */
+const EURO_INTERI = new Set(["ebay"]);
 
 /**
  * Prezzo sul marketplace che, tolta la commissione, lascia `base` in tasca
@@ -157,7 +159,8 @@ const MINIMO: Record<string, number> = { ebay: 1 };
 export function priceCoveringFee(base: string | number, fee: ResolvedFee, marketplace: string): string {
   const gross = grossUpPrice(Number(base), fee);
   if (gross == null) return "";
-  return Math.max(gross, MINIMO[marketplace] ?? 0).toFixed(2);
+  const prezzo = Math.max(gross, MINIMO[marketplace] ?? 0);
+  return (EURO_INTERI.has(marketplace) ? Math.ceil(prezzo) : prezzo).toFixed(2);
 }
 
 /** Etichetta del pulsante: "+6.5% +0,35 €", o "uguale" senza commissione. */

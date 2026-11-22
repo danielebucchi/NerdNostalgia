@@ -548,9 +548,10 @@ def test_ebay_price_gets_the_ebay_markup(client, admin_headers, db_session, monk
     carta = _carta_con_foto_pubblica(client, admin_headers, db_session)
     r = client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
     assert r.status_code == 200, r.text
-    # 3 / (1 - 0,13): la commissione si paga sul lordo
-    assert r.json()["price_eur"] == 3.45
-    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "3.45"
+    # 3 / (1 - 0,13) = 3,45: la commissione si paga sul lordo, e su eBay
+    # niente centesimi, all'euro sopra
+    assert r.json()["price_eur"] == 4.0
+    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "4.00"
 
 
 def test_ebay_markup_falls_back_like_the_article_page(client, admin_headers, db_session, monkeypatch):
@@ -558,7 +559,7 @@ def test_ebay_markup_falls_back_like_the_article_page(client, admin_headers, db_
     inviati = _ebay_finto(monkeypatch, client, admin_headers)
     carta = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="10.00")
     client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
-    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "11.24"  # 10 / 0,89
+    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "12.00"  # 10 / 0,89 = 11,24 → 12
 
 
 def test_ebay_price_covers_percent_and_fixed_fee(client, admin_headers, db_session, monkeypatch):
@@ -569,8 +570,9 @@ def test_ebay_price_covers_percent_and_fixed_fee(client, admin_headers, db_sessi
     db_session.commit()
     inviati = _ebay_finto(monkeypatch, client, admin_headers)
     carta = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="3.00")
-    assert client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers).json()["price_eur"] == 3.59
-    lordo = 3.59
+    # 3,59 coprirebbe la commissione; all'euro sopra: 4
+    assert client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers).json()["price_eur"] == 4.0
+    lordo = 4.0
     assert round(lordo - lordo * 0.065 - 0.35, 2) >= 3.00
 
     economica = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="0.13")
@@ -858,14 +860,15 @@ def test_each_platform_can_have_its_own_price(client, admin_headers, db_session,
 
     card = client.get("/api/card-scanner/cards", headers=admin_headers).json()[0]
     assert card["cardtrader_price_auto"] == 3.0
-    assert card["ebay_price_auto"] == 3.38  # 3 / 0,89 per eccesso: ripiego 11% senza commissioni
+    assert card["ebay_price_auto"] == 4.0  # 3 / 0,89 = 3,38 → 4: ripiego 11% senza commissioni, euro intero
 
     r = client.patch(f"/api/personal-cards/{carta['id']}", headers=admin_headers,
                      json={"list_price_cardtrader": "2.50", "list_price_ebay": "4.20"})
     assert r.status_code == 200, r.text
     client.post(f"/api/card-scanner/cards/{carta['id']}/cardtrader", headers=admin_headers)
     assert mondo_finto[-1]["price_eur"] == 2.50
-    assert client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers).json()["price_eur"] == 4.20
+    # Scritto a mano 4,20: anche quello all'euro sopra
+    assert client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers).json()["price_eur"] == 5.0
     # Il sito resta al prezzo della carta (4,40 €), qualunque cosa si scriva per gli altri
     sito = _carta_confermata(client, admin_headers)
     client.patch(f"/api/personal-cards/{sito['id']}", headers=admin_headers,

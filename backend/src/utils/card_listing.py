@@ -182,20 +182,26 @@ def ebay_price_auto(db: Session, card: PersonalCard) -> float:
 
     La commissione si calcola sul lordo, quindi non basta aggiungere la
     percentuale: lordo = (prezzo + fisso) / (1 - percentuale), arrotondato
-    al centesimo superiore, come grossUpPrice della scheda articolo. Con
-    6,5% + 0,35 euro una carta da 3 euro va a 3,59 (non 3,20: ci si
+    all'euro superiore: su eBay niente centesimi. Con 6,5% + 0,35 euro una
+    carta da 3 euro va a 4 (3,59 coprirebbe la commissione; 3,20 ci si
     rimetteva). Se anche cosi' resta sotto il minimo di eBay, va a 1 euro."""
     base = Decimal(str(sale_price(card)))
     percentuale, fisso = marketplace_fee(db, "ebay", _categoria(db, card))
-    lordo = ((base + fisso) / (1 - percentuale / 100)).quantize(Decimal("0.01"), rounding=ROUND_CEILING)
+    lordo = _euro_intero((base + fisso) / (1 - percentuale / 100))
     return float(max(lordo, EBAY_PREZZO_MINIMO))
 
 
+def _euro_intero(prezzo: Decimal) -> Decimal:
+    """Su eBay i prezzi sono senza centesimi: si arrotonda all'euro sopra."""
+    return prezzo.quantize(Decimal("1"), rounding=ROUND_CEILING)
+
+
 def ebay_price(db: Session, card: PersonalCard) -> float:
-    """Il prezzo scritto per eBay se c'e' (mai sotto il minimo di eBay),
-    se no quello calcolato. Solo eBay: sito e CardTrader hanno il loro."""
+    """Il prezzo scritto per eBay se c'e' (all'euro sopra, mai sotto il
+    minimo di eBay), se no quello calcolato. Solo eBay: sito e CardTrader
+    hanno il loro."""
     if card.list_price_ebay is not None and float(card.list_price_ebay) > 0:
-        return float(max(Decimal(str(card.list_price_ebay)), EBAY_PREZZO_MINIMO))
+        return float(max(_euro_intero(Decimal(str(card.list_price_ebay))), EBAY_PREZZO_MINIMO))
     return ebay_price_auto(db, card)
 
 
