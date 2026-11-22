@@ -290,6 +290,27 @@ def test_language_from_card_text_beats_noise_next_to_the_set_code():
     assert l.language == "it"
 
 
+def test_base_set_italian_with_little_text_is_not_read_as_noise_language():
+    """Testo OCR vero di due carte Base Set italiane finite in tedesco e
+    spagnolo: poco testo, e rumore scambiato per sigla + lingua."""
+    diglett = ("Pokémon Base\n\nlett\n\n30 pv @\n\ntaipo. Lunghezza: 0,2 m; Peso: 0,8 kg.\n\nFossa\n\n"
+               "Fangosberla\n\ndebolezza resistenza costo di ritirata\n\n4) -30\n\nAS\n\n"
+               "dove sopravvive mangiando\n\nSeed Oe\n\ntanto risale in superficie. LIVE")
+    l = parse_codes({"bottom": "IR DE", "full": diglett}, "pokemon")
+    assert l.language == "it"
+
+    super_pozione = ("OZIO!\n\nScarta una carta Energia\n\nassegnata a uno dei tuoi\n\n"
+                     "Pokémon per poter togliere al\n\nquel Pokémon\n\nmassimo 4 segnalini danno da\n\n"
+                     "es ES eae ee")
+    l = parse_codes({"bottom": "DA ES", "full": super_pozione}, "pokemon")
+    assert l.language == "it"
+
+
+def test_set_code_language_still_counts_when_the_text_says_nothing():
+    l = parse_codes({"bottom": "Illus. 5ban Graphics\nSSP EN 004/191", "full": "Pikachu ex 200"}, "pokemon")
+    assert l.language == "en"
+
+
 def test_set_only_in_japanese_has_no_language_choice():
     assert ci.lingue("pokemon_language:en|it|fr,pokemon_reverse") == {"en", "it", "fr"}
     assert ci.lingue("first_edition") == set()

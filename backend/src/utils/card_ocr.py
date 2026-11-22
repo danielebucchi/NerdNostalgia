@@ -280,19 +280,26 @@ def _pulisci(testo: str) -> str:
 # occorrenze: l'OCR sbaglia le parole lunghe, ma le corte e frequenti
 # ("il tuo turno", "your turn") escono quasi sempre giuste.
 PAROLE_LINGUA = {
-    "it": {"il", "tuo", "tua", "danno", "danni", "della", "dei", "puoi", "questo", "nella",
-           "avversario", "segnalino", "segnalini", "difensore", "anziché", "mazzo", "metti", "volta"},
+    "it": {"il", "tuo", "tua", "tuoi", "danno", "danni", "della", "dei", "puoi", "questo", "nella",
+           "avversario", "segnalino", "segnalini", "difensore", "anziché", "mazzo", "metti", "volta",
+           "scarta", "debolezza", "resistenza", "ritirata", "lunghezza"},
     "en": {"the", "your", "damage", "this", "card", "opponent", "you", "may", "each",
-           "deck", "defending", "attack", "of", "put", "once"},
-    "fr": {"le", "votre", "tour", "dégâts", "cette", "carte", "adversaire", "vous", "pouvez", "chaque"},
-    "de": {"dein", "deinen", "zug", "schaden", "diese", "karte", "gegner", "du", "kannst", "der"},
-    "es": {"tu", "daño", "esta", "rival", "puedes", "los", "tus", "vez", "pon", "defensor"},
+           "deck", "defending", "attack", "of", "put", "once",
+           "discard", "weakness", "resistance", "retreat", "length", "weight"},
+    "fr": {"le", "votre", "tour", "dégâts", "cette", "carte", "adversaire", "vous", "pouvez", "chaque",
+           "défaussez", "faiblesse", "retraite", "taille", "poids"},
+    "de": {"dein", "deinen", "zug", "schaden", "diese", "karte", "gegner", "du", "kannst", "der",
+           "schwäche", "resistenz", "rückzug", "rückzugskosten", "größe", "gewicht"},
+    "es": {"tu", "daño", "esta", "rival", "puedes", "los", "tus", "vez", "pon", "defensor",
+           "descarta", "debilidad", "resistencia", "retirada", "altura"},
 }
-# NB: niente parole comuni a due lingue ("turno", "carta", "del" sono sia
-# italiano sia spagnolo): farebbero pari e la lingua non si deciderebbe.
+# NB: niente parole comuni a due lingue ("turno", "carta", "del", "peso",
+# "costo" sono sia italiano sia spagnolo): farebbero pari e la lingua non
+# si deciderebbe. Le parole fisse del riquadro in basso (debolezza,
+# resistenza, ritirata, lunghezza) contano anche sulle carte con poco testo.
 
 
-def detect_language(testo: str) -> Optional[str]:
+def detect_language(testo: str, minimo: int = 4) -> Optional[str]:
     """Lingua del testo della carta, se le parole tipiche lo dicono con
     un certo stacco. None se il testo e' troppo poco o ambiguo (o non e'
     in caratteri latini: giapponese, cinese...)."""
@@ -300,7 +307,7 @@ def detect_language(testo: str) -> Optional[str]:
     conteggi = {lang: sum(1 for p in parole if p in insieme) for lang, insieme in PAROLE_LINGUA.items()}
     ordinati = sorted(conteggi.items(), key=lambda x: -x[1])
     (primo, n1), (_, n2) = ordinati[0], ordinati[1]
-    if n1 >= 4 and n1 >= 2 * max(n2, 1):
+    if n1 >= minimo and n1 >= 2 * max(n2, 1):
         return primo
     return None
 
@@ -408,8 +415,10 @@ def parse_codes(testi: dict, game_hint: Optional[str] = None,
     if not out.number:
         out.notes.append("numero non letto")
     # La lingua dal testo vince su quella accanto alla sigla: "GE · ES"
-    # puo' essere rumore letto come sigla, sedici parole italiane no.
-    out.language = detect_language(full) or out.language
+    # puo' essere rumore letto come sigla, sedici parole italiane no. Anche
+    # due sole parole bastano contro la sigla: sulle carte vecchie (Base Set)
+    # la sigla di lingua non c'e', e quella trovata e' sempre rumore.
+    out.language = detect_language(full) or detect_language(full, minimo=2) or out.language
     return out
 
 
