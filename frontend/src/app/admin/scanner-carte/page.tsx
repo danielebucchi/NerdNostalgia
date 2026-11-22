@@ -683,17 +683,15 @@ function CodaConferma({
     chiavi.current[scanId] = chiave;
   }, []);
 
-  async function eliminaDoppioniEConfermaTutte() {
+  async function eliminaDoppioni() {
     const via = doppioniInCoda(coda, chiavi.current);
-    const idVia = new Set(via.map((s) => s.id));
-    const daConfermare = coda.filter((s) => !idVia.has(s.id) && s.candidates.length);
-    const senza = coda.length - via.length - daConfermare.length;
-    if (!window.confirm(
-      `Scarto ${via.length} doppion${via.length === 1 ? "e" : "i"} e confermo ${daConfermare.length} cart${daConfermare.length === 1 ? "a" : "e"}` +
-      (senza ? ` (${senza} senza carta proposta restano in coda)` : "") + ". Procedo?",
-    )) return;
+    if (!via.length) {
+      setAvanzamento("Nessun doppione in coda.");
+      return;
+    }
+    if (!window.confirm(`Scarto ${via.length} doppion${via.length === 1 ? "e" : "i"} (resta il primo di ogni carta). Procedo?`)) return;
     setBusy(true);
-    const scartati = await inFila(
+    const { errori } = await inFila(
       via,
       async (s) => {
         await scarta(s.id);
@@ -701,7 +699,19 @@ function CodaConferma({
       },
       (n) => setAvanzamento(`Scarto i doppioni ${n}/${via.length}…`),
     );
-    const confermati = await inFila(
+    setAvanzamento(errori.length ? `${errori.length} non scartati: ${errori[0].error}` : null);
+    setBusy(false);
+  }
+
+  async function confermaTutte() {
+    const daConfermare = coda.filter((s) => s.candidates.length);
+    const senza = coda.length - daConfermare.length;
+    if (!window.confirm(
+      `Confermo ${daConfermare.length} cart${daConfermare.length === 1 ? "a" : "e"}` +
+      (senza ? ` (${senza} senza carta proposta restano in coda)` : "") + ". Procedo?",
+    )) return;
+    setBusy(true);
+    const { errori } = await inFila(
       daConfermare,
       async (s) => {
         const c = await conferma(s.id, { ...datiConferma(s, s.candidates[0], imp), ...scelte.current[s.id] });
@@ -709,8 +719,7 @@ function CodaConferma({
       },
       (n) => setAvanzamento(`Confermo ${n}/${daConfermare.length}…`),
     );
-    const errori = [...scartati.errori, ...confermati.errori];
-    setAvanzamento(errori.length ? `${errori.length} non riuscite: ${errori[0].error}` : null);
+    setAvanzamento(errori.length ? `${errori.length} non confermate: ${errori[0].error}` : null);
     setBusy(false);
   }
 
@@ -744,14 +753,24 @@ function CodaConferma({
             Conferma le {sicure.length} sicure
           </button>
         )}
+        {coda.length > 1 && (
+          <button
+            type="button"
+            className="btn btn-ghost text-sm text-pink-deep disabled:opacity-50"
+            disabled={busy}
+            onClick={eliminaDoppioni}
+          >
+            🗑 Elimina doppioni
+          </button>
+        )}
         {coda.some((s) => s.candidates.length) && (
           <button
             type="button"
             className="btn btn-ghost text-sm disabled:opacity-50"
             disabled={busy}
-            onClick={eliminaDoppioniEConfermaTutte}
+            onClick={confermaTutte}
           >
-            Elimina doppioni e conferma tutte
+            ✓ Conferma tutte
           </button>
         )}
       </div>
