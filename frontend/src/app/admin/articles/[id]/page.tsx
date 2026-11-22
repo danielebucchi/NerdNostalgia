@@ -313,8 +313,14 @@ export default function AdminArticleEditPage({ params }: PageProps) {
             </p>
           </div>
 
+          {/* Edit form: prima i dati, poi dove metterlo in vendita */}
+          <div className="card p-5 mb-6">
+            <h2 className="display text-lg text-ink mb-3">Dati articolo</h2>
+            <ArticleForm initial={article} onSaved={(saved) => setArticle(saved)} />
+          </div>
+
           {/* Marketplace: Vinted (manuale), eBay e CardTrader (API) */}
-          <div className="grid gap-4 lg:grid-cols-2 mb-6">
+          <div className="grid gap-4 lg:grid-cols-2">
             <MarketplaceSyncBox
               article={article}
               marketplace="vinted"
@@ -322,12 +328,6 @@ export default function AdminArticleEditPage({ params }: PageProps) {
             />
             <EbayPublishBox article={article} onUpdated={reload} />
             <CardTraderBox article={article} onUpdated={(a) => setArticle(a)} />
-          </div>
-
-          {/* Edit form */}
-          <div className="card p-5">
-            <h2 className="display text-lg text-ink mb-3">Dati articolo</h2>
-            <ArticleForm initial={article} onSaved={(saved) => setArticle(saved)} />
           </div>
         </>
       )}
