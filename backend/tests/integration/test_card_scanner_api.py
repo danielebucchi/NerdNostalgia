@@ -721,6 +721,33 @@ def test_cards_go_on_ebay_as_one_listing_with_variations(client, admin_headers, 
         assert card.ebay_listing_id == "800000000001"
 
 
+def test_deleting_a_card_takes_it_out_of_the_group_without_rewriting_the_others(
+        client, admin_headers, db_session, ebay_finto, monkeypatch):
+    """Con decine di voci riscriverle tutte falliva al primo 500 di eBay:
+    si aggiorna solo l'elenco delle varianti."""
+    from utils import ebay_client as eb
+    cancellati = []
+    monkeypatch.setattr(eb, "delete_inventory_item", lambda sku: cancellati.append(sku))
+    a, b, c = (_carta_confermata(client, admin_headers) for _ in range(3))
+    chiave = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
+                         json={"card_ids": [a["id"], b["id"], c["id"]], "title": "Carte"}).json()["group_key"]
+    ebay_finto["items"].clear()
+
+    r = client.delete(f"/api/card-scanner/cards/{a['id']}", headers=admin_headers)
+    assert r.status_code == 204, r.text
+    gruppo = ebay_finto["groups"][chiave]
+    assert gruppo["variantSKUs"] == [f"NN-PC-{b['id']}", f"NN-PC-{c['id']}"]
+    voci = gruppo["variesBy"]["specifications"][0]["values"]
+    assert voci == ["Durant ex 004/191 Slightly Played", f"Durant ex 004/191 Slightly Played #{c['id']}"]
+    # Solo b cambia voce (perde il "#id": ora e' la prima): solo b si riscrive
+    assert list(ebay_finto["items"]) == [f"NN-PC-{b['id']}"]
+    assert cancellati == [f"NN-PC-{a['id']}"]
+    for carta in (b, c):
+        card = db_session.get(PersonalCard, carta["id"])
+        db_session.refresh(card)
+        assert card.ebay_group_key == chiave and card.ebay_listing_id == "800000000001"
+
+
 def test_variations_need_two_free_cards(client, admin_headers, ebay_finto):
     a = _carta_confermata(client, admin_headers)
     r = client.post("/api/card-scanner/ebay-group", headers=admin_headers,

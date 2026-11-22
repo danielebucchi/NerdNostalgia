@@ -28,6 +28,7 @@ import requests
 LOGGER = logging.getLogger("ebay")
 
 TIMEOUT = 30
+RIPROVA_DOPO = 2  # secondi prima di riprovare un 5xx
 
 # Scope minimi per creare/pubblicare inserzioni e leggere le business policy.
 SCOPES = [
@@ -185,10 +186,17 @@ def _request(
     }
     if extra_headers:
         headers.update(extra_headers)
-    try:
-        resp = requests.request(method, url, headers=headers, params=params, json=json, timeout=TIMEOUT)
-    except requests.RequestException as exc:
-        raise EbayError(f"Rete/timeout verso eBay: {exc}") from exc
+    # eBay risponde ogni tanto 500 "errore di sistema" a chiamate valide: le
+    # chiamate ripetibili (GET, PUT, DELETE) si riprovano una volta.
+    tentativi = 2 if method in ("GET", "PUT", "DELETE") else 1
+    for tentativo in range(tentativi):
+        try:
+            resp = requests.request(method, url, headers=headers, params=params, json=json, timeout=TIMEOUT)
+        except requests.RequestException as exc:
+            raise EbayError(f"Rete/timeout verso eBay: {exc}") from exc
+        if resp.status_code < 500 or tentativo == tentativi - 1:
+            break
+        time.sleep(RIPROVA_DOPO)
     if resp.status_code == 401:
         raise EbayError("Token eBay non valido/scaduto (401)", 401, _safe_body(resp))
     if resp.status_code >= 400:

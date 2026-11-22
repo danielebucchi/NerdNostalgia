@@ -88,3 +88,34 @@ def test_access_token_cached(monkeypatch):
     t3 = eb._access_token()
     assert t3 == "AT2"
     assert calls["n"] == 2
+
+
+def test_a_500_on_a_repeatable_call_is_retried_once(monkeypatch):
+    monkeypatch.setattr(eb, "_access_token", lambda: "AT")
+    monkeypatch.setattr(eb, "RIPROVA_DOPO", 0)
+    risposte = [_Resp(500, {"errors": [{"errorId": 25001}]}), _Resp(200, {"ok": True})]
+    chiamate = []
+
+    def fake_request(method, url, **kw):
+        chiamate.append(method)
+        return risposte.pop(0)
+
+    monkeypatch.setattr(eb.requests, "request", fake_request)
+    assert eb._request("PUT", "/sell/inventory/v1/inventory_item/NN-PC-1", json={}) == {"ok": True}
+    assert chiamate == ["PUT", "PUT"]
+
+
+def test_a_500_on_publish_is_not_retried(monkeypatch):
+    """Pubblicare due volte non e' innocuo: l'errore torna a chi chiama."""
+    monkeypatch.setattr(eb, "_access_token", lambda: "AT")
+    monkeypatch.setattr(eb, "RIPROVA_DOPO", 0)
+    chiamate = []
+
+    def fake_request(method, url, **kw):
+        chiamate.append(method)
+        return _Resp(500, {"errors": []})
+
+    monkeypatch.setattr(eb.requests, "request", fake_request)
+    with pytest.raises(eb.EbayError):
+        eb._request("POST", "/sell/inventory/v1/offer/1/publish")
+    assert chiamate == ["POST"]

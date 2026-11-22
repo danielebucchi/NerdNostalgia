@@ -226,6 +226,31 @@ def publish_group(db: Session, carte: List[PersonalCard], titolo: Optional[str] 
     return _scrivi_gruppo(db, chiave or f"NN-GRP-{uuid.uuid4().hex[:10]}", titolo, tutte)
 
 
+def _togli_voce(db: Session, chiave: str, card: PersonalCard, restano: List[PersonalCard]) -> None:
+    """Toglie una voce dal gruppo pubblicato senza riscrivere le altre: si
+    aggiorna l'elenco delle varianti e si ripubblica. Riscrivere ogni carta
+    (decine di chiamate) bastava che eBay ne sbagliasse una per non poter
+    piu' togliere niente. Si riscrive solo una carta la cui voce cambia
+    (il suffisso "#id" dei doppioni dipende da chi c'e')."""
+    titolo = _titolo_attuale(chiave)
+    if not titolo:
+        raise ValueError(f"Inserzione con varianti {chiave} non trovata su eBay")
+    prima = _etichette_uniche(sorted(restano + [card], key=lambda c: c.id))
+    voci = _etichette_uniche(restano)
+    comuni = _aspetti_comuni(restano)
+    for c in restano:
+        if voci[c.id] != prima[c.id]:
+            aspetti = {**comuni, ASPETTO_VARIANTE: [voci[c.id]]}
+            eb.put_inventory_item(cl.ebay_sku(c), cl._articolo_ebay(db, c, aspetti, cl._immagini(c)))
+    foto_gruppo = [f[0] for f in (cl._immagini(c) for c in restano) if f][:12]
+    _pubblica_gruppo(db, chiave, titolo, restano, voci, comuni, foto_gruppo)
+    # La voce tolta non serve piu' su eBay: via articolo (e la sua offerta).
+    try:
+        eb.delete_inventory_item(cl.ebay_sku(card))
+    except eb.EbayError as exc:
+        LOGGER.info("Articolo eBay %s non cancellato: %s", cl.ebay_sku(card), exc)
+
+
 def remove_card(db: Session, card: PersonalCard) -> None:
     """Toglie la carta dall'inserzione con varianti (venduta altrove,
     ritirata). Le altre restano in vendita; se ne resta una sola il gruppo
@@ -233,11 +258,11 @@ def remove_card(db: Session, card: PersonalCard) -> None:
     chiave = card.ebay_group_key
     altre = (db.query(PersonalCard)
              .filter(PersonalCard.ebay_group_key == chiave, PersonalCard.id != card.id)
+             .order_by(PersonalCard.id)
              .all())
     restano = [c for c in altre if c.status != "SOLD"]
     if len(restano) >= 2:
-        titolo = _titolo_attuale(chiave) or ""
-        _scrivi_gruppo(db, chiave, titolo, restano)
+        _togli_voce(db, chiave, card, restano)
     else:
         try:
             eb.withdraw_by_inventory_item_group(chiave)
