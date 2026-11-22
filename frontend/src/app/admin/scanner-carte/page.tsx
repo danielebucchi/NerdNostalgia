@@ -1160,18 +1160,17 @@ function Collezione({
     setOrdineStato(o);
     window.localStorage.setItem("nn_scanner_ordine", o);
   }
+  // Il filtro per canale NON si ricorda: rimasto su "Sul sito" da una
+  // visita prima, nascondeva le carte appena confermate mentre la scheda
+  // "Da mettere in vendita" le contava.
   const [canale, setCanaleStato] = useState<FiltroCanale>("tutti");
-  useEffect(() => {
-    const v = window.localStorage.getItem("nn_scanner_canale") as FiltroCanale | null;
-    if (v && FILTRI_CANALE.some((f) => f.id === v)) setCanaleStato(v);
-  }, []);
   function setCanale(c: FiltroCanale) {
     setCanaleStato(c);
     setSelezione(new Set()); // come per le viste: niente azioni su carte nascoste
-    window.localStorage.setItem("nn_scanner_canale", c);
   }
+  const filtroCanale = FILTRI_CANALE.find((f) => f.id === canale)!;
   const nellaVista = tutte.filter(VISTE.find((x) => x.id === vista)!.filtro);
-  const filtrate = nellaVista.filter(FILTRI_CANALE.find((f) => f.id === canale)!.filtro);
+  const filtrate = nellaVista.filter(filtroCanale.filtro);
   // Quante voci ha ogni inserzione con varianti: lo mostra la riga.
   const vociGruppo: Record<string, number> = {};
   for (const c of tutte) if (c.ebay_group_key && c.ebay_listing_id) vociGruppo[c.ebay_group_key] = (vociGruppo[c.ebay_group_key] || 0) + 1;
@@ -1359,7 +1358,8 @@ function Collezione({
 
       <div className="flex gap-1 mb-3 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 whitespace-nowrap" role="tablist">
         {VISTE.map((v) => {
-          const n = tutte.filter(v.filtro).length;
+          // Contate col filtro canale attivo: il numero e' quello che si vede.
+          const n = tutte.filter(v.filtro).filter(filtroCanale.filtro).length;
           const attiva = v.id === vista;
           return (
             <button key={v.id} type="button" role="tab" aria-selected={attiva}
@@ -1503,7 +1503,15 @@ function Collezione({
       )}
       {esito && <p className="text-xs text-ink-soft mb-3 whitespace-pre-line">{esito}</p>}
 
-      {carte.length === 0 ? (
+      {carte.length === 0 && canale !== "tutti" && nellaVista.length > 0 ? (
+        <p className="text-ink-soft text-sm">
+          Nessuna carta qui con il filtro «{filtroCanale.label}»: {nellaVista.length} nascost
+          {nellaVista.length === 1 ? "a" : "e"}.{" "}
+          <button type="button" className="underline text-lilac-deep" onClick={() => setCanale("tutti")}>
+            Mostra tutti i canali
+          </button>
+        </p>
+      ) : carte.length === 0 ? (
         <p className="text-ink-soft text-sm">
           {tutte.length === 0
             ? "Nessuna carta: conferma qualche scan."
