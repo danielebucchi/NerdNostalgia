@@ -532,10 +532,13 @@ def _ebay_finto(monkeypatch, client, admin_headers):
 
 
 def _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="3.00"):
+    """Carta pronta per eBay: `prezzo` e' sia il prezzo della carta sia il
+    minimo CardTrader, da cui parte la regola del prezzo eBay."""
     carta = _carta_confermata(client, admin_headers)
     card = db_session.get(PersonalCard, carta["id"])
     card.images = ["https://api.example.test/static/scans/1/x.webp"]
     card.list_price = prezzo
+    card.cardtrader_price = prezzo
     db_session.commit()
     return carta
 
@@ -548,10 +551,10 @@ def test_ebay_price_gets_the_ebay_markup(client, admin_headers, db_session, monk
     carta = _carta_con_foto_pubblica(client, admin_headers, db_session)
     r = client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
     assert r.status_code == 200, r.text
-    # 3 / (1 - 0,13) = 3,45: la commissione si paga sul lordo, e su eBay
-    # niente centesimi, all'euro sopra
-    assert r.json()["price_eur"] == 4.0
-    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "4.00"
+    # 3 / (1 - 0,13) = 3,45 (la commissione si paga sul lordo), poi la
+    # regola di Vinted: +2 all'euro sopra = 6
+    assert r.json()["price_eur"] == 6.0
+    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "6.00"
 
 
 def test_ebay_markup_falls_back_like_the_article_page(client, admin_headers, db_session, monkeypatch):
@@ -559,7 +562,7 @@ def test_ebay_markup_falls_back_like_the_article_page(client, admin_headers, db_
     inviati = _ebay_finto(monkeypatch, client, admin_headers)
     carta = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="10.00")
     client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers)
-    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "12.00"  # 10 / 0,89 = 11,24 → 12
+    assert inviati["offer"]["pricingSummary"]["price"]["value"] == "14.00"  # 10 / 0,89 = 11,24, +2 → 14
 
 
 def test_ebay_price_covers_percent_and_fixed_fee(client, admin_headers, db_session, monkeypatch):
@@ -570,9 +573,9 @@ def test_ebay_price_covers_percent_and_fixed_fee(client, admin_headers, db_sessi
     db_session.commit()
     inviati = _ebay_finto(monkeypatch, client, admin_headers)
     carta = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="3.00")
-    # 3,59 coprirebbe la commissione; all'euro sopra: 4
-    assert client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers).json()["price_eur"] == 4.0
-    lordo = 4.0
+    # 3,59 copre la commissione; poi la regola: +2 all'euro sopra = 6
+    assert client.post(f"/api/card-scanner/cards/{carta['id']}/ebay", headers=admin_headers).json()["price_eur"] == 6.0
+    lordo = 3.59
     assert round(lordo - lordo * 0.065 - 0.35, 2) >= 3.00
 
     economica = _carta_con_foto_pubblica(client, admin_headers, db_session, prezzo="0.13")
@@ -840,6 +843,9 @@ def test_ebay_price_is_never_under_one_euro_the_other_channels_keep_theirs(
     from models.db import Article
     a, b = (_carta_confermata(client, admin_headers) for _ in range(2))
     client.patch(f"/api/personal-cards/{a['id']}", json={"list_price": "0.12"}, headers=admin_headers)
+    card = db_session.get(PersonalCard, a["id"])
+    card.cardtrader_price = 0.10
+    db_session.commit()
 
     r = client.post("/api/card-scanner/ebay-group", headers=admin_headers,
                     json={"card_ids": [a["id"], b["id"]], "title": "Carte"})
@@ -860,7 +866,7 @@ def test_each_platform_can_have_its_own_price(client, admin_headers, db_session,
 
     card = client.get("/api/card-scanner/cards", headers=admin_headers).json()[0]
     assert card["cardtrader_price_auto"] == 3.0
-    assert card["ebay_price_auto"] == 4.0  # 3 / 0,89 = 3,38 → 4: ripiego 11% senza commissioni, euro intero
+    assert card["ebay_price_auto"] == 6.0  # 3 / 0,89 = 3,38 (ripiego 11% senza commissioni), +2 → 6
 
     r = client.patch(f"/api/personal-cards/{carta['id']}", headers=admin_headers,
                      json={"list_price_cardtrader": "2.50", "list_price_ebay": "4.20"})

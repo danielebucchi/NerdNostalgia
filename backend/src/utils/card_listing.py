@@ -176,19 +176,21 @@ EBAY_PREZZO_MINIMO = Decimal("1.00")
 
 
 def ebay_price_auto(db: Session, card: PersonalCard) -> float:
-    """Prezzo eBay calcolato: quello che, tolta la commissione eBay
-    (Commissioni: percentuale + quota fissa), lascia in tasca il prezzo
-    della carta.
+    """Prezzo eBay calcolato: la regola di Vinted (vedi regola_carte)
+    applicata al prezzo che copre la commissione eBay.
 
+    Si parte da dove parte Vinted (minimo CardTrader, se no il prezzo della
+    carta) e si aggiunge la commissione eBay (percentuale + quota fissa).
     La commissione si calcola sul lordo, quindi non basta aggiungere la
-    percentuale: lordo = (prezzo + fisso) / (1 - percentuale), arrotondato
-    all'euro superiore: su eBay niente centesimi. Con 6,5% + 0,35 euro una
-    carta da 3 euro va a 4 (3,59 coprirebbe la commissione; 3,20 ci si
-    rimetteva). Se anche cosi' resta sotto il minimo di eBay, va a 1 euro."""
-    base = Decimal(str(sale_price(card)))
+    percentuale: lordo = (base + fisso) / (1 - percentuale). Su quello la
+    regola: +2 all'euro sopra, +15% oltre i 15 euro, scalini per le carte
+    economiche, ma sotto 1 euro resta 1 (il minimo di eBay) invece della
+    soglia di 0,90 di Vinted. Con 6,5% + 0,35 euro un minimo CardTrader di
+    3 euro fa 3,59 di lordo, e 6 euro su eBay."""
+    base = Decimal(str(base_regola(card)))
     percentuale, fisso = marketplace_fee(db, "ebay", _categoria(db, card))
-    lordo = _euro_intero((base + fisso) / (1 - percentuale / 100))
-    return float(max(lordo, EBAY_PREZZO_MINIMO))
+    lordo = (base + fisso) / (1 - percentuale / 100)
+    return max(regola_carte(float(lordo), EBAY_SCALINI), float(EBAY_PREZZO_MINIMO))
 
 
 def _euro_intero(prezzo: Decimal) -> Decimal:
@@ -600,30 +602,42 @@ VINTED_QUOTA_SOPRA = 0.15
 # Carte economiche, a scalini di un euro: sotto 0,90 → 1; 0,90-1,10 → 2;
 # fino a 1,90 → 3. Da li' la regola +2 (1,95 → 4), senza salti.
 VINTED_SCALINI = ((0.90, 1.0), (1.10, 2.0), (1.90, 3.0))
+# eBay, sul prezzo con le commissioni: sotto 1 euro resta 1 (il minimo di
+# eBay), poi gli stessi scalini di Vinted.
+EBAY_SCALINI = ((1.00, 1.0), (1.10, 2.0), (1.90, 3.0))
 
 
-def vinted_price(card: PersonalCard) -> Optional[float]:
-    """Prezzo per Vinted, con la regola che usi su Vinted: minimo CardTrader
-    + 2 euro arrotondato all'euro superiore, cioe' da +2 a +3 (2,60 → 5;
-    12,10 → 15). Sopra i 15 euro in piu' il 15% della parte che supera i 15,
-    cosi' il ricarico cresce col prezzo senza salti (20 → 23, 30 → 35,
-    50 → 58, 100 → 115). Le carte economiche a scalini: sotto 0,90 → 1
-    euro, fino a 1,10 → 2, fino a 1,90 → 3. Senza minimo CardTrader si parte
-    dal prezzo della carta."""
-    import math
+def base_regola(card: PersonalCard) -> float:
+    """Da dove parte la regola: il minimo CardTrader, se no il prezzo della
+    carta (ValueError se non c'e' nemmeno quello)."""
     if card.cardtrader_price is not None and float(card.cardtrader_price) > 0:
-        base = float(card.cardtrader_price)
-    else:
-        try:
-            base = sale_price(card)
-        except ValueError:
-            return None
-    for i, (fino_a, prezzo) in enumerate(VINTED_SCALINI):
+        return float(card.cardtrader_price)
+    return sale_price(card)
+
+
+def regola_carte(base: float, scalini) -> float:
+    """La regola che usi su Vinted: base + 2 euro arrotondato all'euro
+    superiore, cioe' da +2 a +3 (2,60 → 5; 12,10 → 15). Sopra i 15 euro in
+    piu' il 15% della parte che supera i 15, cosi' il ricarico cresce col
+    prezzo senza salti (20 → 23, 30 → 35, 50 → 58, 100 → 115). Le carte
+    economiche a scalini (vedi VINTED_SCALINI, EBAY_SCALINI)."""
+    import math
+    for i, (fino_a, prezzo) in enumerate(scalini):
         # Il primo scalino esclude il suo limite (0,90 e' gia' "intorno all'euro").
         if base < fino_a or (i > 0 and base <= fino_a):
             return prezzo
     extra = max(base - VINTED_SOGLIA, 0) * VINTED_QUOTA_SOPRA
     return float(math.ceil(round(base + VINTED_RICARICO + extra, 6)))
+
+
+def vinted_price(card: PersonalCard) -> Optional[float]:
+    """Prezzo per Vinted: la regola (regola_carte) sul minimo CardTrader, o
+    sul prezzo della carta se il minimo non c'e'."""
+    try:
+        base = base_regola(card)
+    except ValueError:
+        return None
+    return regola_carte(base, VINTED_SCALINI)
 
 
 def vinted_description(card: PersonalCard) -> str:

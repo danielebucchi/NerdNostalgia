@@ -90,3 +90,15 @@ def test_variations_menu_is_ordered_by_set_and_printed_number():
         _carta(id=5, printed_code="004/102"),  # seconda copia del 4: dopo l'altra
     ]
     assert [c.id for c in ordina_per_numero(carte)] == [2, 5, 4, 3, 1]
+
+
+def test_ebay_cheap_cards_stay_at_one_euro_below_one_with_fees():
+    """Sul prezzo con le commissioni la regola di Vinted, ma sotto 1 euro
+    resta 1 (non la soglia di 0,90)."""
+    from utils.card_listing import EBAY_SCALINI, VINTED_SCALINI, regola_carte
+    assert regola_carte(0.95, EBAY_SCALINI) == 1.0
+    assert regola_carte(0.95, VINTED_SCALINI) == 2.0
+    assert regola_carte(1.02, EBAY_SCALINI) == 2.0
+    assert regola_carte(1.44, EBAY_SCALINI) == 3.0
+    assert regola_carte(3.59, EBAY_SCALINI) == 6.0
+    assert regola_carte(21.76, EBAY_SCALINI) == 25.0
