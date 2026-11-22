@@ -23,6 +23,7 @@ import {
   conferma,
   costruisciIndice,
   eliminaCarta,
+  doppioniInCoda,
   inFila,
   nomeDelFronte,
   pubblicaCardTrader,
@@ -676,9 +677,42 @@ function CodaConferma({
   const [avanzamento, setAvanzamento] = useState<string | null>(null);
   const sicure = coda.filter((s) => s.confidence === "alta" && s.candidates.length && !s.note);
   const scelte = useRef<Record<number, SceltaRiga>>({});
-  const onScelte = useCallback((scanId: number, s: SceltaRiga) => {
+  const chiavi = useRef<Record<number, string | null>>({});
+  const onScelte = useCallback((scanId: number, s: SceltaRiga, chiave: string | null) => {
     scelte.current[scanId] = s;
+    chiavi.current[scanId] = chiave;
   }, []);
+
+  async function eliminaDoppioniEConfermaTutte() {
+    const via = doppioniInCoda(coda, chiavi.current);
+    const idVia = new Set(via.map((s) => s.id));
+    const daConfermare = coda.filter((s) => !idVia.has(s.id) && s.candidates.length);
+    const senza = coda.length - via.length - daConfermare.length;
+    if (!window.confirm(
+      `Scarto ${via.length} doppion${via.length === 1 ? "e" : "i"} e confermo ${daConfermare.length} cart${daConfermare.length === 1 ? "a" : "e"}` +
+      (senza ? ` (${senza} senza carta proposta restano in coda)` : "") + ". Procedo?",
+    )) return;
+    setBusy(true);
+    const scartati = await inFila(
+      via,
+      async (s) => {
+        await scarta(s.id);
+        onScartata(s.id);
+      },
+      (n) => setAvanzamento(`Scarto i doppioni ${n}/${via.length}…`),
+    );
+    const confermati = await inFila(
+      daConfermare,
+      async (s) => {
+        const c = await conferma(s.id, { ...datiConferma(s, s.candidates[0], imp), ...scelte.current[s.id] });
+        onConfermata(s.id, c);
+      },
+      (n) => setAvanzamento(`Confermo ${n}/${daConfermare.length}…`),
+    );
+    const errori = [...scartati.errori, ...confermati.errori];
+    setAvanzamento(errori.length ? `${errori.length} non riuscite: ${errori[0].error}` : null);
+    setBusy(false);
+  }
 
   async function confermaSicure() {
     setBusy(true);
@@ -708,6 +742,16 @@ function CodaConferma({
             onClick={confermaSicure}
           >
             Conferma le {sicure.length} sicure
+          </button>
+        )}
+        {coda.some((s) => s.candidates.length) && (
+          <button
+            type="button"
+            className="btn btn-ghost text-sm disabled:opacity-50"
+            disabled={busy}
+            onClick={eliminaDoppioniEConfermaTutte}
+          >
+            Elimina doppioni e conferma tutte
           </button>
         )}
       </div>
@@ -797,7 +841,8 @@ function RigaScan({
   onConfermata: (scanId: number, c: PersonalCard) => void;
   onAggiornata: (s: Scan) => void;
   onScartata: (id: number) => void;
-  onScelte: (scanId: number, s: SceltaRiga) => void;
+  /** chiave: la carta che la riga confermerebbe (blueprint, reverse, 1ª ed.). */
+  onScelte: (scanId: number, s: SceltaRiga, chiave: string | null) => void;
 }) {
   const [scelto, setScelto] = useState<Candidato | null>(scan.candidates[0] ?? null);
   const [extra, setExtra] = useState<Candidato[]>([]);
@@ -826,7 +871,7 @@ function RigaScan({
     if (toccati.has("quantity")) s.quantity = qty;
     if (toccati.has("reverse")) s.reverse = reverse;
     if (toccati.has("first_edition")) s.first_edition = primaEd;
-    onScelte(scan.id, s);
+    onScelte(scan.id, s, scelto ? `${scelto.blueprint_id}|${reverse ? "r" : ""}|${primaEd ? "1" : ""}` : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scelto, condizione, qty, reverse, primaEd, toccati]);
 

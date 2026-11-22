@@ -334,3 +334,20 @@ export async function inFila<T, R>(
   }
   return { ok, errori };
 }
+
+/** Doppioni nella coda: scan che diventerebbero la stessa carta (la chiave
+ * della riga: carta CardTrader, reverse, 1ª edizione). Si tiene il primo
+ * in coda; quelli senza carta scelta non contano. */
+export function doppioniInCoda<T extends { id: number }>(
+  coda: T[],
+  chiavi: Record<number, string | null | undefined>,
+): T[] {
+  const viste = new Set<string>();
+  return coda.filter((s) => {
+    const k = chiavi[s.id];
+    if (!k) return false;
+    if (viste.has(k)) return true;
+    viste.add(k);
+    return false;
+  });
+}
