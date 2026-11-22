@@ -675,8 +675,15 @@ def ebay_preview(
 
 
 class EbayPublishRequest(BaseModel):
-    """Prezzo scelto per eBay (all'euro sopra); null = il suggerito."""
+    """Prezzo scelto per eBay (all'euro sopra); null = il suggerito. Titolo
+    solo per eBay; null = lascia com'e', "" = quello del sito."""
     price: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
+    title: Optional[str] = Field(None, max_length=200)
+
+
+class EbayCategoryRequest(BaseModel):
+    category_id: str = Field(..., min_length=1, max_length=20)
+    category_name: Optional[str] = Field(None, max_length=200)
 
 
 @router.post("/{article_id}/ebay/publish")
@@ -689,9 +696,11 @@ def ebay_publish(
     """Mette l'articolo su eBay (Inventory API), o aggiorna l'inserzione.
     Con il body si sceglie anche il prezzo (null = il suggerito)."""
     article = _article_or_404(article_helper, article_id)
-    if payload is not None:
-        article_ebay.imposta_prezzo(article_helper.db, article, payload.price)
     try:
+        if payload is not None:
+            article_ebay.imposta_prezzo(article_helper.db, article, payload.price)
+            if payload.title is not None:
+                article_ebay.imposta_titolo(article_helper.db, article, payload.title)
         return article_ebay.publish(article_helper.db, article)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -699,6 +708,34 @@ def ebay_publish(
         article_helper.db.rollback()
         detail = f"{exc} (body={exc.body})" if getattr(exc, "body", None) else str(exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail) from exc
+
+
+@router.get("/{article_id}/ebay/categories")
+def ebay_categories(
+    article_id: int,
+    q: str = Query(..., min_length=2, max_length=100),
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Categorie eBay proposte per un testo, per cambiare quella dell'articolo."""
+    _article_or_404(article_helper, article_id)
+    try:
+        return article_ebay.cerca_categorie(q)
+    except eb.EbayError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.put("/{article_id}/ebay/category")
+def ebay_set_category(
+    article_id: int,
+    payload: EbayCategoryRequest,
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Categoria eBay scelta a mano: vale dalla prossima pubblicazione/aggiornamento."""
+    article = _article_or_404(article_helper, article_id)
+    article_ebay.imposta_categoria(article_helper.db, article, payload.category_id, payload.category_name)
+    return article_ebay.anteprima(article_helper.db, article)
 
 
 @router.delete("/{article_id}/ebay/publish")

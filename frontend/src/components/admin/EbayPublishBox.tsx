@@ -2,8 +2,8 @@
 /**
  * Box "eBay automatico" sulla pagina admin articolo: mette l'articolo su
  * eBay tramite API (un'inserzione, niente varianti), con le regole delle
- * carte dello scanner. Prezzo e categoria si vedono prima di pubblicare.
- * Il prezzo scritto nel box eBay manuale vince sul calcolato.
+ * carte dello scanner. Prezzo, titolo e categoria si vedono (e si cambiano)
+ * prima di pubblicare.
  */
 import { useCallback, useEffect, useState } from "react";
 import { adminApi } from "@/lib/admin-api";
@@ -15,6 +15,9 @@ interface Anteprima {
   price_manual: boolean;
   category_id: string | null;
   category_name: string | null;
+  /** Titolo per eBay: quello scritto nel box, se no quello del sito. */
+  title: string;
+  title_custom: boolean;
   listing_id: string | null;
   url: string | null;
   collection_card: boolean;
@@ -24,6 +27,13 @@ interface Anteprima {
 }
 
 const eur = (v: number | null) => (v == null ? "—" : `${v.toFixed(0)} €`);
+const MAX_TITOLO = 80;
+
+interface Categoria {
+  id: string;
+  name: string;
+  path: string;
+}
 
 export function EbayPublishBox({
   article,
@@ -41,6 +51,15 @@ export function EbayPublishBox({
   useEffect(() => {
     if (info?.price_eur != null) setPrezzo(String(info.price_eur));
   }, [info?.price_eur]);
+  // Titolo eBay: parte da quello in uso (scritto per eBay o del sito).
+  const [titolo, setTitolo] = useState("");
+  useEffect(() => {
+    if (info) setTitolo(info.title);
+  }, [info?.title]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Categoria: si cambia cercandola fra quelle che propone eBay.
+  const [cambiaCategoria, setCambiaCategoria] = useState(false);
+  const [cercaCategoria, setCercaCategoria] = useState("");
+  const [categorie, setCategorie] = useState<Categoria[]>([]);
 
   const carica = useCallback(() => {
     adminApi
@@ -69,11 +88,36 @@ export function EbayPublishBox({
   }
 
   /** Il body della pubblicazione: il prezzo scritto, o null = il suggerito
-   * (che segue la regola se cambia il prezzo dell'articolo). */
+   * (che segue la regola se cambia il prezzo dell'articolo); il titolo,
+   * "" = quello del sito. */
   function corpo() {
     const v = Number(prezzo.replace(",", "."));
     const scelto = prezzo.trim() && Number.isFinite(v) && v > 0 ? v : null;
-    return { price: scelto != null && scelto !== info?.price_suggested ? scelto : null };
+    const t = titolo.trim();
+    return {
+      price: scelto != null && scelto !== info?.price_suggested ? scelto : null,
+      title: t === article.title.trim() ? "" : t,
+    };
+  }
+
+  async function cercaCategorie() {
+    if (cercaCategoria.trim().length < 2) return;
+    setError(null);
+    try {
+      const q = encodeURIComponent(cercaCategoria.trim());
+      setCategorie(await adminApi.get<Categoria[]>(`/api/articles/${article.id}/ebay/categories?q=${q}`));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function scegliCategoria(c: Categoria) {
+    await esegui(
+      () => adminApi.put(`/api/articles/${article.id}/ebay/category`, { category_id: c.id, category_name: c.name }),
+      online ? "categoria cambiata: premi Aggiorna su eBay per applicarla" : "categoria cambiata",
+    );
+    setCambiaCategoria(false);
+    setCategorie([]);
   }
 
   const online = !!info?.listing_id;
@@ -107,6 +151,24 @@ export function EbayPublishBox({
         </div>
       ) : (
         <div className="space-y-3 text-sm">
+          <label className="block">
+            <span className="block text-xs font-bold uppercase tracking-wider text-ink-soft">
+              Titolo eBay <span className={titolo.length > MAX_TITOLO ? "text-pink-deep" : ""}>{titolo.length}/{MAX_TITOLO}</span>
+            </span>
+            <input className="input mt-1 w-full" maxLength={MAX_TITOLO} value={titolo}
+              onChange={(e) => setTitolo(e.target.value)} aria-label="Titolo eBay" />
+            <span className="block text-[11px] text-ink-soft mt-1">
+              Solo per eBay: il sito tiene il suo. Metti le parole che si cercano (gioco, numero, lingua, condizione).
+              {titolo.trim() !== article.title.trim() && (
+                <>
+                  {" · "}
+                  <button type="button" className="underline" onClick={() => setTitolo(article.title)}>
+                    usa quello del sito
+                  </button>
+                </>
+              )}
+            </span>
+          </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="block text-xs font-bold uppercase tracking-wider text-ink-soft">Prezzo eBay (€)</span>
@@ -129,9 +191,37 @@ export function EbayPublishBox({
               <span className="block text-xs font-bold uppercase tracking-wider text-ink-soft">Categoria eBay</span>
               <span className="text-ink">
                 {info?.category_id ? `${info.category_name ?? ""} (${info.category_id})` : "la propone eBay dal titolo"}
-              </span>
+              </span>{" "}
+              <button type="button" className="underline text-xs text-lilac-deep" onClick={() => setCambiaCategoria((v) => !v)}>
+                cambia
+              </button>
             </div>
           </div>
+          {cambiaCategoria && (
+            <div className="rounded-xl border border-lilac-deep/40 bg-lilac/10 p-3 space-y-2">
+              <div className="flex gap-2">
+                <input className="input py-1 text-sm flex-1" placeholder="es. Nintendo 64 giochi, carte Pokémon"
+                  value={cercaCategoria} onChange={(e) => setCercaCategoria(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && cercaCategorie()} aria-label="Cerca categoria eBay" />
+                <button type="button" className="btn btn-ghost text-xs" onClick={cercaCategorie}
+                  disabled={cercaCategoria.trim().length < 2}>
+                  🔎 Cerca
+                </button>
+              </div>
+              {categorie.length > 0 && (
+                <ul className="space-y-1">
+                  {categorie.map((c) => (
+                    <li key={c.id}>
+                      <button type="button" className="w-full text-left px-2 py-1 rounded hover:bg-ink/5" disabled={busy}
+                        onClick={() => scegliCategoria(c)}>
+                        {c.path} <span className="text-xs text-ink-soft">({c.id})</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {online ? (
             <div className="flex flex-wrap gap-2 items-center">

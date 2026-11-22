@@ -21,6 +21,7 @@ con varianti: i loro articoli non passano da qui.
 """
 import html
 import logging
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
@@ -108,7 +109,53 @@ def _immagini(article: Article) -> List[str]:
 
 
 def _titolo(article: Article) -> str:
-    return (article.title or "").strip()[:MAX_TITOLO].strip()
+    """Il titolo per eBay scritto nel box (metadati), se no quello del sito."""
+    titolo = (article.article_metadata or {}).get("ebay_title") or article.title or ""
+    return titolo.strip()[:MAX_TITOLO].strip()
+
+
+def imposta_titolo(db: Session, article: Article, titolo: Optional[str]) -> None:
+    """Titolo solo per eBay (max 80); vuoto = quello del sito."""
+    meta = dict(article.article_metadata or {})
+    titolo = (titolo or "").strip()
+    if len(titolo) > MAX_TITOLO:
+        raise ValueError(f"Titolo troppo lungo: eBay ne accetta {MAX_TITOLO} caratteri")
+    if titolo and titolo != (article.title or "").strip():
+        meta["ebay_title"] = titolo
+    else:
+        meta.pop("ebay_title", None)
+    article.article_metadata = meta
+    db.commit()
+
+
+# Condizione della carta letta dal titolo/descrizione, quando l'articolo non
+# la dice: le sigle e le parole che si usano scrivendo gli annunci.
+CONDIZIONI_NEL_TESTO = (
+    (r"near\s*mint|\bnm\b", "Near Mint"),
+    (r"slightly\s*played|lightly\s*played|\bsp\b|\blp\b|\bexc(ellent)?\b", "Slightly Played"),
+    (r"moderately\s*played|\bmp\b", "Moderately Played"),
+    (r"heavily\s*played|\bhp\b|\bplayed\b", "Played"),
+    (r"\bpoor\b|\bdamaged\b|danneggiat", "Poor"),
+    (r"\bmint\b", "Mint"),
+)
+
+
+def condizione_dal_testo(testo: str) -> Optional[str]:
+    t = (testo or "").lower()
+    for schema, condizione in CONDIZIONI_NEL_TESTO:
+        if re.search(schema, t):
+            return condizione
+    return None
+
+
+def _condizione_carta(article: Article) -> str:
+    """Per le carte singole eBay vuole la condizione: quella dell'articolo,
+    se no quella scritta nel titolo. Mai un Near Mint inventato."""
+    condizione = article.card_condition or condizione_dal_testo(f"{article.title} {article.description or ''}")
+    if not condizione:
+        raise ValueError("Di che condizione e' la carta? Scrivila nel titolo (es. NM, played, poor) "
+                         "o sceglila nel box CardTrader")
+    return condizione
 
 
 def _descrizione(db: Session, article: Article) -> str:
@@ -124,6 +171,25 @@ def _descrizione(db: Session, article: Article) -> str:
 
 def _categoria_carte(db: Session) -> str:
     return cl._setting(db, "ebay_card_category_id") or cl.EBAY_CATEGORIA_CARTE
+
+
+def cerca_categorie(testo: str) -> List[Dict[str, Any]]:
+    """Le categorie eBay che eBay propone per un testo (per cambiarla a mano)."""
+    proposte = (eb.category_suggestions(eb.default_category_tree_id(), testo) or {}).get("categorySuggestions") or []
+    esito = []
+    for p in proposte[:10]:
+        cat = p.get("category") or {}
+        sopra = [a.get("categoryName") for a in reversed(p.get("categoryTreeNodeAncestors") or [])]
+        esito.append({"id": cat.get("categoryId"), "name": cat.get("categoryName"),
+                      "path": " > ".join([x for x in sopra if x] + [cat.get("categoryName") or ""])})
+    return esito
+
+
+def imposta_categoria(db: Session, article: Article, categoria_id: str, nome: Optional[str]) -> None:
+    meta = dict(article.article_metadata or {})
+    meta["ebay_category_id"], meta["ebay_category_name"] = str(categoria_id), nome
+    article.article_metadata = meta
+    db.commit()
 
 
 def categoria(db: Session, article: Article) -> Tuple[str, Optional[str]]:
@@ -205,7 +271,7 @@ def _articolo_ebay(db: Session, article: Article, categoria_id: str) -> Dict[str
         item["condition"] = "USED_VERY_GOOD"
         item["conditionDescriptors"] = [{
             "name": "40001",
-            "values": [cl.EBAY_CONDIZIONE_CARTA.get(article.card_condition or "Near Mint", "400010")],
+            "values": [cl.EBAY_CONDIZIONE_CARTA.get(_condizione_carta(article), "400010")],
         }]
     else:
         item["condition"] = CONDIZIONI_EBAY.get(article.condition, "USED_EXCELLENT")
@@ -234,7 +300,8 @@ def _offerta_ebay(db: Session, article: Article, conf: Dict[str, str], sku: str,
 def cosa_va_su_ebay(article: Article) -> tuple:
     """Quello dell'articolo che finisce nell'inserzione: se cambia
     salvando, l'inserzione si riallinea."""
-    return (article.title, article.description, str(article.price), str(article.ebay_price),
+    return (article.title, (article.article_metadata or {}).get("ebay_title"), article.description,
+            str(article.price), str(article.ebay_price),
             tuple(article.images or []), article.condition, article.quantity, article.quantity_sold,
             article.card_condition, article.brand, article.model)
 
@@ -274,6 +341,8 @@ def anteprima(db: Session, article: Article) -> Dict[str, Any]:
         "price_manual": article.ebay_price is not None and float(article.ebay_price) > 0,
         "category_id": meta.get("ebay_category_id"),
         "category_name": meta.get("ebay_category_name"),
+        "title": _titolo(article),
+        "title_custom": bool(meta.get("ebay_title")),
         "listing_id": article.ebay_listing_id,
         "url": listing_url(article),
         "collection_card": carta is not None,

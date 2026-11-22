@@ -174,3 +174,52 @@ def test_saving_without_changes_for_ebay_leaves_the_listing_alone(client, admin_
     client.post(f"/api/articles/{art.id}/ebay/publish", headers=admin_headers)
     client.patch(f"/api/articles/{art.id}", json={"cost": "3.00"}, headers=admin_headers)
     assert ebay_finto["updated"] == []
+
+
+def _come_carta_singola(db_session, art):
+    from utils import card_listing as cl
+    art.article_metadata = {"ebay_category_id": cl.EBAY_CATEGORIA_CARTE, "ebay_category_name": "GCC: carte singole"}
+    db_session.commit()
+
+
+def test_card_condition_is_read_from_the_title(client, admin_headers, db_session, admin_user, ebay_finto):
+    art = _articolo(db_session, admin_user, title="Venusaur 15 base set poor pokemon", description="")
+    _come_carta_singola(db_session, art)
+    r = client.post(f"/api/articles/{art.id}/ebay/publish", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    item = ebay_finto["items"][f"NN-ART-{art.id}"]
+    assert item["conditionDescriptors"][0]["values"] == ["400017"]  # Poor, non Near Mint
+
+
+def test_card_without_condition_is_not_published_as_near_mint(client, admin_headers, db_session, admin_user,
+                                                                ebay_finto):
+    art = _articolo(db_session, admin_user, title="Dragonite holo fossil", description="")
+    _come_carta_singola(db_session, art)
+    r = client.post(f"/api/articles/{art.id}/ebay/publish", headers=admin_headers)
+    assert r.status_code == 400 and "condizione" in r.json()["detail"]
+    assert ebay_finto["offers"] == []
+
+
+def test_ebay_title_can_differ_from_the_site(client, admin_headers, db_session, admin_user, ebay_finto):
+    art = _articolo(db_session, admin_user)
+    titolo = "Super Mario 64 Nintendo 64 PAL ITA cartuccia originale"
+    r = client.post(f"/api/articles/{art.id}/ebay/publish", json={"title": titolo}, headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert ebay_finto["items"][f"NN-ART-{art.id}"]["product"]["title"] == titolo
+    db_session.refresh(art)
+    assert art.title == "Super Mario 64 Nintendo 64 PAL"  # il sito non cambia
+    anteprima = client.get(f"/api/articles/{art.id}/ebay/preview", headers=admin_headers).json()
+    assert anteprima["title"] == titolo and anteprima["title_custom"]
+    r = client.post(f"/api/articles/{art.id}/ebay/publish", json={"title": "x" * 81}, headers=admin_headers)
+    assert r.status_code == 400
+
+
+def test_ebay_category_can_be_chosen_by_hand(client, admin_headers, db_session, admin_user, ebay_finto):
+    art = _articolo(db_session, admin_user)
+    r = client.get(f"/api/articles/{art.id}/ebay/categories?q=nintendo 64", headers=admin_headers)
+    assert r.status_code == 200 and r.json()[0]["id"] == "139973"
+    r = client.put(f"/api/articles/{art.id}/ebay/category", headers=admin_headers,
+                   json={"category_id": "139971", "category_name": "Console"})
+    assert r.status_code == 200 and r.json()["category_id"] == "139971"
+    client.post(f"/api/articles/{art.id}/ebay/publish", headers=admin_headers)
+    assert ebay_finto["offers"][0]["categoryId"] == "139971"
