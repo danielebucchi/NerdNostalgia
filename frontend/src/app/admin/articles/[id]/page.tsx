@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ArticleForm } from "@/components/admin/ArticleForm";
 import { CardTraderBox } from "@/components/admin/CardTraderBox";
+import { EbayPublishBox } from "@/components/admin/EbayPublishBox";
 import { MarketplaceSyncBox } from "@/components/admin/MarketplaceSyncBox";
 import { Sortable } from "@/components/admin/Sortable";
 import { adminApi } from "@/lib/admin-api";
@@ -324,6 +325,7 @@ export default function AdminArticleEditPage({ params }: PageProps) {
               marketplace="ebay"
               onUpdated={(a) => setArticle(a)}
             />
+            <EbayPublishBox article={article} onUpdated={reload} />
             <CardTraderBox article={article} onUpdated={(a) => setArticle(a)} />
           </div>
 

@@ -33,7 +33,9 @@ from models.entities.article import (
     VintedSyncUpdate,
 )
 from utils.category_alerts import notify_new_article
+from utils import article_ebay
 from utils import cardtrader_sync as cts
+from utils import ebay_client as eb
 from utils.storage import (
     UploadValidationError,
     delete_article_dir,
@@ -485,13 +487,22 @@ def delete_article(
     article_helper: ArticleHelper = Depends(get_article_helper),
     _admin: User = Depends(require_admin),
 ):
-    """Elimina un articolo e tutti i suoi file immagine caricati."""
+    """Elimina un articolo e tutti i suoi file immagine caricati. Se e' su
+    eBay prima lo si ritira: se eBay non risponde ci si ferma, l'inserzione
+    resterebbe viva senza l'articolo."""
     article = article_helper.get("id", article_id)
     if not article:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Articolo con ID {article_id} non trovato",
         )
+    if article.ebay_listing_id:
+        try:
+            article_ebay.unpublish(article_helper.db, article)
+        except eb.EbayError as exc:
+            article_helper.db.rollback()
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
+                                detail=f"Non ritirato da eBay, articolo non eliminato: {exc}") from exc
     article_helper.delete(article)
     delete_article_dir(article_id)
     return None
@@ -555,6 +566,7 @@ def archive_article(
             detail=f"Articolo con ID {article_id} non trovato",
         )
     article_helper.set_status(article, ArticleStatus.ARCHIVED)
+    article_ebay.on_sold_elsewhere(article_helper.db, article)
     return _to_response(article)
 
 
@@ -612,6 +624,61 @@ def update_ebay_sync(
         payload.ebay_price,
     )
     return _to_response(article)
+
+
+def _article_or_404(article_helper: ArticleHelper, article_id: int):
+    article = article_helper.get("id", article_id)
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Articolo con ID {article_id} non trovato",
+        )
+    return article
+
+
+@router.get("/{article_id}/ebay/preview")
+def ebay_preview(
+    article_id: int,
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Prezzo e categoria con cui l'articolo andrebbe su eBay, e
+    l'inserzione se c'e' gia'."""
+    return article_ebay.anteprima(article_helper.db, _article_or_404(article_helper, article_id))
+
+
+@router.post("/{article_id}/ebay/publish")
+def ebay_publish(
+    article_id: int,
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Mette l'articolo su eBay (Inventory API), o aggiorna l'inserzione."""
+    article = _article_or_404(article_helper, article_id)
+    try:
+        return article_ebay.publish(article_helper.db, article)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except eb.EbayError as exc:
+        article_helper.db.rollback()
+        detail = f"{exc} (body={exc.body})" if getattr(exc, "body", None) else str(exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail) from exc
+
+
+@router.delete("/{article_id}/ebay/publish")
+def ebay_unpublish(
+    article_id: int,
+    article_helper: ArticleHelper = Depends(get_article_helper),
+    _admin: User = Depends(require_admin),
+):
+    """Ritira l'inserzione eBay dell'articolo."""
+    article = _article_or_404(article_helper, article_id)
+    try:
+        article_ebay.unpublish(article_helper.db, article)
+    except eb.EbayError as exc:
+        article_helper.db.rollback()
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return {"ok": True}
 
 
 @router.post("/{article_id}/images", response_model=ArticleResponse)

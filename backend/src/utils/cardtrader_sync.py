@@ -356,6 +356,10 @@ def auto_unpublish_on_sold(db, article: Article, piattaforma: str = "sito") -> N
             LOGGER.info("Auto-unpublish CardTrader su vendita: articolo %s", article.id)
     except Exception as exc:  # noqa: BLE001
         LOGGER.warning("Auto-unpublish CardTrader fallito per articolo %s: %s", article.id, exc)
+    # Articolo su eBay (inserzione propria, non della collezione carte):
+    # venduto altrove, l'inserzione si ritira.
+    from utils.article_ebay import on_sold_elsewhere
+    on_sold_elsewhere(db, article)
     # Carta della collezione venduta sul sito: venduta anche li', e via
     # dalle sue inserzioni CardTrader/eBay.
     try:
