@@ -30,6 +30,13 @@ def test_site_title_starts_with_the_game():
     assert site_title(_carta(game_id=None)).startswith("Charizard ·")
 
 
+def test_site_title_says_the_condition_next_to_the_language():
+    from utils.card_listing import site_title
+    assert site_title(_carta()).endswith("004/102 (IT, NM)")
+    assert site_title(_carta(condition="Poor", first_edition=True)).endswith("(IT, PO, 1ª ed.)")
+    assert site_title(_carta(condition=None)).endswith("(IT)")
+
+
 def test_vinted_title_is_short_lowercase_and_italian():
     from utils.card_listing import vinted_description, vinted_title
     c = _carta(name="Spearow", name_it="Spearow", collection="EX Crystal Guardians",

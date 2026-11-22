@@ -540,14 +540,22 @@ def _categoria(db: Session, card: PersonalCard) -> Optional[int]:
 GIOCHI_VETRINA = {5: "Pokémon", 1: "Magic", 4: "Yu-Gi-Oh!", 15: "One Piece"}
 
 
+# Le sigle di CardTrader: chi compra carte le riconosce al volo.
+SIGLE_CONDIZIONE = {
+    "Mint": "M", "Near Mint": "NM", "Slightly Played": "SP",
+    "Moderately Played": "MP", "Played": "PL", "Poor": "PO",
+}
+
+
 def site_title(card: PersonalCard) -> str:
-    """Es. "Pokémon · Durant ex · Surging Sparks 004/191 (IT)": il gioco in
-    testa, che nel catalogo del sito si cerca anche per quello."""
+    """Es. "Pokémon · Durant ex · Surging Sparks 004/191 (IT, NM)": il gioco
+    in testa, che nel catalogo del sito si cerca anche per quello."""
     gioco = GIOCHI_VETRINA.get(card.game_id or 0)
     parti = ([gioco, "·"] if gioco else []) + [
         nome_vetrina(card), "·", set_vetrina(card) or "", card.printed_code or card.card_number or ""]
     lingua = (card.language or "").upper()
-    extra = [x for x in (lingua, "1ª ed." if card.first_edition else "",
+    condizione = SIGLE_CONDIZIONE.get(card.condition or "", "")
+    extra = [x for x in (lingua, condizione, "1ª ed." if card.first_edition else "",
                          "Reverse" if card.reverse else "") if x]
     titolo = " ".join(p for p in parti if p)
     if extra:
