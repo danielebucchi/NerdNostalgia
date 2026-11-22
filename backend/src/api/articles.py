@@ -1,6 +1,7 @@
 """
 API endpoint per gli articoli.
 """
+import logging
 from decimal import ROUND_HALF_UP, Decimal
 from typing import List, Optional
 
@@ -34,6 +35,7 @@ from models.entities.article import (
 )
 from utils.category_alerts import notify_new_article
 from utils import article_ebay
+from utils import cardtrader_client as ct
 from utils import cardtrader_sync as cts
 from utils import ebay_client as eb
 from utils.storage import (
@@ -45,6 +47,7 @@ from utils.storage import (
 )
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
+logger = logging.getLogger("articles")
 
 
 @router.post("/reorder", status_code=status.HTTP_204_NO_CONTENT)
@@ -423,6 +426,7 @@ def get_article(
         risposta.vinted_title = vinted_title(carta)
         risposta.vinted_description = vinted_description(carta)
         risposta.vinted_price_suggested = vinted_price(carta)
+        risposta.collection_card_id = carta.id
     return risposta
 
 
@@ -496,6 +500,13 @@ def delete_article(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Articolo con ID {article_id} non trovato",
         )
+    if article.cardtrader_product_id:
+        try:
+            cts.unpublish_article(article_helper.db, article)
+        except ct.CardTraderError as exc:
+            article_helper.db.rollback()
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
+                                detail=f"Non ritirato da CardTrader, articolo non eliminato: {exc}") from exc
     if article.ebay_listing_id:
         try:
             article_ebay.unpublish(article_helper.db, article)
@@ -566,7 +577,13 @@ def archive_article(
             detail=f"Articolo con ID {article_id} non trovato",
         )
     article_helper.set_status(article, ArticleStatus.ARCHIVED)
+    # Archiviato: via dai marketplace come se fosse venduto altrove.
     article_ebay.on_sold_elsewhere(article_helper.db, article)
+    try:
+        cts.unpublish_article(article_helper.db, article)
+    except Exception as exc:  # noqa: BLE001 — l'archiviazione resta
+        article_helper.db.rollback()
+        logger.warning("Articolo %s archiviato ma non ritirato da CardTrader: %s", article.id, exc)
     return _to_response(article)
 
 

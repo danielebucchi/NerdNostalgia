@@ -29,6 +29,11 @@ def is_card_article(article: Article) -> bool:
 
 # ── Risoluzione automatica blueprint da collezione + numero ────────
 
+# Prezzo proposto per gli articoli: il 2° piu' basso fra le inserzioni con
+# le stesse caratteristiche (il 1° e' spesso un'occasione o un errore).
+POSIZIONE_PREZZO = 2
+
+
 def _norm_number(s: Optional[str]) -> str:
     """Normalizza un numero carta per il confronto: prende la parte prima
     di '/', tiene alfanumerici, toglie zeri iniziali. '004/102'→'4',
@@ -199,7 +204,7 @@ def publish_article(
     article: Article,
     *,
     price_eur: Optional[float] = None,
-    price_position: int = 4,
+    price_position: int = POSIZIONE_PREZZO,
     quantity: Optional[int] = None,
     condition: Optional[str] = None,
     language: Optional[str] = None,
@@ -213,6 +218,10 @@ def publish_article(
     caratteristiche. Solleva ValueError (dati) o ct.CardTraderError (API)."""
     if not article.cardtrader_blueprint_id:
         raise ValueError("Articolo non abbinato a un blueprint CardTrader")
+    from models.db import PersonalCard
+    if db.query(PersonalCard.id).filter(PersonalCard.article_id == article.id).first():
+        # Pubblicarla anche da qui farebbe due inserzioni della stessa carta.
+        raise ValueError("E' una carta della collezione: su CardTrader si mette dallo scanner carte (Collezione)")
 
     # Attributi effettivi: argomento esplicito → campo articolo → default
     condition = condition or article.card_condition or "Near Mint"
@@ -287,7 +296,7 @@ def auto_publish_if_card(
     db, article: Article, *, expansion_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Hook alla pubblicazione sul sito: se e' una carta abbinabile, la
-    pubblica anche su CardTrader col prezzo 4°. Best-effort: non solleva mai
+    pubblica anche su CardTrader col prezzo 2°. Best-effort: non solleva mai
     (la pubblicazione sul sito non deve fallire per CardTrader).
 
     Se `expansion_id` e' dato (l'utente ha scelto l'espansione esatta), il

@@ -100,6 +100,9 @@ export interface Article {
   /** Prezzo proposto per Vinted: minimo CardTrader + 2 € (+15% della parte
    *  sopra i 15 €), all'euro superiore. */
   vinted_price_suggested?: number | null;
+  /** Carta della collezione (scanner) venduta tramite l'articolo: su
+   * CardTrader ed eBay si gestisce dalla collezione. Solo nel singolo articolo. */
+  collection_card_id?: number | null;
   cardtrader_synced_at: string | null;
   created_at: string;
   updated_at: string;

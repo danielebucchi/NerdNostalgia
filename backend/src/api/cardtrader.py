@@ -123,11 +123,16 @@ def list_blueprints(
 ):
     items = _wrap(ct.blueprints, expansion_id)
     if search:
-        q = search.lower()
+        q = search.strip().lower()
+
+        def numero(b):
+            # CardTrader lo tiene in fixed_properties: "015" per il 15 del Base Set
+            return (b.get("fixed_properties") or {}).get("collector_number") or b.get("collector_number")
+
         items = [
             b for b in items
             if q in str(b.get("name", "")).lower()
-            or q in str(b.get("collector_number", "")).lower()
+            or (numero(b) and cts._norm_number(q) and cts._norm_number(q) == cts._norm_number(numero(b)))
         ]
     return items[:200]
 
@@ -165,14 +170,14 @@ def resolve_blueprint(
 @router.get("/suggested-price")
 def suggested_price(
     blueprint_id: int = Query(...),
-    position: int = Query(4, ge=1, le=50, description="N-esimo piu' basso (default 4°)"),
+    position: int = Query(cts.POSIZIONE_PREZZO, ge=1, le=50, description="N-esimo piu' basso (default 2°)"),
     condition: Optional[str] = Query(None),
     language: Optional[str] = Query(None),
     reverse: Optional[bool] = Query(None),
     first_edition: Optional[bool] = Query(None),
     _admin: User = Depends(require_admin),
 ):
-    """4° prezzo piu' basso, filtrato per condizione/lingua/reverse/prima
+    """2° prezzo piu' basso, filtrato per condizione/lingua/reverse/prima
     edizione se passati (comparabili con la carta che vendi)."""
     res = _wrap(
         ct.suggested_price_cents, blueprint_id, position,
@@ -194,7 +199,7 @@ class PublishRequest(BaseModel):
     # Prezzo: se assente, calcolato come N-esimo piu' basso dal marketplace
     # (filtrato per condizione/lingua/reverse/prima edizione)
     price_eur: Optional[float] = Field(None, ge=0)
-    price_position: int = Field(4, ge=1, le=50, description="N-esimo piu' basso (default 4°)")
+    price_position: int = Field(cts.POSIZIONE_PREZZO, ge=1, le=50, description="N-esimo piu' basso (default 2°)")
     quantity: Optional[int] = Field(None, ge=1)
     condition: str = Field("Near Mint")
     language: Optional[str] = Field(None, description="Codice lingua CardTrader (it/en/...)")
@@ -211,7 +216,7 @@ def publish_article(
     _admin: User = Depends(require_admin),
 ):
     """Mette in vendita l'articolo su CardTrader. Serve
-    cardtrader_blueprint_id gia' abbinato. Prezzo = 4° piu' basso se non
+    cardtrader_blueprint_id gia' abbinato. Prezzo = 2° piu' basso se non
     passato esplicitamente. Se gia' pubblicato, aggiorna prezzo/quantita'."""
     _guard()
     article = helper.get("id", article_id)

@@ -3,7 +3,7 @@
 /**
  * Box CardTrader sulla pagina admin articolo.
  * Flusso: gioco → espansione → cerca carta → abbina blueprint (salvato
- * sull'articolo) → mostra prezzo consigliato (4° più basso) → pubblica.
+ * sull'articolo) → mostra prezzo consigliato (2° più basso) → pubblica.
  * Solo per carte: CardTrader accetta solo prodotti agganciati a un blueprint.
  */
 import { useEffect, useState } from "react";
@@ -44,6 +44,9 @@ export function CardTraderBox({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Carta della collezione: su CardTrader la mette lo scanner. Resta vero
+  // anche se l'articolo arriva poi da un endpoint che non lo dice.
+  const [collezione] = useState(!!article.collection_card_id);
   const bpId = article.cardtrader_blueprint_id;
   const productId = article.cardtrader_product_id;
 
@@ -143,7 +146,7 @@ export function CardTraderBox({
         language,
         reverse,
         first_edition: firstEdition,
-        price_position: 4,
+        price_position: 2,
       };
       if (priceOverride.trim()) body.price_eur = Number(priceOverride);
       const res = await adminApi.post<{ product_id: number; price_eur: number }>(
@@ -189,7 +192,22 @@ export function CardTraderBox({
         )}
       </div>
 
-      {!status?.ok ? (
+      {collezione ? (
+        <div className="text-sm space-y-2">
+          {article.marketplace_links?.cardtrader ? (
+            <p className="text-ink">
+              ✅ In vendita su CardTrader come carta della collezione:{" "}
+              <a href={article.marketplace_links.cardtrader} target="_blank" rel="noreferrer"
+                className="underline text-lilac-deep">vedi ↗</a>
+            </p>
+          ) : (
+            <p className="text-ink-soft">Non è su CardTrader.</p>
+          )}
+          <p className="text-ink-soft">
+            È una carta della collezione: su CardTrader si mette, si aggiorna e si ritira dallo scanner carte (Collezione).
+          </p>
+        </div>
+      ) : !status?.ok ? (
         <p className="text-sm text-ink-soft">
           CardTrader non configurato/raggiungibile. Imposta CARDTRADER_JWT.
         </p>
@@ -222,7 +240,7 @@ export function CardTraderBox({
           <div className="grid grid-cols-2 gap-3 items-end">
             <label className="block">
               <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
-                Prezzo consigliato (4°)
+                Prezzo consigliato (2°)
               </span>
               <div className="text-2xl display text-pink-deep leading-tight">
                 {price ? `€${price.eur.toFixed(2)}` : "—"}

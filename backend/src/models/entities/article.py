@@ -169,6 +169,9 @@ class ArticleResponse(BaseModel):
     vinted_description: Optional[str] = None
     # Prezzo proposto per Vinted (card_listing.vinted_price).
     vinted_price_suggested: Optional[float] = None
+    # Carta della collezione (scanner) venduta tramite l'articolo: su
+    # CardTrader ed eBay si gestisce dalla collezione. Solo nel singolo articolo.
+    collection_card_id: Optional[int] = None
     created_at: str
     updated_at: str
     published_at: Optional[str]
