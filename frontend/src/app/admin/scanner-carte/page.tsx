@@ -1446,7 +1446,7 @@ function Collezione({
         </button>
         <button type="button" className="btn btn-ghost text-xs text-pink-deep disabled:opacity-50" disabled={busy || !selezione.size}
           onClick={() => {
-            if (!window.confirm(`Eliminare ${selezione.size} cart${selezione.size === 1 ? "a" : "e"} dalla collezione? Spariscono anche gli scan.`)) return;
+            if (!window.confirm(`Eliminare ${selezione.size} cart${selezione.size === 1 ? "a" : "e"} dalla collezione? Quelle in vendita si ritirano prima da sito, CardTrader ed eBay. Spariscono anche gli scan.`)) return;
             inBlocco("Elimino", async (c) => {
               await eliminaCarta(c.id);
               setSelezione((s) => {
@@ -1881,9 +1881,9 @@ function RigaCarta({
 
   const azioni = (
     <button type="button" className="text-xs underline text-pink-deep disabled:opacity-50" disabled={busy}
-      title={c.cardtrader_product_id || c.ebay_listing_id || c.site_status === "PUBLISHED" ? "Prima ritirala dalla vendita" : undefined}
       onClick={() => {
-        if (!window.confirm(`Eliminare «${c.name}» dalla collezione? Sparisce anche lo scan.`)) return;
+        const inVendita = c.cardtrader_product_id || c.ebay_listing_id || c.site_status === "PUBLISHED";
+        if (!window.confirm(`Eliminare «${c.name}» dalla collezione?${inVendita ? " Prima la ritiro dalla vendita." : ""} Sparisce anche lo scan.`)) return;
         azione(async () => { await eliminaCarta(c.id); onRicarica(); });
       }}>
       🗑 elimina

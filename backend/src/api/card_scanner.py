@@ -588,15 +588,17 @@ def list_cards(
 def delete_card(card_id: int, db: Session = Depends(get_db), _admin: User = Depends(require_admin)):
     """Toglie la carta dalla collezione, con i suoi scan.
 
-    Se e' in vendita su CardTrader o eBay ci si ferma: cancellarla qui
-    lascerebbe l'inserzione viva senza piu' niente che la ricordi, e la
-    carta si potrebbe vendere senza averla. Prima si ritira."""
+    Se e' in vendita la si ritira prima da ogni canale. Se un marketplace
+    non risponde ci si ferma senza cancellare: l'inserzione resterebbe viva
+    senza piu' niente che la ricordi, e la carta si potrebbe vendere senza
+    averla."""
     card = _card_or_404(db, card_id)
     sul_sito = card.article is not None and card.article.status.value == "PUBLISHED"
-    in_vendita = [n for n, v in (("CardTrader", card.cardtrader_product_id),
-                                 ("eBay", card.ebay_listing_id), ("sito", sul_sito)) if v]
-    if in_vendita:
-        raise HTTPException(409, f"La carta e' in vendita su {' e '.join(in_vendita)}: ritirala prima")
+    for attiva, ritira in ((card.cardtrader_product_id, cl.unpublish_cardtrader),
+                           (card.ebay_listing_id or card.ebay_group_key, cl.unpublish_ebay),
+                           (sul_sito, cl.unpublish_site)):
+        if attiva:
+            _esegui(ritira, db, card)
     file = list(card.images or [])
     for scan in db.query(CardScan).filter(CardScan.personal_card_id == card.id):
         file += [scan.image_url, scan.back_image_url]

@@ -250,14 +250,42 @@ def test_card_can_be_deleted_with_its_scan(client, admin_headers, db_session):
     assert db_session.get(CardScan, scan["id"]) is None
 
 
-def test_card_on_sale_must_be_withdrawn_first(client, admin_headers):
+def test_card_on_sale_is_withdrawn_then_deleted(client, admin_headers, db_session, monkeypatch):
+    from models.db import Article, ArticleStatus
+    from utils import cardtrader_client as ct
+    ritirate = []
+    monkeypatch.setattr(ct, "delete_product", lambda pid: ritirate.append(pid))
     scan = _carica(client, admin_headers).json()
     carta = client.post(f"/api/card-scanner/scans/{scan['id']}/confirm",
                         json={"blueprint_id": 10}, headers=admin_headers).json()
     client.post(f"/api/card-scanner/cards/{carta['id']}/cardtrader", headers=admin_headers)
+    art_id = client.post(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers).json()["article_id"]
+
     r = client.delete(f"/api/card-scanner/cards/{carta['id']}", headers=admin_headers)
-    assert r.status_code == 409
-    assert "ritirala" in r.json()["detail"]
+    assert r.status_code == 204, r.text
+    assert ritirate == [777]
+    assert db_session.get(Article, art_id).status == ArticleStatus.ARCHIVED
+    assert client.get("/api/card-scanner/cards", headers=admin_headers).json() == []
+
+
+def test_card_stays_if_a_marketplace_cannot_withdraw_it(client, admin_headers, db_session, monkeypatch):
+    """Cancellarla lascerebbe l'inserzione viva senza la carta: ci si ferma."""
+    from utils import cardtrader_client as ct
+
+    def giu(pid):
+        raise ct.CardTraderError("CardTrader giu'", status=503)
+
+    monkeypatch.setattr(ct, "delete_product", giu)
+    scan = _carica(client, admin_headers).json()
+    carta = client.post(f"/api/card-scanner/scans/{scan['id']}/confirm",
+                        json={"blueprint_id": 10}, headers=admin_headers).json()
+    client.post(f"/api/card-scanner/cards/{carta['id']}/cardtrader", headers=admin_headers)
+
+    r = client.delete(f"/api/card-scanner/cards/{carta['id']}", headers=admin_headers)
+    assert r.status_code == 502
+    card = db_session.get(PersonalCard, carta["id"])
+    db_session.refresh(card)
+    assert card.cardtrader_product_id == 777
 
 
 # --- sito ---------------------------------------------------------------
@@ -295,7 +323,6 @@ def test_withdrawn_from_the_site_is_archived_not_deleted(client, admin_headers, 
     from models.db import Article, ArticleStatus
     carta = _carta_confermata(client, admin_headers)
     art_id = client.post(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers).json()["article_id"]
-    assert client.delete(f"/api/card-scanner/cards/{carta['id']}", headers=admin_headers).status_code == 409
     client.delete(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers)
     assert db_session.get(Article, art_id).status == ArticleStatus.ARCHIVED
 
