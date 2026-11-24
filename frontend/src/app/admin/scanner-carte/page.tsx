@@ -803,7 +803,9 @@ function CodaConferma({
 function datiConferma(s: Scan, c: Candidato, imp: Impostazioni) {
   return {
     blueprint_id: c.blueprint_id,
-    condition: imp.condizione || null,
+    // Il nome del file ("93_PL") e' deciso carta per carta: vale piu' della
+    // condizione scelta per tutto il lotto nella pagina.
+    condition: s.ocr.from_filename?.condizione || imp.condizione || null,
     language: imp.lingua || s.ocr.language || null,
     quantity: 1,
     price_now: imp.valutaSubito,
@@ -811,11 +813,11 @@ function datiConferma(s: Scan, c: Candidato, imp: Impostazioni) {
 }
 
 /** Valori iniziali dei controlli della riga, dall'analisi della carta. */
-function dallAnalisi(a: Analisi | undefined, imp: Impostazioni, forzata?: string | null) {
+function dallAnalisi(a: Analisi | undefined, imp: Impostazioni, forzata?: string | null, dalNome?: string | null) {
   return {
-    // Quella scelta ora nella pagina, poi quella forzata al caricamento,
-    // solo alla fine la stima dello scan.
-    condizione: imp.condizione || forzata || a?.condition?.value || "Near Mint",
+    // Quella del nome del file (carta per carta), poi quella scelta ora
+    // nella pagina, poi quella forzata al caricamento, infine la stima.
+    condizione: dalNome || imp.condizione || forzata || a?.condition?.value || "Near Mint",
     reverse: a?.reverse?.value === true,
     primaEd: a?.first_edition?.value === true,
   };
@@ -872,7 +874,16 @@ function RigaScan({
   const [collezione, setCollezione] = useState("");
   const [collezioneId, setCollezioneId] = useState<number | null>(scan.expansion_id ?? null);
   const [qty, setQty] = useState(1);
-  const iniziali = dallAnalisi(scan.features, imp, scan.ocr.condition_forced);
+  const iniziali = dallAnalisi(scan.features, imp, scan.ocr.condition_forced, scan.ocr.from_filename?.condizione);
+  // Cosa ha detto il nome del file, per vederlo prima di confermare.
+  const fn = scan.ocr.from_filename;
+  const nomeFile = fn && (fn.condizione || fn.prima_edizione || (fn.copia ?? 0) >= 2)
+    ? "dal nome: " + [
+        fn.condizione,
+        fn.prima_edizione && "1ª edizione",
+        (fn.copia ?? 0) >= 2 && `copia ${fn.copia}: +1 alla quantità della carta già in magazzino`,
+      ].filter(Boolean).join(" · ")
+    : null;
   const [condizione, setCondizione] = useState(iniziali.condizione);
   const [reverse, setReverse] = useState(iniziali.reverse);
   const [primaEd, setPrimaEd] = useState(iniziali.primaEd);
@@ -899,7 +910,7 @@ function RigaScan({
   // La condizione scelta nelle impostazioni vale anche per le righe gia' in
   // coda, se non la si e' cambiata a mano.
   useEffect(() => {
-    if (!toccati.has("condition")) setCondizione(dallAnalisi(scan.features, imp, scan.ocr.condition_forced).condizione);
+    if (!toccati.has("condition")) setCondizione(dallAnalisi(scan.features, imp, scan.ocr.condition_forced, scan.ocr.from_filename?.condizione).condizione);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imp.condizione]);
 
@@ -921,7 +932,7 @@ function RigaScan({
   // Quando arriva l'analisi giusta, i controlli ripartono da lì.
   useEffect(() => {
     if (!analisiValida) return;
-    const v = dallAnalisi(scan.features, imp, scan.ocr.condition_forced);
+    const v = dallAnalisi(scan.features, imp, scan.ocr.condition_forced, scan.ocr.from_filename?.condizione);
     if (!toccati.has("condition")) setCondizione(v.condizione);
     if (!toccati.has("reverse")) setReverse(v.reverse);
     if (!toccati.has("first_edition")) setPrimaEd(v.primaEd);
@@ -1025,6 +1036,7 @@ function RigaScan({
         )}
         <div className="min-w-0 md:contents">
         <p className="text-[11px] text-ink-soft mt-1 break-all">{scan.original_filename}</p>
+        {nomeFile && <p className="text-[11px] text-ink mt-0.5">{nomeFile}</p>}
         {scan.back_image_url ? (
           <a href={scan.back_image_url} target="_blank" rel="noreferrer" className="block mt-2">
             <img src={thumbUrlFor(scan.back_image_url)} alt="retro" className="w-16 rounded shadow" />

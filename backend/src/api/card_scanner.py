@@ -37,6 +37,7 @@ from utils import card_learning as learn
 from utils import card_listing as cl
 from utils import card_ocr
 from utils import card_pricing as cp
+from utils import scan_filename
 from utils import cardtrader_client as ct
 from utils import ebay_client as eb
 from utils import ebay_variations
@@ -58,6 +59,25 @@ def _guard_cardtrader():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="CardTrader non configurato: manca CARDTRADER_JWT.",
         )
+
+
+def _riallinea_quantita(db: Session, card: PersonalCard, admin_id: int) -> None:
+    """Copia in piu' di una carta gia' in vendita: le inserzioni prendono la
+    quantita' nuova. Best-effort per canale; le inserzioni eBay con varianti
+    si aggiornano ripubblicandole dallo scanner."""
+    canali = []
+    if card.article is not None and card.article.status.value == "PUBLISHED":
+        canali.append(("sito", lambda: cl.publish_site(db, card, admin_id)))
+    if card.cardtrader_product_id:
+        canali.append(("cardtrader", lambda: cl.publish_cardtrader(db, card)))
+    if card.ebay_listing_id and not card.ebay_group_key:
+        canali.append(("ebay", lambda: cl.publish_ebay(db, card)))
+    for nome, fn in canali:
+        try:
+            fn()
+        except Exception as exc:  # noqa: BLE001
+            db.rollback()
+            LOGGER.warning("Quantita' della carta %s non aggiornata su %s: %s", card.id, nome, exc)
 
 
 def _nomi_italiani(db: Session, card: PersonalCard) -> None:
@@ -196,7 +216,8 @@ def _riconosci(db: Session, scan: CardScan, card_img, lettura) -> None:
                          appreso=learn.confusions(db, scan.game_id))
         scan.candidates = esito["candidates"]
         scan.confidence = esito["confidence"]
-        scan.ocr = {**lettura.as_dict(), "variant_note": esito.get("note")}
+        scan.ocr = {**lettura.as_dict(), "variant_note": esito.get("note"),
+                    "from_filename": (scan.ocr or {}).get("from_filename")}
         scan.error = None if esito["candidates"] else "Nessun candidato: cerca la carta a mano"
         if esito["candidates"]:
             _analizza(db, scan, esito["candidates"][0]["blueprint_id"], card_img)
@@ -238,6 +259,10 @@ def _analizza(db: Session, scan: CardScan, blueprint_id: int, card_img=None) -> 
             tarate=learn.load_thresholds(db),
         )
         scan.features = {"blueprint_id": bp.id, **analisi}
+        # "1ed" nel nome del file: deciso guardando la carta, vale piu' del
+        # timbro cercato nello scan.
+        if ((scan.ocr or {}).get("from_filename") or {}).get("prima_edizione"):
+            scan.features["first_edition"] = {"value": True, "source": "nome file"}
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         LOGGER.warning("Analisi scan %s fallita: %s", scan.id, exc)
@@ -287,11 +312,19 @@ def upload_scan(
     if language and language.strip() and language.strip().lower() != lettura.language:
         lettura.language_read = lettura.language
         lettura.language = language.strip().lower()
+    # Il nome del file ("93_PL_002.jpg") lo scrive chi ha la carta in mano:
+    # la sua condizione vale come quella scelta nella pagina, e il numero
+    # aiuta quando l'OCR non lo legge.
+    dal_nome = scan_filename.leggi(file.filename)
+    condition = condition or dal_nome.condizione
+    if dal_nome.numero and not lettura.number:
+        lettura.number = dal_nome.numero
     lettura.condition_forced = condition
     scan = CardScan(
         image_url="", original_filename=(file.filename or "")[:255],
         game_id=game_id, expansion_id=expansion_id,
-        status=CardScanStatus.PENDING, ocr=lettura.as_dict(), candidates=[],
+        status=CardScanStatus.PENDING, ocr={**lettura.as_dict(), "from_filename": dal_nome.as_dict()},
+        candidates=[],
     )
     db.add(scan)
     db.commit()
@@ -303,7 +336,31 @@ def upload_scan(
     db.commit()
 
     _riconosci(db, scan, card_img, lettura)
+    _scarta_se_ricaricato(db, scan)
     return _scan_response(scan)
+
+
+# Stesso file e stessa immagine di uno scan gia' in coda o confermato: e'
+# lo stesso scan caricato di nuovo (cartella ricaricata), non un'altra
+# copia. Le copie hanno un nome diverso ("_002"), quindi non c'entrano.
+SOGLIA_RICARICATO = 0.95
+
+
+def _scarta_se_ricaricato(db: Session, scan: CardScan) -> None:
+    if not scan.original_filename or not scan.dhash:
+        return
+    gemelli = (db.query(CardScan)
+               .filter(CardScan.id != scan.id,
+                       CardScan.original_filename == scan.original_filename,
+                       CardScan.status.in_([CardScanStatus.PENDING, CardScanStatus.CONFIRMED]),
+                       CardScan.dhash.isnot(None))
+               .all())
+    for g in gemelli:
+        if learn._somiglianza(g.dhash, scan.dhash) >= SOGLIA_RICARICATO:
+            scan.status = CardScanStatus.DISCARDED
+            scan.error = f"Gia' caricato: e' lo stesso file dello scan #{g.id}"
+            db.commit()
+            return
 
 
 @router.get("/scans", response_model=List[ScanResponse])
@@ -460,12 +517,40 @@ def confirm_scan(
     reverse = payload.reverse if payload.reverse is not None else dall_analisi("reverse")
     prima = payload.first_edition if payload.first_edition is not None else dall_analisi("first_edition")
 
+    lingua = (payload.language or letto.get("language") or _default_language(db) or "it").lower()
+    # Un'altra copia di una carta gia' in magazzino (stessa carta, condizione,
+    # lingua, reverse, prima edizione): sale la quantita', non nasce una
+    # carta nuova. Solo se lo dice il nome del file ("93_PL_002.jpg" dopo
+    # "93_PL_001.jpg"): senza, la stessa carta scansionata due volte per
+    # sbaglio farebbe salire la quantita' di una copia che non c'e'.
+    copia_n = int(((letto.get("from_filename") or {}).get("copia")) or 0)
+    copia_di = None if copia_n < 2 else (db.query(PersonalCard)
+                .filter(PersonalCard.cardtrader_blueprint_id == bp.id,
+                        PersonalCard.condition == condizione,
+                        PersonalCard.language == lingua,
+                        PersonalCard.reverse == reverse,
+                        PersonalCard.first_edition == prima,
+                        PersonalCard.status == PersonalCardStatus.IN_STOCK)
+                .order_by(PersonalCard.id).first())
+    if copia_di is not None:
+        copia_di.quantity = int(copia_di.quantity or 1) + payload.quantity
+        scan.status = CardScanStatus.CONFIRMED
+        scan.personal_card_id = copia_di.id
+        db.commit()
+        if not scan.dhash:
+            img = _immagine_salvata(scan.image_url)
+            scan.dhash = ci.dhash(img) if img is not None else None
+        learn.learn_from_confirmation(db, scan, copia_di, bp.expansion_code or "")
+        _riallinea_quantita(db, copia_di, _admin.id)
+        db.refresh(copia_di)
+        return _to_response(copia_di)
+
     card = PersonalCard(
         name=bp.name,
         collection=bp.expansion_name,
         card_number=bp.collector_number,
         printed_code=stampato or bp.collector_number,
-        language=(payload.language or letto.get("language") or _default_language(db) or "it").lower(),
+        language=lingua,
         condition=condizione,
         quantity=payload.quantity,
         status=PersonalCardStatus.IN_STOCK,

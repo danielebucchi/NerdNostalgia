@@ -4,6 +4,7 @@ CardTrader, eBay e Tesseract sono finti: mettere in vendita carte vere
 mentre si prova il codice vorrebbe dire vendere carte che non esistono.
 """
 import io
+import itertools
 
 import pytest
 from PIL import Image
@@ -69,12 +70,17 @@ def mondo_finto(monkeypatch, tmp_path, db_session):
     return prodotti
 
 
-def _carica(client, admin_headers):
+_N_SCAN = itertools.count(1)
+
+
+def _carica(client, admin_headers, nome=None):
+    """Uno scan. Nome diverso a ogni chiamata, come gli scan veri: lo stesso
+    file con la stessa immagine ricaricato e' un doppione e si scarta."""
     buf = io.BytesIO()
     Image.new("RGB", (630, 880), "white").save(buf, format="PNG")
     return client.post(
         "/api/card-scanner/scans",
-        files={"file": ("scan001.png", buf.getvalue(), "image/png")},
+        files={"file": (nome or f"scan{next(_N_SCAN):03d}.png", buf.getvalue(), "image/png")},
         data={"game_id": "5"},
         headers=admin_headers,
     )
@@ -1064,3 +1070,42 @@ def test_new_price_in_the_collection_reaches_the_listings(client, admin_headers,
     assert r.status_code == 200, r.text
     assert aggiornati[-1] == (777, {"price": 8.5, "quantity": 1})
     assert float(db_session.get(Article, art_id).price) == 9.0
+
+
+
+# --- nome del file: condizione, prima edizione, copie, doppioni ----------
+
+
+def test_filename_condition_and_first_edition_reach_the_card(client, admin_headers, db_session):
+    scan = _carica(client, admin_headers, "4_1ed_PL.jpg").json()
+    assert scan["ocr"]["condition_forced"] == "Played"
+    carta = client.post(f"/api/card-scanner/scans/{scan['id']}/confirm",
+                        json={"blueprint_id": 10}, headers=admin_headers).json()
+    assert carta["condition"] == "Played" and carta["first_edition"] is True
+
+
+def test_next_copy_raises_the_quantity_instead_of_a_new_card(client, admin_headers, db_session):
+    """93_PL_001 crea la carta, 93_PL_002 e' una seconda copia: quantita' 2."""
+    prima = client.post(f"/api/card-scanner/scans/{_carica(client, admin_headers, '4_PL_001.jpg').json()['id']}/confirm",
+                        json={"blueprint_id": 10}, headers=admin_headers).json()
+    seconda = client.post(f"/api/card-scanner/scans/{_carica(client, admin_headers, '4_PL_002.jpg').json()['id']}/confirm",
+                          json={"blueprint_id": 10}, headers=admin_headers).json()
+    assert seconda["id"] == prima["id"] and seconda["quantity"] == 2
+    assert len(client.get("/api/card-scanner/cards", headers=admin_headers).json()) == 1
+
+
+def test_same_card_scanned_again_without_copy_number_stays_a_new_card(client, admin_headers):
+    """Senza contatore nel nome non si indovina: potrebbe essere uno scan
+    rifatto per sbaglio, e una copia inventata in magazzino costa di piu'."""
+    a = _carta_confermata(client, admin_headers)
+    b = _carta_confermata(client, admin_headers)
+    assert a["id"] != b["id"] and b["quantity"] == 1
+
+
+def test_same_file_uploaded_again_is_discarded_as_duplicate(client, admin_headers):
+    primo = _carica(client, admin_headers, "48_NM.jpg").json()
+    di_nuovo = _carica(client, admin_headers, "48_NM.jpg").json()
+    assert primo["status"] == "PENDING"
+    assert di_nuovo["status"] == "DISCARDED" and f"#{primo['id']}" in di_nuovo["error"]
+    # Un'altra copia ha un altro nome: non e' un doppione
+    assert _carica(client, admin_headers, "48_NM_002.jpg").json()["status"] == "PENDING"

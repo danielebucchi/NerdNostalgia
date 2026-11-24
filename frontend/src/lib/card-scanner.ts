@@ -56,6 +56,14 @@ export interface Lettura {
   language?: string | null;
   language_read?: string | null;
   condition_forced?: string | null;
+  /** Letto dal nome del file ("93_PL_002.jpg"): numero, condizione, prima
+   *  edizione, numero della copia. */
+  from_filename?: {
+    numero?: string | null;
+    condizione?: string | null;
+    prima_edizione?: boolean;
+    copia?: number | null;
+  } | null;
   printed_code?: string | null;
   name_text?: string;
   notes?: string[];
