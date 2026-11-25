@@ -1,0 +1,52 @@
+"""Canale Telegram dei nuovi arrivi: un annuncio per articolo, mai di piu'."""
+import pytest
+
+from models.db import Article, ArticleCondition, ArticleStatus
+from utils import category_alerts, telegram_channel
+
+
+@pytest.fixture
+def canale(monkeypatch):
+    inviati = []
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:abc")
+    monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@nerdnostalgia")
+    monkeypatch.setattr(telegram_channel, "_invia", inviati.append)
+
+    class Subito:  # il thread parte e finisce subito, per vedere l'invio nel test
+        def __init__(self, target, args, daemon=None):
+            self.t, self.a = target, args
+
+        def start(self):
+            self.t(*self.a)
+    monkeypatch.setattr(telegram_channel.threading, "Thread", Subito)
+    telegram_channel._inviati.clear()
+    return inviati
+
+
+def _articolo(db, admin_user, titolo="Charizard <Set Base>"):
+    a = Article(user_id=admin_user.id, title=titolo, price=12.3, condition=ArticleCondition.USED,
+                status=ArticleStatus.PUBLISHED, quantity=1)
+    db.add(a)
+    db.commit()
+    return a
+
+
+def test_new_article_is_announced_once(db_session, admin_user, canale):
+    a = _articolo(db_session, admin_user)
+    category_alerts.notify_new_article(db_session, a)
+    category_alerts.notify_new_article(db_session, a)      # ripubblicato: niente doppione
+    assert len(canale) == 1
+    assert "Charizard &lt;Set Base&gt;" in canale[0] and "12,30 €" in canale[0]
+    assert f"/articles/{a.id}" in canale[0]
+
+
+def test_without_configuration_nothing_is_sent(db_session, admin_user, canale, monkeypatch):
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN")
+    category_alerts.notify_new_article(db_session, _articolo(db_session, admin_user))
+    assert canale == []
+
+
+def test_at_most_twenty_an_hour(db_session, admin_user, canale):
+    for i in range(25):
+        telegram_channel.annuncia(db_session, _articolo(db_session, admin_user, f"Carta {i}"))
+    assert len(canale) == telegram_channel.MAX_ORA

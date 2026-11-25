@@ -32,6 +32,9 @@ services:
       - DISABLE_SCHEDULER=${DISABLE_SCHEDULER:-}
       # Solo la sync Vinted (in produzione gira dal Mac): gli altri job restano.
       - DISABLE_VINTED_SYNC=${DISABLE_VINTED_SYNC:-}
+      # Canale Telegram dei nuovi arrivi (utils/telegram_channel.py): vuoti = spento.
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID:-}
       # URL pubblico del sito, usato nei link delle email (avvisi nuovi
       # arrivi, inquiry). Riusa la stessa var del frontend.
       - SITE_PUBLIC_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3737}

@@ -78,6 +78,13 @@ def _recipients_for(db: Session, article: Article) -> List[str]:
 def notify_new_article(db: Session, article: Article) -> int:
     """Manda l'avviso "nuovo arrivo" agli iscritti pertinenti.
     Ritorna il numero di email inviate. Non solleva mai."""
+    # Qui passano tutte le pubblicazioni: anche il canale Telegram.
+    try:
+        from utils import telegram_channel
+        telegram_channel.annuncia(db, article)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        LOGGER.exception("Annuncio Telegram fallito per articolo %s", article.id)
     try:
         recipients = _recipients_for(db, article)
     except Exception:  # noqa: BLE001
