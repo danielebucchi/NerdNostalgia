@@ -20,7 +20,7 @@ def _avvia(monkeypatch, **env):
 def test_without_vinted_the_other_jobs_still_run(monkeypatch):
     jobs = _avvia(monkeypatch, DISABLE_VINTED_SYNC="1")
     assert jobs == {"daily_backup", "marketplace_sales_sync", "weekly_price_watch", "italian_names",
-                    "ebay_listings_watch"}
+                    "ebay_listings_watch", "weekly_newsletter"}
 
 
 def test_everything_by_default(monkeypatch):

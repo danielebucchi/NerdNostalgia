@@ -42,6 +42,15 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "label": "Email di contatto",
         "help": "Mostrata nelle pagine pubbliche (privacy, contatti).",
     },
+    "newsletter_enabled": {
+        "default": "false",
+        "public": False,
+        "label": "Newsletter settimanale dei nuovi arrivi",
+        "help": "true/false. Il venerdi' alle 18 un'email con gli articoli "
+                "pubblicati nella settimana, ai clienti che hanno dato il "
+                "consenso promozionale. Prima di accenderla, prova l'anteprima "
+                "(POST /api/newsletter/preview: arriva solo a te).",
+    },
     "free_shipping_all": {
         "default": "",
         "public": True,

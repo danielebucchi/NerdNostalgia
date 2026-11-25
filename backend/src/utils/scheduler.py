@@ -88,6 +88,20 @@ def _price_watch_job():
         db.close()
 
 
+def _newsletter_job():
+    """Venerdi' alle 18: nuovi arrivi ai clienti con consenso (se accesa)."""
+    from utils import newsletter
+    db = SessionLocal()
+    try:
+        esito = newsletter.run_settimanale(db)
+        if esito:
+            LOGGER.info("Newsletter: %s", esito)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Newsletter fallita: %s", exc)
+    finally:
+        db.close()
+
+
 def _italian_names_job():
     """Nomi italiani alle carte che non li hanno (e titoli del sito)."""
     from utils.card_listing import aggiorna_nomi_italiani
@@ -165,6 +179,16 @@ def start_scheduler() -> None:
         max_instances=1,
         coalesce=True,
         next_run_time=datetime.now(tz=APP_TZ) + timedelta(minutes=2),
+    )
+    # Newsletter dei nuovi arrivi: venerdi' 18:00, parte solo se accesa in
+    # Impostazioni (newsletter_enabled).
+    _scheduler.add_job(
+        _newsletter_job,
+        CronTrigger(day_of_week="fri", hour=18, minute=0),
+        id="weekly_newsletter",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     # Backup giornaliero (SQLite snapshot + tar uploads) alle 03:30 locali
     _scheduler.add_job(

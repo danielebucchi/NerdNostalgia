@@ -73,6 +73,8 @@ export default function AdminSettingsPage() {
         <div className="card p-4 mb-4 text-pink-deep font-semibold">⚠ {error}</div>
       )}
 
+      <Newsletter />
+
       {loading ? (
         <div className="card p-10 text-center text-ink-soft">Caricamento…</div>
       ) : (
@@ -163,5 +165,55 @@ export default function AdminSettingsPage() {
         }
       `}</style>
     </AdminShell>
+  );
+}
+
+
+interface StatoNewsletter {
+  enabled: boolean;
+  last_sent: string | null;
+  recipients: number;
+  new_articles: number;
+}
+
+/** Newsletter dei nuovi arrivi: chi la riceve, cosa c'e' dentro, e
+ *  l'anteprima che arriva solo all'admin. Si accende con l'impostazione
+ *  "Newsletter settimanale dei nuovi arrivi" qui sotto. */
+function Newsletter() {
+  const [stato, setStato] = useState<StatoNewsletter | null>(null);
+  const [nota, setNota] = useState<string | null>(null);
+  const [invio, setInvio] = useState(false);
+  useEffect(() => {
+    adminApi.get<StatoNewsletter>("/api/newsletter/status").then(setStato).catch(() => setStato(null));
+  }, []);
+  if (!stato) return null;
+  return (
+    <div className="card p-5 sm:p-6 max-w-3xl mb-4">
+      <h2 className="display text-lg text-ink mb-1">📬 Newsletter dei nuovi arrivi</h2>
+      <p className="text-sm text-ink-soft">
+        {stato.enabled ? "Accesa: parte il venerdì alle 18." : "Spenta: si accende dall'impostazione qui sotto."}{" "}
+        La ricevono <strong>{stato.recipients}</strong> clienti con il consenso; questa settimana ci sono{" "}
+        <strong>{stato.new_articles}</strong> nuovi arrivi.
+        {stato.last_sent && <> Ultimo invio: {new Date(stato.last_sent).toLocaleString("it-IT")}.</>}
+      </p>
+      <div className="flex items-center gap-3 mt-3">
+        <button type="button" className="btn btn-ghost text-sm" disabled={invio || !stato.new_articles}
+          onClick={async () => {
+            setInvio(true);
+            setNota(null);
+            try {
+              const r = await adminApi.post<{ inviate: number; motivo?: string }>("/api/newsletter/preview");
+              setNota(r.inviate ? "Anteprima inviata alla tua email." : r.motivo ?? "Non inviata.");
+            } catch (e) {
+              setNota(e instanceof Error ? e.message : String(e));
+            } finally {
+              setInvio(false);
+            }
+          }}>
+          {invio ? "Invio…" : "✉️ Mandami l'anteprima"}
+        </button>
+        {nota && <span className="text-sm text-ink-soft">{nota}</span>}
+      </div>
+    </div>
   );
 }
