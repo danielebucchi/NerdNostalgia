@@ -108,3 +108,12 @@ def test_status_shows_what_will_go_out(client, admin_headers, db_session, admin_
     assert st["enabled"] is True and len(st["next_carousel"]) == 1 and len(st["next_stories"]) == 1
     assert st["next_carousel"][0]["image"].split("?")[0].endswith("/post.jpg")
     assert client.get("/api/social/instagram/status").status_code == 401
+
+
+def test_token_refresh_only_for_instagram_login(db_session, monkeypatch):
+    monkeypatch.setenv("INSTAGRAM_USER_ID", "1789")
+    monkeypatch.setenv("INSTAGRAM_ACCESS_TOKEN", "tok")
+    chiamate = []
+    monkeypatch.setattr(instagram.requests, "get", lambda *a, **k: chiamate.append(a) or None)
+    monkeypatch.delenv("INSTAGRAM_GRAPH_URL", raising=False)
+    assert instagram.rinnova_token(db_session) is False and chiamate == []   # utente di sistema: non scade

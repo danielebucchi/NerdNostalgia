@@ -7,12 +7,17 @@ Instagram: i nuovi arrivi pubblicati in automatico.
 - Una Storia per ogni articolo da almeno `instagram_story_min_price` euro,
   al massimo MAX_STORIE_GIORNO al giorno.
 
-Usa la "Instagram API with Instagram Login" (account professionale, niente
-Pagina Facebook). Configurazione: INSTAGRAM_USER_ID e INSTAGRAM_ACCESS_TOKEN
-(env, dal vault di garganacl) e la spunta `instagram_enabled` in
-Impostazioni. Il token dura 60 giorni: il job del lunedi' lo rinnova e
-tiene quello nuovo nei settings (chiave fuori dalla SPEC, quindi non
-compare in Impostazioni ne' nelle API pubbliche).
+Configurazione: INSTAGRAM_USER_ID (l'id dell'account Instagram) e
+INSTAGRAM_ACCESS_TOKEN (env, dal vault di garganacl) e la spunta
+`instagram_enabled` in Impostazioni. Due tipi di token, stessi endpoint:
+
+- quello dell'API con login unificato (Facebook Login for Business, token
+  dell'utente di sistema): non scade, parla con graph.facebook.com. E' il
+  default, ed e' quello usato in produzione.
+- quello dell'API con login di Instagram (INSTAGRAM_GRAPH_URL=
+  https://graph.instagram.com/v23.0): dura 60 giorni, il job del lunedi' lo
+  rinnova e tiene quello nuovo nei settings (chiave fuori dalla SPEC, quindi
+  non compare in Impostazioni ne' nelle API pubbliche).
 
 Instagram vuole JPEG raggiungibili da un URL pubblico, in proporzioni fra
 4:5 e 1.91:1 per il feed: le scansioni delle carte (circa 5:7) sono piu'
@@ -37,7 +42,7 @@ from models.db import Article, ArticleStatus
 
 LOGGER = logging.getLogger("instagram")
 
-GRAPH = "https://graph.instagram.com/v23.0"
+GRAPH_DEFAULT = "https://graph.facebook.com/v23.0"
 TIMEOUT = 30
 
 CHIAVE_ACCESO = "instagram_enabled"
@@ -64,6 +69,10 @@ class ErroreInstagram(Exception):
 
 def _ora() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _graph() -> str:
+    return (os.getenv("INSTAGRAM_GRAPH_URL") or GRAPH_DEFAULT).rstrip("/")
 
 
 def _api_url() -> str:
@@ -262,9 +271,9 @@ def _chiama(metodo: str, percorso: str, token: str, **parametri) -> dict:
     parametri["access_token"] = token
     try:
         if metodo == "GET":
-            r = requests.get(f"{GRAPH}/{percorso}", params=parametri, timeout=TIMEOUT)
+            r = requests.get(f"{_graph()}/{percorso}", params=parametri, timeout=TIMEOUT)
         else:
-            r = requests.post(f"{GRAPH}/{percorso}", data=parametri, timeout=TIMEOUT)
+            r = requests.post(f"{_graph()}/{percorso}", data=parametri, timeout=TIMEOUT)
     except requests.RequestException as exc:
         raise ErroreInstagram(f"Instagram non raggiungibile: {exc}") from exc
     try:
@@ -392,9 +401,10 @@ def pubblica_storie(db: Session) -> List[str]:
 
 
 def rinnova_token(db: Session) -> bool:
-    """Il token vale 60 giorni e si rinnova solo se ha almeno un giorno:
-    il job del lunedi' lo allunga ogni settimana."""
-    if not configurato(db):
+    """Solo per il login di Instagram: quel token vale 60 giorni e si rinnova
+    solo se ha almeno un giorno, il job del lunedi' lo allunga ogni
+    settimana. Il token dell'utente di sistema non scade."""
+    if not configurato(db) or "graph.instagram.com" not in _graph():
         return False
     r = requests.get("https://graph.instagram.com/refresh_access_token",
                      params={"grant_type": "ig_refresh_token", "access_token": _token(db)}, timeout=TIMEOUT)
