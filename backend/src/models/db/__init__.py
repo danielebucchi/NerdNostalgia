@@ -26,6 +26,7 @@ from .platform import Platform
 from .setting import Setting
 from .shipping_addresses import ShippingAddress
 from .misc_sales import MiscSale, MiscSaleKind
+from .newsletter_subscriber import NewsletterSubscriber
 from .personal_card import PersonalCard, PersonalCardStatus
 from .vinted import VintedSettings, VintedSyncLog
 from .wanted import WantedItem, WantedStatus
@@ -48,6 +49,7 @@ __all__ = [
     "CardReference",
     "OcrCorrection",
     "CategoryAlert",
+    "NewsletterSubscriber",
     "ConsignmentSale",
     "Expense",
     "Inquiry",

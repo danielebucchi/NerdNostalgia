@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: false },
 };
 
-const LAST_UPDATE = "2 ottobre 2026";
+const LAST_UPDATE = "25 novembre 2026";
 
 export default function PrivacyPage() {
   return (
@@ -102,6 +102,14 @@ export default function PrivacyPage() {
             collegati al profilo così li ritrovi nello storico
           </li>
         </ul>
+
+        <p>
+          <strong>Se si iscrive alla newsletter dal fondo del sito</strong>,
+          senza account: l&apos;indirizzo email e le date in cui ha chiesto
+          l&apos;iscrizione, l&apos;ha confermata dal link che Le mandiamo e,
+          se succede, l&apos;ha revocata. Senza la conferma dal link non Le
+          scriviamo.
+        </p>
 
         <p>
           <strong>Se lascia una recensione</strong>: il voto, il testo che
@@ -334,8 +342,11 @@ export default function PrivacyPage() {
           non ha prestato alcun consenso promozionale.
         </p>
         <p>
-          <strong>Email promozionali</strong> — solo se ha spuntato la
-          casella apposita, che è separata dalla registrazione e parte vuota.
+          <strong>Email promozionali</strong> (la newsletter dei nuovi
+          arrivi, una volta a settimana) — solo se ha spuntato la casella
+          apposita, che è separata dalla registrazione e parte vuota, oppure
+          se si è iscritto dal riquadro in fondo al sito e ha confermato dal
+          link nell&apos;email.
           Può revocare il consenso in qualsiasi momento, senza dare spiegazioni e
           senza che questo tocchi i Suoi ordini:
         </p>

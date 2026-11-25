@@ -627,6 +627,22 @@ CREATE INDEX IF NOT EXISTS idx_category_alerts_category
     ON category_alerts(category_id);
 
 -- ============================================================
+-- newsletter_subscribers (iscritti senza account, vedi 0037)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    confirm_token VARCHAR(64),
+    confirm_sent_at TIMESTAMP,
+    confirmed_at TIMESTAMP,
+    revoked_at TIMESTAMP,
+    unsubscribe_token VARCHAR(64) NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_newsletter_subscribers_confirm
+    ON newsletter_subscribers(confirm_token);
+
+-- ============================================================
 -- reviews: recensioni del venditore, una per ordine (vedi 0024)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS reviews (

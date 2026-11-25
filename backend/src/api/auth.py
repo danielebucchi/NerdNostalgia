@@ -224,11 +224,28 @@ def unsubscribe(
         .first()
     )
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Link non valido. Se vuoi smettere di ricevere le email, "
-                   "scrivimi e ci penso io.",
+        # Non e' un cliente: puo' essere un iscritto alla newsletter dal
+        # footer, che ha lo stesso link in fondo alle email.
+        from models.db import NewsletterSubscriber
+        iscritto = (
+            db.query(NewsletterSubscriber)
+            .filter(NewsletterSubscriber.unsubscribe_token == payload.token,
+                    NewsletterSubscriber.confirmed_at.isnot(None))
+            .first()
         )
+        if iscritto is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Link non valido. Se vuoi smettere di ricevere le email, "
+                       "scrivimi e ci penso io.",
+            )
+        iscritto.revoked_at = (None if payload.marketing_consent
+                               else datetime.now(timezone.utc).replace(tzinfo=None))
+        db.commit()
+        LOGGER.info("Newsletter -> %s per iscritto %s (da link email)",
+                    payload.marketing_consent, iscritto.id)
+        return ConsentResponse(email=_email_offuscata(iscritto.email),
+                               marketing_consent=iscritto.attivo)
 
     _applica_consenso(user, payload.marketing_consent)
     db.commit()

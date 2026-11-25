@@ -3,6 +3,7 @@ import { getPublicSettings } from "@/lib/api";
 import { CartNavLink } from "@/components/CartNavLink";
 import { CustomerNav } from "@/components/CustomerNav";
 import { LogoImage } from "@/components/LogoImage";
+import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { SearchBox } from "@/components/SearchBox";
 
 // Soglia allineata a FREE_SHIPPING_FROM in lib/cart.ts
@@ -159,6 +160,7 @@ export async function Footer() {
           </a>
         </div>
       </div>
+      <NewsletterSignup />
       <div className="text-center text-xs text-ink-soft pb-6 px-4 space-y-2">
         <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
           <Link href="/resi" className="hover:text-lilac-deep hover:underline">
