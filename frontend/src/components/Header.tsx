@@ -152,6 +152,9 @@ export async function Footer() {
       </div>
       <div className="text-center text-xs text-ink-soft pb-6 px-4 space-y-2">
         <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <Link href="/resi" className="hover:text-lilac-deep hover:underline">
+            Resi e recesso
+          </Link>
           <Link href="/privacy" className="hover:text-lilac-deep hover:underline">
             Privacy
           </Link>
