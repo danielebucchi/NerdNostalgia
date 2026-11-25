@@ -138,6 +138,16 @@ export async function Footer() {
               🃏 Trovaci anche su CardTrader ↗
             </a>
           )}
+          {/* Il gioco gratuito fatto da noi: solo un link, niente vendita
+              dentro il gioco (e' un fan game Pokemon, va tenuto non commerciale). */}
+          <a
+            href="https://play.nerdnostalgia.store"
+            target="_blank"
+            rel="noopener"
+            className="text-sm text-lilac-deep font-semibold mt-2 block hover:underline"
+          >
+            ⚽ Gioca gratis a PokéCalcio ↗
+          </a>
         </div>
       </div>
       <div className="text-center text-xs text-ink-soft pb-6 px-4 space-y-2">
