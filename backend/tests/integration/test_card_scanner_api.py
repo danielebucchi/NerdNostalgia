@@ -1109,3 +1109,13 @@ def test_same_file_uploaded_again_is_discarded_as_duplicate(client, admin_header
     assert di_nuovo["status"] == "DISCARDED" and f"#{primo['id']}" in di_nuovo["error"]
     # Un'altra copia ha un altro nome: non e' un doppione
     assert _carica(client, admin_headers, "48_NM_002.jpg").json()["status"] == "PENDING"
+
+
+def test_article_page_says_it_costs_less_here(client, admin_headers, db_session):
+    """La carta costa 4,40 sul sito: eBay (commissioni) e Vinted (regola
+    +2 €) costano di piu', e la pagina lo sa."""
+    carta = _carta_confermata(client, admin_headers)
+    art_id = client.post(f"/api/card-scanner/cards/{carta['id']}/site", headers=admin_headers).json()["article_id"]
+    altrove = client.get(f"/api/articles/{art_id}").json()["prices_elsewhere"]
+    assert altrove["ebay"] > 4.40 and altrove["vinted"] >= 6.0
+    assert "cardtrader" not in altrove   # stesso prezzo del sito: niente da dire

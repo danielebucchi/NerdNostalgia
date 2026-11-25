@@ -163,6 +163,9 @@ class ArticleResponse(BaseModel):
     # Dove si compra anche fuori dal sito, per la pagina pubblica:
     # {"cardtrader": url, "ebay": url}, solo gli annunci attivi.
     marketplace_links: Dict[str, str] = {}
+    # Quanto costa lo stesso pezzo sui marketplace, solo dove costa di piu':
+    # la pagina dice "qui lo paghi meno". Solo nella pagina del singolo articolo.
+    prices_elsewhere: Dict[str, float] = {}
     # Per le carte dello scanner: titolo e descrizione nel formato di Vinted
     # (vedi card_listing.vinted_title). Solo nella pagina del singolo articolo.
     vinted_title: Optional[str] = None

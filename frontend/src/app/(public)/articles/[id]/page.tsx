@@ -194,6 +194,7 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           <div className="display text-4xl text-pink-deep leading-none mb-4">
             {formatPrice(article)}
           </div>
+          <CostaMeno prezzi={article.prices_elsewhere} />
           <BuyControls article={article} />
         </div>
 
@@ -265,6 +266,24 @@ export default async function ArticleDetailPage({ params }: PageProps) {
       <StickyCtaBar article={article} />
       <AdminArticleEditor articleId={article.id} />
     </article>
+  );
+}
+
+const NOMI_MARKETPLACE: Record<string, string> = { ebay: "eBay", vinted: "Vinted", cardtrader: "CardTrader" };
+
+/** "Qui lo paghi meno": sul sito non ci sono le commissioni dei
+ *  marketplace, e il prezzo lo riflette. Solo i canali dove costa di piu'. */
+function CostaMeno({ prezzi }: { prezzi?: Article["prices_elsewhere"] }) {
+  const voci = Object.entries(prezzi ?? {}).filter(([, v]) => v != null) as [string, number][];
+  if (!voci.length) return null;
+  const eur = (v: number) => v.toLocaleString("it-IT", { style: "currency", currency: "EUR" });
+  return (
+    <p className="-mt-2 mb-4 text-sm text-mint-deep font-semibold">
+      💚 Qui lo paghi meno:{" "}
+      <span className="font-normal text-ink-soft">
+        {voci.map(([k, v]) => `su ${NOMI_MARKETPLACE[k] ?? k} ${eur(v)}`).join(" · ")}
+      </span>
+    </p>
   );
 }
 

@@ -104,6 +104,31 @@ def _carta_collegata(article: Article):
     return db.query(PersonalCard).filter(PersonalCard.article_id == article.id).first()
 
 
+def _prezzi_altrove(article: Article, carta) -> dict:
+    """Il prezzo dello stesso pezzo su eBay, Vinted e CardTrader, quando e'
+    piu' alto che qui. Per le carte dello scanner lo si calcola (commissioni
+    eBay, regola Vinted); per gli altri articoli si usa quello registrato
+    nei riquadri marketplace, se l'annuncio e' online."""
+    prezzi = {}
+    if carta is not None:
+        from utils import card_listing as cl
+        db = object_session(article)
+        for nome, calcola in (("ebay", lambda: cl.ebay_price(db, carta)),
+                              ("vinted", lambda: cl.vinted_price(carta)),
+                              ("cardtrader", lambda: cl.cardtrader_price(carta))):
+            try:
+                prezzi[nome] = calcola()
+            except Exception:  # noqa: BLE001 — senza prezzo non si confronta
+                continue
+    else:
+        if article.ebay_price and article.ebay_status == EbayStatus.LISTED:
+            prezzi["ebay"] = float(article.ebay_price)
+        if article.vinted_price and article.vinted_status == VintedStatus.LISTED:
+            prezzi["vinted"] = float(article.vinted_price)
+    qui = float(article.price or 0)
+    return {k: round(float(v), 2) for k, v in prezzi.items() if v and qui and float(v) > qui}
+
+
 def _marketplace_links(article: Article) -> dict:
     """Gli annunci attivi dello stesso pezzo su CardTrader ed eBay. Per le
     carte dello scanner le inserzioni stanno sulla carta della collezione
@@ -421,6 +446,7 @@ def get_article(
     # servono alla pagina del singolo pezzo.
     risposta.marketplace_links = _marketplace_links(article)
     carta = _carta_collegata(article)
+    risposta.prices_elsewhere = _prezzi_altrove(article, carta)
     if carta is not None:
         from utils.card_listing import vinted_description, vinted_price, vinted_title
         risposta.vinted_title = vinted_title(carta)
