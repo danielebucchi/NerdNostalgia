@@ -51,6 +51,23 @@ SETTINGS_SPEC: Dict[str, dict] = {
                 "consenso promozionale. Prima di accenderla, prova l'anteprima "
                 "(POST /api/newsletter/preview: arriva solo a te).",
     },
+    "instagram_enabled": {
+        "default": "false",
+        "public": False,
+        "label": "Instagram automatico",
+        "help": "true/false. Ogni giorno alle 18:30 un carosello con i nuovi "
+                "arrivi (fino a 10, i piu' cari) e una Storia per ogni pezzo "
+                "sopra la soglia qui sotto. Servono INSTAGRAM_USER_ID e "
+                "INSTAGRAM_ACCESS_TOKEN sul server. Cosa uscira': GET "
+                "/api/social/instagram/status.",
+    },
+    "instagram_story_min_price": {
+        "default": "20",
+        "public": False,
+        "label": "Instagram — prezzo minimo per la Storia (€)",
+        "help": "Gli articoli da questo prezzo in su hanno anche una Storia "
+                "(al massimo 10 al giorno).",
+    },
     "free_shipping_all": {
         "default": "",
         "public": True,

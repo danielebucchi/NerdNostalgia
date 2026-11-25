@@ -36,6 +36,9 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID:-}
       - TELEGRAM_TOPIC_ID=${TELEGRAM_TOPIC_ID:-}
+      # Instagram automatico (utils/instagram.py): vuoti = spento.
+      - INSTAGRAM_USER_ID=${INSTAGRAM_USER_ID:-}
+      - INSTAGRAM_ACCESS_TOKEN=${INSTAGRAM_ACCESS_TOKEN:-}
       # URL pubblico del sito, usato nei link delle email (avvisi nuovi
       # arrivi, inquiry). Riusa la stessa var del frontend.
       - SITE_PUBLIC_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3737}

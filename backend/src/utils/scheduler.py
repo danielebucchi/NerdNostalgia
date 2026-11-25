@@ -102,6 +102,39 @@ def _newsletter_job():
         db.close()
 
 
+def _instagram_carousel_job():
+    from utils import instagram
+    db = SessionLocal()
+    try:
+        instagram.pubblica_carosello(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Instagram, carosello fallito: %s", exc)
+    finally:
+        db.close()
+
+
+def _instagram_stories_job():
+    from utils import instagram
+    db = SessionLocal()
+    try:
+        instagram.pubblica_storie(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Instagram, Storie fallite: %s", exc)
+    finally:
+        db.close()
+
+
+def _instagram_token_job():
+    from utils import instagram
+    db = SessionLocal()
+    try:
+        instagram.rinnova_token(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Instagram, rinnovo token fallito: %s", exc)
+    finally:
+        db.close()
+
+
 def _italian_names_job():
     """Nomi italiani alle carte che non li hanno (e titoli del sito)."""
     from utils.card_listing import aggiorna_nomi_italiani
@@ -186,6 +219,33 @@ def start_scheduler() -> None:
         _newsletter_job,
         CronTrigger(day_of_week="fri", hour=18, minute=0),
         id="weekly_newsletter",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    # Instagram (parte solo se acceso in Impostazioni): il carosello del
+    # giorno alle 18:30, le Storie dei pezzi sopra soglia ogni mezz'ora di
+    # giorno, il rinnovo del token (dura 60 giorni) il lunedi' alle 05:00.
+    _scheduler.add_job(
+        _instagram_carousel_job,
+        CronTrigger(hour=18, minute=30),
+        id="instagram_carousel",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    _scheduler.add_job(
+        _instagram_stories_job,
+        CronTrigger(hour="9-21", minute="10,40"),
+        id="instagram_stories",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    _scheduler.add_job(
+        _instagram_token_job,
+        CronTrigger(day_of_week="mon", hour=5, minute=0),
+        id="instagram_token",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

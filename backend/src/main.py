@@ -40,6 +40,7 @@ from api.personal_cards import router as personal_cards_router
 from api.reviews import router as reviews_router
 from api.feeds import router as feeds_router
 from api.newsletter import router as newsletter_router
+from api.social import router as social_router
 from api.settings import router as settings_router
 from api.stripe import router as stripe_router
 from api.users import router as users_router
@@ -114,6 +115,7 @@ app.include_router(inpost_router)
 app.include_router(reviews_router)
 app.include_router(feeds_router)
 app.include_router(newsletter_router)
+app.include_router(social_router)
 
 
 # Static files (uploaded images)
