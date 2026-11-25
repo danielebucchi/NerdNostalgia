@@ -7,7 +7,10 @@ cosi' non serve mandarla (e i .webp come foto Telegram non li prende).
 
 Configurazione (env, dal vault di garganacl): TELEGRAM_BOT_TOKEN, il bot
 amministratore del canale, e TELEGRAM_CHANNEL_ID ("@nomecanale" o l'id
-numerico). Senza, non fa niente.
+numerico). Senza, non fa niente. Se la chat e' un gruppo con gli argomenti,
+TELEGRAM_TOPIC_ID e' l'id dell'argomento "Nuovi arrivi": il numero in fondo
+al link di un messaggio dell'argomento (t.me/gruppo/<id>/...). Vuoto = la
+chat principale.
 
 Un articolo si annuncia una volta sola (article_metadata.telegram_posted),
 anche se torna pubblicato. Al massimo MAX_ORA messaggi l'ora: una sync
@@ -60,13 +63,20 @@ def testo(titolo: str, prezzo: float, link: str, categoria: Optional[str]) -> st
     return "\n".join(righe)
 
 
+def payload(messaggio: str) -> dict:
+    dati = {"chat_id": os.environ["TELEGRAM_CHANNEL_ID"], "text": messaggio,
+            "parse_mode": "HTML", "link_preview_options": {"prefer_large_media": True}}
+    argomento = (os.getenv("TELEGRAM_TOPIC_ID") or "").strip()
+    if argomento.isdigit():
+        dati["message_thread_id"] = int(argomento)
+    return dati
+
+
 def _invia(messaggio: str) -> None:
     try:
         r = requests.post(
             f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage",
-            json={"chat_id": os.environ["TELEGRAM_CHANNEL_ID"], "text": messaggio,
-                  "parse_mode": "HTML", "link_preview_options": {"prefer_large_media": True}},
-            timeout=TIMEOUT,
+            json=payload(messaggio), timeout=TIMEOUT,
         )
         if r.status_code != 200:
             LOGGER.warning("Telegram ha rifiutato l'annuncio (%s): %s", r.status_code, r.text[:300])

@@ -50,3 +50,11 @@ def test_at_most_twenty_an_hour(db_session, admin_user, canale):
     for i in range(25):
         telegram_channel.annuncia(db_session, _articolo(db_session, admin_user, f"Carta {i}"))
     assert len(canale) == telegram_channel.MAX_ORA
+
+
+def test_topic_of_a_group_with_topics(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "@nerdnostalgia")
+    monkeypatch.delenv("TELEGRAM_TOPIC_ID", raising=False)
+    assert "message_thread_id" not in telegram_channel.payload("ciao")
+    monkeypatch.setenv("TELEGRAM_TOPIC_ID", "42")
+    assert telegram_channel.payload("ciao")["message_thread_id"] == 42
