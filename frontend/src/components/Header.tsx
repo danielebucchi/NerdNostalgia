@@ -148,6 +148,15 @@ export async function Footer() {
           >
             ⚽ Gioca gratis a PokéCalcio ↗
           </a>
+          {/* Il gruppo Telegram: nuovi arrivi annunciati dal bot, scambi e domande. */}
+          <a
+            href="https://t.me/NerdNostalgia"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-lilac-deep font-semibold mt-2 block hover:underline"
+          >
+            💬 Unisciti al gruppo Telegram ↗
+          </a>
         </div>
       </div>
       <div className="text-center text-xs text-ink-soft pb-6 px-4 space-y-2">

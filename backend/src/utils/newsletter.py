@@ -57,6 +57,11 @@ def _foto(a: Article) -> Optional[str]:
     return url if url.startswith("http") else f"{_api_url()}/{url.lstrip('/')}"
 
 
+# Il gruppo Telegram: i nuovi arrivi li annuncia il bot ogni giorno, la
+# newsletter li riassume una volta a settimana.
+TELEGRAM_URL = "https://t.me/NerdNostalgia"
+
+
 def _corpo(articoli: List[Article], link_revoca: str) -> Dict[str, str]:
     from utils.email import _h, _site_url
     site = _site_url()
@@ -75,13 +80,17 @@ def _corpo(articoli: List[Article], link_revoca: str) -> Dict[str, str]:
             f'<strong style="color:#e879a8">{_h(prezzo)}</strong></a></td>')
     tabella = "".join(f"<tr>{''.join(celle[i:i + 2])}</tr>" for i in range(0, len(celle), 2))
     testo = ("Ecco i nuovi arrivi della settimana su NerdNostalgia:\n\n" + "\n".join(righe_txt)
-             + f"\n\nTutto il catalogo: {site}\n\n"
+             + f"\n\nTutto il catalogo: {site}\n"
+             f"I nuovi arrivi in tempo reale, scambi e domande sul gruppo Telegram: {TELEGRAM_URL}\n\n"
              f"Ricevi questa email perche' hai acconsentito alle comunicazioni promozionali.\n"
              f"Per non riceverle piu': {link_revoca}\n")
     html = f"""<html><body style="font-family:sans-serif;max-width:640px;margin:auto;color:#3d2a5c">
   <h2 style="color:#e879a8">Nuovi arrivi della settimana</h2>
   <table style="width:100%;border-collapse:collapse">{tabella}</table>
   <p style="text-align:center;margin:20px 0"><a href="{_h(site)}" style="background:#e879a8;color:#fff;padding:10px 18px;border-radius:20px;text-decoration:none">Tutto il catalogo</a></p>
+  <p style="text-align:center;font-size:0.9em">Vuoi vederli appena arrivano? Entra nel
+  <a href="{_h(TELEGRAM_URL)}" style="color:#e879a8;font-weight:bold">gruppo Telegram di NerdNostalgia</a>:
+  nuovi arrivi in tempo reale, scambi e domande.</p>
   <p style="color:#888;font-size:0.85em">Ricevi questa email perche' hai acconsentito alle comunicazioni promozionali.
   <a href="{_h(link_revoca)}" style="color:#888">Revoca il consenso</a>.</p>
 </body></html>"""

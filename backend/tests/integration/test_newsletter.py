@@ -43,6 +43,7 @@ def test_only_customers_who_said_yes_and_with_the_revoke_link(db_session, admin_
     assert [m["to"] for m in posta] == ["si@example.test"]
     assert "Charizard" in posta[0]["html_body"] and "Vecchio" not in posta[0]["html_body"]
     assert "/disiscriviti?t=" in posta[0]["text_body"]
+    assert "t.me/NerdNostalgia" in posta[0]["text_body"] and "t.me/NerdNostalgia" in posta[0]["html_body"]
 
 
 def test_weekly_run_only_if_enabled_and_once_a_week(db_session, admin_user, posta):
