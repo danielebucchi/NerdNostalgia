@@ -28,6 +28,7 @@ from .shipping_addresses import ShippingAddress
 from .misc_sales import MiscSale, MiscSaleKind
 from .newsletter_subscriber import NewsletterSubscriber
 from .instagram_media import CardPriceHistory, InstagramMedia, InstagramReply
+from .price_guide import PriceGuideCard, PriceGuideSet
 from .personal_card import PersonalCard, PersonalCardStatus
 from .vinted import VintedSettings, VintedSyncLog
 from .wanted import WantedItem, WantedStatus
@@ -54,6 +55,8 @@ __all__ = [
     "InstagramMedia",
     "InstagramReply",
     "CardPriceHistory",
+    "PriceGuideSet",
+    "PriceGuideCard",
     "ConsignmentSale",
     "Expense",
     "Inquiry",

@@ -200,6 +200,28 @@ def _telegram_ripesca_job():
         db.close()
 
 
+def _price_guide_job():
+    from utils import price_guide
+    db = SessionLocal()
+    try:
+        price_guide.aggiorna(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Guida prezzi non aggiornata: %s", exc)
+    finally:
+        db.close()
+
+
+def _price_guide_vuota() -> bool:
+    from models.db import PriceGuideCard
+    db = SessionLocal()
+    try:
+        return db.query(PriceGuideCard.id).first() is None
+    except Exception:  # noqa: BLE001 — tabella non ancora creata
+        return False
+    finally:
+        db.close()
+
+
 def _italian_names_job():
     """Nomi italiani alle carte che non li hanno (e titoli del sito)."""
     from utils.card_listing import aggiorna_nomi_italiani
@@ -364,6 +386,19 @@ def start_scheduler() -> None:
         replace_existing=True,
         max_instances=1,
         coalesce=True,
+    )
+    # Guida prezzi delle carte Pokémon (pagine pubbliche "quanto vale"):
+    # domenica alle 02:00, e la prima volta pochi minuti dopo l'avvio.
+    # (next_run_time=None metterebbe il job in pausa: si passa solo se serve.)
+    subito = {"next_run_time": datetime.now(tz=APP_TZ) + timedelta(minutes=5)} if _price_guide_vuota() else {}
+    _scheduler.add_job(
+        _price_guide_job,
+        CronTrigger(day_of_week="sun", hour=2, minute=0),
+        id="price_guide",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        **subito,
     )
     # Backup giornaliero (SQLite snapshot + tar uploads) alle 03:30 locali
     _scheduler.add_job(

@@ -72,6 +72,7 @@ export function Header() {
         <SearchBox className="hidden md:block flex-1 max-w-xs mx-2" />
 
         <nav className="hidden md:flex items-center gap-2 flex-shrink-0">
+          <Link href="/prezzi-carte-pokemon" className="btn btn-ghost text-sm">Prezzi carte</Link>
           <CartNavLink variant="desktop" />
           <CustomerNav variant="desktop" />
           <Link href="/contatti" className="btn btn-primary text-sm">Contatti</Link>
@@ -163,6 +164,12 @@ export async function Footer() {
       <NewsletterSignup />
       <div className="text-center text-xs text-ink-soft pb-6 px-4 space-y-2">
         <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <Link href="/prezzi-carte-pokemon" className="hover:text-lilac-deep hover:underline">
+            Prezzi carte Pokémon
+          </Link>
+          <Link href="/valuta-carte" className="hover:text-lilac-deep hover:underline">
+            Valuta le tue carte
+          </Link>
           <Link href="/resi" className="hover:text-lilac-deep hover:underline">
             Resi e recesso
           </Link>

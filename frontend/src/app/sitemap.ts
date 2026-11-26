@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { listAllArticles, listWantedItems } from "@/lib/api";
+import { getGuideSitemap } from "@/lib/price-guide";
 import { SITE_URL } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: "daily",
       priority: 1.0,
+    },
+    {
+      url: `${SITE_URL}/prezzi-carte-pokemon`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${SITE_URL}/valuta-carte`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
     },
     {
       url: `${SITE_URL}/cerco-compro`,
@@ -75,5 +88,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // idem
   }
 
-  return [...staticPages, ...articleEntries, ...wantedEntries];
+  // Guida prezzi: una pagina per set e una per carta (migliaia, ma la
+  // sitemap ne regge 50.000).
+  const guideEntries: MetadataRoute.Sitemap = [];
+  const guida = await getGuideSitemap();
+  for (const s of guida?.sets ?? []) {
+    guideEntries.push({ url: `${SITE_URL}/prezzi-carte-pokemon/${s.slug}`, lastModified: new Date(s.updated_at),
+      changeFrequency: "weekly", priority: 0.6 });
+  }
+  for (const c of guida?.cards ?? []) {
+    guideEntries.push({ url: `${SITE_URL}/prezzi-carte-pokemon/${c.set_slug}/${c.slug}`,
+      lastModified: new Date(c.updated_at), changeFrequency: "weekly", priority: 0.5 });
+  }
+
+  return [...staticPages, ...articleEntries, ...wantedEntries, ...guideEntries];
 }
