@@ -176,57 +176,60 @@ def _prezzo(article: Article) -> str:
     return f"{float(article.price or 0):.2f} €".replace(".", ",")
 
 
-def immagine(article: Article, formato: str = "post") -> bytes:
-    """JPEG pronto per Instagram: la foto riquadrata, titolo e prezzo."""
+def _categoria_breve(article: Article) -> Optional[str]:
+    cat = article.category
+    return (cat.name or "").upper() if cat is not None and cat.name else None
+
+
+def immagine(article: Article, formato: str = "post", mostra_prezzo: bool = True,
+             intestazione: Optional[str] = None) -> bytes:
+    """JPEG pronto per Instagram nello stile del sito (utils/social_grafica):
+    la foto in una carta bianca, logo, categoria, titolo e prezzo."""
+    from utils import social_grafica as g
     storia = formato == "storia"
     w, h = STORIA if storia else POST
-    tela = Image.new("RGB", (w, h), SFONDO)
-    draw = ImageDraw.Draw(tela)
-    margine = 60
-
-    # In alto la scritta (Storia) o il sito (post), in basso titolo e prezzo,
-    # in mezzo la foto, ingrandita fino a riempire lo spazio.
-    if storia:
-        f = _font(64)
-        testo = "NUOVO ARRIVO"
-        draw.text(((w - draw.textlength(testo, font=f)) / 2, 90), testo, font=f, fill=ROSA)
-        alto, fascia = 200, 560
-    else:
-        f = _font(32)
-        testo = "nerdnostalgia.store"
-        draw.text(((w - draw.textlength(testo, font=f)) / 2, 34), testo, font=f, fill=INK)
-        alto, fascia = 100, 270
-
+    tela = g.sfondo((w, h), seme=article.id or 0)
     foto = _foto(article)
-    if foto is not None:
-        box_w, box_h = w - 2 * margine, h - alto - fascia - 20
-        scala = min(box_w / foto.width, box_h / foto.height)
-        foto = foto.resize((max(1, round(foto.width * scala)), max(1, round(foto.height * scala))), Image.LANCZOS)
-        tela.paste(foto, ((w - foto.width) // 2, alto + (box_h - foto.height) // 2))
+    categoria = _categoria_breve(article)
 
-    y = h - fascia + (30 if storia else 10)
-    f_titolo = _font(58 if storia else 44)
-    for riga in _righe(draw, article.title or "", f_titolo, w - 2 * margine, 3 if storia else 2):
-        draw.text(((w - draw.textlength(riga, font=f_titolo)) / 2, y), riga, font=f_titolo, fill=INK)
-        y += f_titolo.size + 12
-    f_prezzo = _font(96 if storia else 72)
-    prezzo = _prezzo(article)
-    draw.text(((w - draw.textlength(prezzo, font=f_prezzo)) / 2, y + 14), prezzo, font=f_prezzo, fill=ROSA)
     if storia:
-        f_sito = _font(44)
-        sito = "nerdnostalgia.store"
-        draw.text(((w - draw.textlength(sito, font=f_sito)) / 2, h - 130), sito, font=f_sito, fill=INK)
+        g.logo(tela, 60, 70, 170)
+        if intestazione is None:
+            recente = article.published_at and _ora() - article.published_at <= timedelta(days=7)
+            intestazione = "NUOVO ARRIVO" if recente else "DISPONIBILE ORA"
+        g.pillola(tela, intestazione, w // 2 + 85, 110, 50, g.BIANCO, g.ROSA_FORTE, "testo")
+        g.carta(tela, foto, (70, 290, w - 70, 1330))
+        y = 1370
+        if categoria:
+            g.etichetta(tela, categoria, w // 2, y, g.LILLA_FORTE, g.BIANCO, 32, "centro")
+            y += 80
+        y = g.testo_centrato(tela, article.title or "", y, "titolo", 60, g.INK, 3)
+        if mostra_prezzo:
+            g.pillola(tela, _prezzo(article), w // 2, max(y + 20, 1650), 96)
+        g.etichetta(tela, "nerdnostalgia.store", w // 2, h - 110, g.BIANCO, g.INK, 34, "centro")
+    else:
+        g.logo(tela, 40, 34, 130)
+        if categoria:
+            g.etichetta(tela, categoria, w - 40, 72, g.BIANCO, g.INK, 30, "destra")
+        g.carta(tela, foto, (60, 140, w - 60, 1030))
+        y = g.testo_centrato(tela, article.title or "", 1050, "titolo", 50, g.INK, 2)
+        if mostra_prezzo:
+            g.pillola(tela, _prezzo(article), w // 2, max(y + 8, 1180), 66)
 
     out = io.BytesIO()
-    tela.save(out, "JPEG", quality=90)
+    tela.convert("RGB").save(out, "JPEG", quality=90)
     return out.getvalue()
+
+
+# Cambia quando cambia la grafica: Instagram non deve riusare le immagini vecchie.
+GRAFICA = "2"
 
 
 def url_immagine(article: Article, formato: str) -> str:
     # Il parametro cambia quando cambia l'articolo: Instagram non deve
     # riusare un'immagine vecchia rimasta in cache.
     versione = int((article.updated_at or article.published_at or _ora()).timestamp())
-    return f"{_api_url()}/api/social/instagram/{article.id}/{formato}.jpg?v={versione}"
+    return f"{_api_url()}/api/social/instagram/{article.id}/{formato}.jpg?v={versione}{GRAFICA}"
 
 
 # ---------------------------------------------------------------------------

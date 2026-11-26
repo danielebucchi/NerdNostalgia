@@ -59,60 +59,44 @@ def venduti(db: Session, anno: int, mese: int) -> List[Article]:
 # Fotogrammi
 # ---------------------------------------------------------------------------
 
-def _tela() -> Tuple[Image.Image, ImageDraw.ImageDraw]:
-    tela = Image.new("RGB", instagram.STORIA, instagram.SFONDO)
-    return tela, ImageDraw.Draw(tela)
-
-
-def _centrato(draw, y: int, testo: str, size: int, colore) -> int:
-    f = instagram._font(size)
-    w = instagram.STORIA[0]
-    draw.text(((w - draw.textlength(testo, font=f)) / 2, y), testo, font=f, fill=colore)
-    return y + size + 18
-
-
-def _intro(anno: int, mese: int, quanti: int) -> Image.Image:
-    tela, draw = _tela()
-    y = _centrato(draw, 620, "VENDUTI A", 90, instagram.INK)
-    y = _centrato(draw, y, MESI[mese - 1].upper(), 130, instagram.ROSA)
-    y = _centrato(draw, y + 40, f"{quanti} pezz{'o' if quanti == 1 else 'i'} hanno trovato casa", 52, instagram.INK)
-    _centrato(draw, 1760, "nerdnostalgia.store", 44, instagram.INK)
-    return tela
+def _intro(anno: int, mese: int, quanti: int, articoli: Optional[List[Article]] = None) -> Image.Image:
+    from utils import instagram_rubriche
+    return instagram_rubriche.copertina(f"Venduti a {MESI[mese - 1]}",
+                                        f"{quanti} pezz{'o' if quanti == 1 else 'i'} hanno trovato casa",
+                                        instagram.STORIA, "GRAZIE A VOI", articoli=articoli)
 
 
 def _pezzo(article: Article, n: int, totale: int) -> Image.Image:
-    tela, draw = _tela()
+    from utils import social_grafica as g
     w, h = instagram.STORIA
-    foto = instagram._foto(article)
-    if foto is not None:
-        box_w, box_h = w - 160, 1250
-        scala = min(box_w / foto.width, box_h / foto.height)
-        foto = foto.resize((max(1, round(foto.width * scala)), max(1, round(foto.height * scala))), Image.LANCZOS)
-        tela.paste(foto, ((w - foto.width) // 2, 150 + (box_h - foto.height) // 2))
+    tela = g.sfondo((w, h), seme=article.id or n)
+    g.logo(tela, 60, 70, 150)
+    g.etichetta(tela, f"{n}/{totale}", w - 60, 110, g.BIANCO, g.INK, 40, "destra")
+    g.carta(tela, instagram._foto(article), (90, 260, w - 90, 1420))
     # Il timbro VENDUTO, inclinato sopra la foto.
-    timbro = Image.new("RGBA", (760, 200), (0, 0, 0, 0))
+    timbro = Image.new("RGBA", (780, 220), (0, 0, 0, 0))
     td = ImageDraw.Draw(timbro)
-    td.rounded_rectangle((8, 8, 752, 192), radius=28, outline=instagram.ROSA + (255,), width=12)
-    f = instagram._font(120)
-    td.text(((760 - td.textlength("VENDUTO", font=f)) / 2, 30), "VENDUTO", font=f, fill=instagram.ROSA + (255,))
+    td.rounded_rectangle((8, 8, 772, 212), radius=40, fill=(255, 255, 255, 215),
+                         outline=g.ROSA_FORTE + (255,), width=14)
+    f = g.font("titolo", 130)
+    td.text(((780 - td.textlength("VENDUTO", font=f)) / 2, 28), "VENDUTO", font=f, fill=g.ROSA_FORTE + (255,))
     timbro = timbro.rotate(12, expand=True, resample=Image.BICUBIC)
-    tela.paste(timbro, ((w - timbro.width) // 2, 650), timbro)
-    y = 1450
-    f_titolo = instagram._font(54)
-    for riga in instagram._righe(draw, article.title or "", f_titolo, w - 120, 3):
-        draw.text(((w - draw.textlength(riga, font=f_titolo)) / 2, y), riga, font=f_titolo, fill=instagram.INK)
-        y += f_titolo.size + 12
-    _centrato(draw, 1780, f"{n}/{totale}", 40, instagram.INK)
-    return tela
+    tela.alpha_composite(timbro, ((w - timbro.width) // 2, 700))
+    g.testo_centrato(tela, article.title or "", 1490, "titolo", 58, g.INK, 3)
+    g.etichetta(tela, "nerdnostalgia.store", w // 2, h - 140, g.BIANCO, g.INK, 40, "centro")
+    return tela.convert("RGB")
 
 
 def _outro() -> Image.Image:
-    tela, draw = _tela()
-    y = _centrato(draw, 700, "GRAZIE!", 140, instagram.ROSA)
-    y = _centrato(draw, y + 30, "Ogni giorno nuovi arrivi", 60, instagram.INK)
-    y = _centrato(draw, y, "nerdnostalgia.store", 70, instagram.INK)
-    _centrato(draw, y + 60, "link in bio", 48, instagram.INK)
-    return tela
+    from utils import social_grafica as g
+    w, h = instagram.STORIA
+    tela = g.sfondo((w, h), seme=7, colori=(g.LILLA, g.ROSA, g.MENTA))
+    g.logo(tela, (w - 320) // 2, 380, 320)
+    y = g.testo_centrato(tela, "Grazie!", 760, "titolo", 150, g.INK, 1)
+    y = g.testo_centrato(tela, "Ogni giorno nuovi arrivi", y + 20, "testo", 58, g.INK_SOFT, 2, peso="SemiBold")
+    g.pillola(tela, "nerdnostalgia.store", w // 2, y + 50, 70)
+    g.etichetta(tela, "link in bio", w // 2, h - 200, g.BIANCO, g.INK, 44, "centro")
+    return tela.convert("RGB")
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +106,7 @@ def _outro() -> Image.Image:
 def video(articoli: List[Article], anno: int, mese: int) -> bytes:
     """Il Reel dei venduti del mese."""
     pezzi = articoli[:MAX_PEZZI]
-    slide = [(_intro(anno, mese, len(articoli)), INTRO)]
+    slide = [(_intro(anno, mese, len(articoli), pezzi), INTRO)]
     slide += [(_pezzo(a, i + 1, len(pezzi)), PER_PEZZO) for i, a in enumerate(pezzi)]
     slide.append((_outro(), OUTRO))
     return monta(slide, seme=anno * 100 + mese)

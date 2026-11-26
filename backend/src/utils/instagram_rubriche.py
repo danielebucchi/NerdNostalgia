@@ -73,27 +73,31 @@ def _carta(a: Article) -> Optional[PersonalCard]:
 # Grafica
 # ---------------------------------------------------------------------------
 
-def copertina(titolo: str, sottotitolo: str, formato=instagram.POST, emoji_testo: str = "") -> Image.Image:
-    """La prima slide di un carosello (o di un Reel): titolo grande e invito."""
-    tela = Image.new("RGB", formato, instagram.SFONDO)
-    draw = ImageDraw.Draw(tela)
+def copertina(titolo: str, sottotitolo: str, formato=instagram.POST, emoji_testo: str = "",
+              articoli: Optional[List[Article]] = None) -> Image.Image:
+    """La prima slide di un carosello (o di un Reel) nello stile del sito:
+    etichetta, titolo grande, sottotitolo e il mosaico delle prime foto."""
+    from utils import social_grafica as g
     w, h = formato
-    y = h // 2 - 260
+    storia = h > w * 1.5
+    tela = g.sfondo(formato, seme=hash(titolo) % 1000)
+    g.logo(tela, 50, 50, 150 if storia else 120)
+    y = int(h * 0.10) if not storia else 300
     if emoji_testo:
-        f = instagram._font(70)
-        draw.text(((w - draw.textlength(emoji_testo, font=f)) / 2, y - 120), emoji_testo, font=f, fill=instagram.ROSA)
-    f_titolo = instagram._font(96)
-    for riga in instagram._righe(draw, titolo, f_titolo, w - 120, 3):
-        draw.text(((w - draw.textlength(riga, font=f_titolo)) / 2, y), riga, font=f_titolo, fill=instagram.INK)
-        y += f_titolo.size + 16
-    f_sotto = instagram._font(50)
-    for riga in instagram._righe(draw, sottotitolo, f_sotto, w - 160, 3):
-        draw.text(((w - draw.textlength(riga, font=f_sotto)) / 2, y + 30), riga, font=f_sotto, fill=instagram.ROSA)
-        y += f_sotto.size + 12
-    f_sito = instagram._font(36)
-    draw.text(((w - draw.textlength("nerdnostalgia.store", font=f_sito)) / 2, h - 90),
-              "nerdnostalgia.store", font=f_sito, fill=instagram.INK)
-    return tela
+        g.etichetta(tela, emoji_testo, w // 2, y, g.ROSA_FORTE, g.BIANCO, 36 if not storia else 44, "centro")
+        y += 90 if not storia else 110
+    y = g.testo_centrato(tela, titolo, y, "titolo", 92 if not storia else 110, g.INK, 3)
+    y = g.testo_centrato(tela, sottotitolo, y + 10, "testo", 46 if not storia else 56, g.INK_SOFT, 2,
+                         peso="SemiBold")
+    foto = [instagram._foto(a) for a in (articoli or [])[:4]]
+    if any(f is not None for f in foto):
+        basso = h - (150 if not storia else 260)
+        g.mosaico(tela, foto, (90, y + 30, w - 90, basso))
+    if not storia:
+        g.etichetta(tela, "SCORRI →", w - 50, h - 100, g.INK, g.BIANCO, 32, "destra")
+    else:
+        g.etichetta(tela, "nerdnostalgia.store", w // 2, h - 140, g.BIANCO, g.INK, 40, "centro")
+    return tela.convert("RGB")
 
 
 def _jpeg(img: Image.Image) -> bytes:
@@ -119,10 +123,13 @@ def _didascalia(righe: List[str], articoli: List[Article], db: Session) -> str:
 
 def _carosello(nome: str, titolo: str, sottotitolo: str, articoli: List[Article], righe: List[str],
                db: Session, emoji: str = "") -> Contenuto:
-    articoli = articoli[:MAX_SLIDE - 1]
-    cover = instagram_reel.salva(_jpeg(copertina(titolo, sottotitolo, emoji_testo=emoji)),
-                                 f"{nome}-{_ora():%Y%m%d}", "jpg")
-    immagini = [cover] + [instagram.url_immagine(a, "post") for a in articoli]
+    from utils import social_grafica as g
+    articoli = articoli[:MAX_SLIDE - 2]
+    giorno = f"{_ora():%Y%m%d}"
+    cover = instagram_reel.salva(_jpeg(copertina(titolo, sottotitolo, emoji_testo=emoji, articoli=articoli)),
+                                 f"{nome}-{giorno}", "jpg")
+    fine = instagram_reel.salva(_jpeg(g.finale(instagram.POST, seme=len(articoli))), f"{nome}-{giorno}-fine", "jpg")
+    immagini = [cover] + [instagram.url_immagine(a, "post") for a in articoli] + [fine]
     return nome, articoli, _didascalia(righe, articoli, db), ("carosello", immagini)
 
 
@@ -133,7 +140,7 @@ def nuovi_della_settimana(db: Session) -> Optional[Contenuto]:
     articoli.sort(key=lambda a: float(a.price), reverse=True)
     pezzi = articoli[:instagram_reel.MAX_PEZZI]
     slide = [(copertina("Nuovi arrivi della settimana", f"{len(articoli)} pezzi appena arrivati",
-                        instagram.STORIA, "NOVITÀ"), instagram_reel.INTRO)]
+                        instagram.STORIA, "NOVITÀ", articoli=pezzi), instagram_reel.INTRO)]
     for a in pezzi:
         img = Image.open(io.BytesIO(instagram.immagine(a, "storia")))
         slide.append((img, instagram_reel.PER_PEZZO))
@@ -155,29 +162,20 @@ def indovina_il_prezzo(db: Session) -> Optional[Contenuto]:
     if not candidati:
         return None
     a, mercato = random.Random(_ora().toordinal()).choice(candidati)
-    domanda = Image.open(io.BytesIO(instagram.immagine(a, "storia")))
-    # Nella domanda il prezzo non si vede: si coprono la fascia in basso e la
-    # scritta "nuovo arrivo" in alto.
-    draw = ImageDraw.Draw(domanda)
+    from utils import social_grafica as g
     w, h = instagram.STORIA
-    draw.rectangle((0, h - 560, w, h), fill=instagram.SFONDO)
-    draw.rectangle((0, 0, w, 195), fill=instagram.SFONDO)
-    f = instagram._font(64)
-    draw.text(((w - draw.textlength("INDOVINA IL PREZZO", font=f)) / 2, 90), "INDOVINA IL PREZZO",
-              font=f, fill=instagram.ROSA)
-    for i, riga in enumerate(["QUANTO VALE?", "Scrivilo nei commenti"]):
-        f = instagram._font(84 if i == 0 else 54)
-        draw.text(((w - draw.textlength(riga, font=f)) / 2, h - 470 + i * 120), riga, font=f,
-                  fill=instagram.ROSA if i == 0 else instagram.INK)
+    base = Image.open(io.BytesIO(instagram.immagine(a, "storia", mostra_prezzo=False,
+                                                    intestazione="INDOVINA IL PREZZO"))).convert("RGBA")
+    domanda = base.copy()
+    g.pillola(domanda, "QUANTO VALE?", w // 2, 1650, 84)
     conto = []
     for n in ("3", "2", "1"):
-        img = domanda.copy()
-        d = ImageDraw.Draw(img)
-        fc = instagram._font(140)
-        d.text(((w - d.textlength(n, font=fc)) / 2, h - 260), n, font=fc, fill=instagram.ROSA)
-        conto.append((img, 1.0))
+        img = base.copy()
+        g.pillola(img, f"  {n}  ", w // 2, 1630, 120, g.LILLA_FORTE)
+        conto.append((img.convert("RGB"), 1.0))
+    domanda = domanda.convert("RGB")
     risposta = copertina(f"{mercato:.2f} €".replace(".", ","), f"il valore di mercato · da noi {instagram._prezzo(a)}",
-                         instagram.STORIA, "RISPOSTA")
+                         instagram.STORIA, "LA RISPOSTA", articoli=[a])
     slide = [(domanda, 3.0)] + conto + [(risposta, 3.5), (instagram_reel._outro(), 2.5)]
     url = instagram_reel.salva(instagram_reel.monta(slide, seme=_ora().toordinal() + 7), f"quiz-{_ora():%Y%m%d}")
     righe = ["🤔 Indovina il prezzo! Quanto vale questa carta?",
@@ -192,7 +190,7 @@ def sotto_i_5(db: Session) -> Optional[Contenuto]:
     if len(articoli) < 3:
         return None
     random.Random(_ora().toordinal()).shuffle(articoli)
-    scelti = articoli[:MAX_SLIDE - 1]
+    scelti = articoli[:MAX_SLIDE - 2]
     righe = ["💸 Sotto i 5 €: piccoli prezzi, grande nostalgia!", ""]
     righe += [f"▪️ {a.title} — {instagram._prezzo(a)}" for a in scelti]
     return _carosello("sotto5", "Sotto i 5 €", "piccoli prezzi, grande nostalgia", scelti, righe, db, "OCCASIONI")
@@ -217,9 +215,9 @@ def idee_regalo(db: Session) -> Optional[Contenuto]:
     for x in articoli:
         per_categoria.setdefault(x.category_id, []).append(x)
     scelti: List[Article] = []
-    while len(scelti) < MAX_SLIDE - 1 and any(per_categoria.values()):
+    while len(scelti) < MAX_SLIDE - 2 and any(per_categoria.values()):
         for lista in per_categoria.values():
-            if lista and len(scelti) < MAX_SLIDE - 1:
+            if lista and len(scelti) < MAX_SLIDE - 2:
                 scelti.append(lista.pop())
     fascia = f"sotto i {a_} €" if a_ is not None else f"oltre i {da} €"
     natale = _ora().month == 12 or (_ora().month == 11 and _ora().day >= 15)
@@ -284,7 +282,7 @@ def anni_fa(db: Session) -> Optional[Contenuto]:
     articoli.sort(key=lambda a: float(a.price), reverse=True)
     titolo = f"{quanti_anni} anni fa usciva {nome_it}" if quanti_anni > 0 else f"{nome_it}, uscito quest'anno"
     righe = [f"⏳ {titolo} ({anno})! Quante di queste carte avevi?", ""]
-    righe += [f"▪️ {a.title} — {instagram._prezzo(a)}" for a in articoli[:MAX_SLIDE - 1]]
+    righe += [f"▪️ {a.title} — {instagram._prezzo(a)}" for a in articoli[:MAX_SLIDE - 2]]
     return _carosello("annifa", titolo, f"il set del {anno}", articoli, righe, db, "NOSTALGIA")
 
 
@@ -351,6 +349,11 @@ def pubblica(db: Session, giorno: Optional[int] = None) -> Optional[Dict[str, ob
     media = instagram._pubblica(token, contenitore)
     instagram_stats.registra(db, media, "reel" if tipo == "reel" else "post", testo, n_items=len(articoli),
                              slot=slot_rubrica(db), rubrica=nome, article_ids=[a.id for a in articoli])
+    # Come per il post del giorno, una Storia per ogni pezzo che non l'ha
+    # ancora avuta. Non per il quiz: la Storia mostrerebbe il prezzo.
+    if nome != "quiz":
+        instagram._storie(db, token, [a for a in articoli
+                                      if not (a.article_metadata or {}).get("instagram_story")])
     LOGGER.info("Instagram: rubrica %s pubblicata (%s)", nome, media)
     return {"rubrica": nome, "media": media, "articoli": [a.id for a in articoli]}
 

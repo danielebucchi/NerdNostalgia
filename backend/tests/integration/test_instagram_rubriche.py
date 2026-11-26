@@ -52,7 +52,7 @@ def test_no_material_no_rubric_that_day(db_session, admin_user, ig):
     assert rub.prepara(db_session, giorno=0) is None              # lunedi': nessun nuovo arrivo
     assert rub.pubblica(db_session, giorno=0) is None and ig == []
     nome, articoli, testo, (tipo, media) = rub.prepara(db_session, giorno=2)
-    assert nome == "sotto5" and tipo == "carosello" and len(media) == len(articoli) + 1
+    assert nome == "sotto5" and tipo == "carosello" and len(media) == len(articoli) + 2   # copertina e finale
     assert "Commenta LISTA" in testo
 
 
@@ -82,6 +82,7 @@ def test_rare_one_is_not_repeated(db_session, admin_user, ig):
     _art(db_session, admin_user, "Costosa", 200)
     _art(db_session, admin_user, "Meno costosa", 80)
     assert rub.pubblica(db_session, giorno=6)["rubrica"] == "rara"
+    assert len([p for _, _, p in ig if p.get("media_type") == "STORIES"]) == 1       # la sua Storia
     assert db_session.query(InstagramMedia).filter_by(rubrica="rara").one().article_ids
     assert rub.prepara(db_session, giorno=6)[1][0].title == "Meno costosa"
 
