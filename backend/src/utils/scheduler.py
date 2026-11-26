@@ -211,11 +211,11 @@ def _price_guide_job():
         db.close()
 
 
-def _price_guide_vuota() -> bool:
-    from models.db import PriceGuideCard
+def _price_guide_da_rifare() -> bool:
+    from utils import price_guide
     db = SessionLocal()
     try:
-        return db.query(PriceGuideCard.id).first() is None
+        return price_guide.da_rifare(db)
     except Exception:  # noqa: BLE001 — tabella non ancora creata
         return False
     finally:
@@ -388,9 +388,10 @@ def start_scheduler() -> None:
         coalesce=True,
     )
     # Guida prezzi delle carte Pokémon (pagine pubbliche "quanto vale"):
-    # domenica alle 02:00, e la prima volta pochi minuti dopo l'avvio.
+    # domenica alle 02:00, e pochi minuti dopo l'avvio se e' vuota o fatta
+    # da una versione precedente del codice.
     # (next_run_time=None metterebbe il job in pausa: si passa solo se serve.)
-    subito = {"next_run_time": datetime.now(tz=APP_TZ) + timedelta(minutes=5)} if _price_guide_vuota() else {}
+    subito = {"next_run_time": datetime.now(tz=APP_TZ) + timedelta(minutes=5)} if _price_guide_da_rifare() else {}
     _scheduler.add_job(
         _price_guide_job,
         CronTrigger(day_of_week="sun", hour=2, minute=0),

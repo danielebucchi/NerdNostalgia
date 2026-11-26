@@ -62,10 +62,15 @@ export const getGuideSets = () => leggi<GuideSet[]>("/sets");
 export const getGuideSet = (slug: string) => leggi<GuideSetDetail>(`/sets/${encodeURIComponent(slug)}`);
 export const getGuideCard = (setSlug: string, slug: string) =>
   leggi<GuideCardDetail>(`/cards/${encodeURIComponent(setSlug)}/${encodeURIComponent(slug)}`);
-export const getGuideSitemap = () =>
-  leggi<{ sets: { slug: string; updated_at: string }[]; cards: { set_slug: string; slug: string; updated_at: string }[] }>(
-    "/sitemap",
-  );
+/** Per la sitemap: niente cache di Next.js, la risposta e' grande. */
+export async function getGuideSitemap(): Promise<{ sets: { slug: string; updated_at: string }[]; cards: [string, string][] } | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/price-guide/sitemap`, { cache: "no-store" });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Dal browser: la ricerca di "Valuta la tua carta". */
 export async function searchGuide(q: string): Promise<GuideCard[]> {

@@ -60,7 +60,7 @@ def test_public_pages_and_search(client, db_session, admin_user, fonti):
     trovate = client.get("/api/price-guide/search?q=charizard base").json()
     assert [c["name"] for c in trovate] == ["Charizard"]
     mappa = client.get("/api/price-guide/sitemap").json()
-    assert {c["slug"] for c in mappa["cards"]} == {"4-charizard", "2-blastoise"}
+    assert {slug for _, slug in mappa["cards"]} == {"4-charizard", "2-blastoise"}
 
 
 def test_buy_offer_rule(client, db_session, fonti):
@@ -75,3 +75,16 @@ def test_buy_offer_rule(client, db_session, fonti):
     assert client.get("/api/price-guide/cards/set-base/4-charizard").json()["buy_offer"] == 72.3
     SettingHelper(db=db_session).upsert("buy_offer_percent", "50")
     assert client.get("/api/price-guide/search?q=blastoise").json()[0]["buy_offer"] == 19.7   # 50% di 39,51
+
+
+def test_version_only_tells_real_variants_apart(db_session, fonti, monkeypatch):
+    from utils import cardtrader_client as ct
+    monkeypatch.setattr(ct, "blueprints_cached", lambda e: [
+        {"id": 11, "name": "Charizard", "version": "Holo Rare | 4/102", "fixed_properties": {"collector_number": "004/102"}},
+        {"id": 12, "name": "Blastoise", "version": "Holo Rare | 2/102", "fixed_properties": {"collector_number": "2"}},
+        {"id": 13, "name": "Blastoise", "version": "Shadowless", "fixed_properties": {"collector_number": "2"}}])
+    price_guide.aggiorna(db_session, pausa=0)
+    slugs = {c.blueprint_id: (c.slug, c.name_en) for c in db_session.query(PriceGuideCard)}
+    assert slugs[11] == ("4-charizard", "Charizard")
+    assert slugs[13] == ("2-blastoise-shadowless", "Blastoise (Shadowless)")
+    assert not price_guide.da_rifare(db_session)

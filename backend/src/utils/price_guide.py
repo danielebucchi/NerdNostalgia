@@ -27,6 +27,10 @@ from utils import card_names_it
 LOGGER = logging.getLogger("price_guide")
 
 PAUSA = 1.0     # fra un'espansione e l'altra: CardTrader e TCGdex hanno limiti
+# Cambia quando cambia il modo di costruire i dati (nomi, indirizzi): al
+# riavvio il server rifa' la guida senza aspettare la domenica.
+VERSIONE = "2"
+CHIAVE_VERSIONE = "price_guide_version"
 
 
 def slug(testo: str) -> str:
@@ -85,25 +89,37 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
     carte_en = {(c.get("localId") or "").lstrip("0") or c.get("localId"): c for c in en.get("cards") or []}
     nomi_it = {(c.get("localId") or "").lstrip("0") or c.get("localId"): c.get("name") for c in it.get("cards") or []}
     esistenti = {c.blueprint_id: c for c in db.query(PriceGuideCard).filter(PriceGuideCard.set_id == riga.id)}
-    slug_usati = {c.slug for c in esistenti.values()}
+    blueprint = [bp for bp in ct.blueprints_cached(espansione["id"]) if _numero(bp.get("fixed_properties"))]
+    # Per i Pokémon CardTrader mette nella "versione" rarita' e numero
+    # ("Holo Rare | 4/102"): conta solo se due carte del set hanno lo stesso
+    # numero (varianti vere), e allora distingue nome e indirizzo.
+    per_numero: Dict[str, int] = {}
+    for bp in blueprint:
+        per_numero[_numero(bp["fixed_properties"])] = per_numero.get(_numero(bp["fixed_properties"]), 0) + 1
+    # Gli indirizzi si ricalcolano ogni volta: prima nomi provvisori, cosi'
+    # lo scambio di due indirizzi non urta il vincolo di unicita'.
+    for c in esistenti.values():
+        c.slug = f"tmp-{c.blueprint_id}"
+    db.flush()
+    slug_usati: set = set()
     salvate = 0
-    for bp in ct.blueprints_cached(espansione["id"]):
+    for bp in sorted(blueprint, key=lambda b: b["id"]):
         numero = _numero(bp.get("fixed_properties"))
-        if not numero:
-            continue                                  # busta, mazzo, box: non e' una carta
         tcg = carte_en.get(numero) or {}
+        variante = bp.get("version") if per_numero[numero] > 1 else None
+        nome = nomi_it.get(numero) or tcg.get("name") or bp.get("name") or ""
+        base = slug(f"{numero}-{nome}" + (f"-{variante}" if variante else ""))
+        proposto = base if base not in slug_usati else f"{base}-{bp['id']}"
+        slug_usati.add(proposto)
         carta = esistenti.get(bp["id"])
         if carta is None:
-            nome = nomi_it.get(numero) or tcg.get("name") or bp.get("name") or ""
-            base = slug(f"{numero}-{nome}" + (f"-{bp['version']}" if bp.get("version") else ""))
-            proposto = base if base not in slug_usati else f"{base}-{bp['id']}"
-            slug_usati.add(proposto)
-            carta = PriceGuideCard(set_id=riga.id, blueprint_id=bp["id"], slug=proposto)
+            carta = PriceGuideCard(set_id=riga.id, blueprint_id=bp["id"])
             db.add(carta)
+        carta.slug = proposto
         carta.number = numero
         carta.name_en = (tcg.get("name") or bp.get("name") or "")[:200]
-        if bp.get("version"):
-            carta.name_en = f"{carta.name_en} ({bp['version']})"[:200]
+        if variante:
+            carta.name_en = f"{carta.name_en} ({variante})"[:200]
         carta.name_it = nomi_it.get(numero)
         carta.image_url = f"{tcg['image']}/high.webp" if tcg.get("image") else None
         minimo, offerte = prezzi.get(bp["id"], (None, 0))
@@ -140,7 +156,10 @@ def aggiorna(db: Session, pausa: float = PAUSA, limite: Optional[int] = None) ->
             break
         if pausa:
             time.sleep(pausa)
-    LOGGER.info("Guida prezzi: %d set, %d carte, %d errori", fatti, carte, errori)
+    if fatti:
+        from helpers.setting import SettingHelper
+        SettingHelper(db=db).upsert(CHIAVE_VERSIONE, VERSIONE)
+    LOGGER.warning("Guida prezzi: %d set, %d carte, %d errori", fatti, carte, errori)
     return {"set": fatti, "carte": carte, "errori": errori}
 
 
@@ -169,6 +188,13 @@ def offerta(centesimi: Optional[int], regola: tuple) -> Optional[float]:
     if valore <= soglia:
         return round(fissa, 2)
     return int(valore * percentuale / 100 * 10) / 10
+
+
+def da_rifare(db: Session) -> bool:
+    """Vuota, o costruita da una versione precedente del codice."""
+    from helpers.setting import SettingHelper
+    vuota = db.query(PriceGuideCard.id).first() is None
+    return vuota or SettingHelper(db=db).get_value(CHIAVE_VERSIONE, default="") != VERSIONE
 
 
 def euro(centesimi: Optional[int]) -> Optional[float]:

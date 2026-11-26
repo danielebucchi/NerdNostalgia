@@ -92,13 +92,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // sitemap ne regge 50.000).
   const guideEntries: MetadataRoute.Sitemap = [];
   const guida = await getGuideSitemap();
+  const dataSet = new Map<string, Date>();
   for (const s of guida?.sets ?? []) {
+    dataSet.set(s.slug, new Date(s.updated_at));
     guideEntries.push({ url: `${SITE_URL}/prezzi-carte-pokemon/${s.slug}`, lastModified: new Date(s.updated_at),
       changeFrequency: "weekly", priority: 0.6 });
   }
-  for (const c of guida?.cards ?? []) {
-    guideEntries.push({ url: `${SITE_URL}/prezzi-carte-pokemon/${c.set_slug}/${c.slug}`,
-      lastModified: new Date(c.updated_at), changeFrequency: "weekly", priority: 0.5 });
+  for (const [setSlug, slug] of guida?.cards ?? []) {
+    guideEntries.push({ url: `${SITE_URL}/prezzi-carte-pokemon/${setSlug}/${slug}`,
+      lastModified: dataSet.get(setSlug) ?? now, changeFrequency: "weekly", priority: 0.5 });
   }
 
   return [...staticPages, ...articleEntries, ...wantedEntries, ...guideEntries];

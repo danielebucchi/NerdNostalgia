@@ -100,10 +100,12 @@ def sitemap(db: Session = Depends(get_db)):
     carte = (db.query(PriceGuideCard.set_id, PriceGuideCard.slug, PriceGuideCard.updated_at)
              .filter(PriceGuideCard.min_price_cents.isnot(None)).all())
     con_carte = {set_id for set_id, _, _ in carte}
+    # Compatta: con ventimila carte ogni byte conta (la cache di Next.js
+    # rifiuta le risposte sopra i 2 MB). La data e' quella del set.
     return JSONResponse({
-        "sets": [{"slug": s.slug, "updated_at": s.updated_at.isoformat()} for i, s in sets_.items() if i in con_carte],
-        "cards": [{"set_slug": sets_[set_id].slug, "slug": slug_, "updated_at": quando.isoformat()}
-                  for set_id, slug_, quando in carte if set_id in sets_],
+        "sets": [{"slug": s.slug, "updated_at": s.updated_at.date().isoformat()}
+                 for i, s in sets_.items() if i in con_carte],
+        "cards": [[sets_[set_id].slug, slug_] for set_id, slug_, _ in carte if set_id in sets_],
     }, headers=CACHE)
 
 
