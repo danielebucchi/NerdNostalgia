@@ -3,7 +3,7 @@ API endpoint per gli articoli.
 """
 import logging
 from decimal import ROUND_HALF_UP, Decimal
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
@@ -292,6 +292,11 @@ def list_articles(
         description="Includi gli articoli prenotati da un ordine in attesa "
                     "(serve all'admin; il catalogo pubblico li nasconde).",
     ),
+    unlinked: Optional[Literal["all", "vinted", "ebay", "cardtrader"]] = Query(
+        None,
+        description="Solo gli articoli NON collegati a quel marketplace; "
+                    "'all' = non collegati a nessuno dei tre (Vinted, eBay, CardTrader).",
+    ),
     article_helper: ArticleHelper = Depends(get_article_helper),
     category_helper: CategoryHelper = Depends(get_category_helper),
 ):
@@ -315,6 +320,7 @@ def list_articles(
         max_price=max_price,
         search=search,
         include_reserved=include_reserved,
+        unlinked=unlinked,
     )
 
     return ArticleListResponse(

@@ -15,6 +15,16 @@ import type { Article, ArticleListResponse } from "@/lib/types";
 
 const STATUS_OPTIONS = ["", "DRAFT", "PUBLISHED", "SOLD", "ARCHIVED"] as const;
 
+// Filtro "non collegati": gli articoli che mancano su un marketplace (o su
+// tutti e tre), per sapere cosa resta da mettere in vendita altrove.
+const UNLINKED_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "Tutti" },
+  { value: "all", label: "Su nessun marketplace" },
+  { value: "vinted", label: "Senza Vinted" },
+  { value: "ebay", label: "Senza eBay" },
+  { value: "cardtrader", label: "Senza CardTrader" },
+];
+
 const STATUS_CHIP: Record<string, string> = {
   DRAFT: "chip-lilac",
   PUBLISHED: "chip-mint",
@@ -26,11 +36,38 @@ function ArticlesListContent() {
   const search = useSearchParams();
   const [status, setStatus] = useState<string>(search.get("status") ?? "");
   const [query, setQuery] = useState<string>(search.get("search") ?? "");
+  const [unlinked, setUnlinked] = useState<string>(search.get("unlinked") ?? "");
   const [debouncedQuery, setDebouncedQuery] = useState<string>(query);
   const [items, setItems] = useState<Article[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // I filtri della lista, da `skip` in poi (le pagine sono da 100).
+  function filtri(skip: number): URLSearchParams {
+    const qs = new URLSearchParams({ limit: "100", skip: String(skip), include_reserved: "true" });
+    if (status) qs.set("status", status);
+    if (debouncedQuery) qs.set("search", debouncedQuery);
+    if (unlinked) qs.set("unlinked", unlinked);
+    return qs;
+  }
+
+  const [loadingMore, setLoadingMore] = useState(false);
+  async function caricaAltri() {
+    setLoadingMore(true);
+    try {
+      const data = await adminApi.get<ArticleListResponse>(`/api/articles/?${filtri(items.length)}`);
+      setItems((curr) => {
+        const visti = new Set(curr.map((a) => a.id));
+        return [...curr, ...data.items.filter((a) => !visti.has(a.id))];
+      });
+      setTotal(data.total);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   // Debounce della query (300ms)
   useEffect(() => {
@@ -54,10 +91,7 @@ function ArticlesListContent() {
         // include_reserved: in admin devono comparire anche i pezzi
         // impegnati da un ordine in attesa, altrimenti spariscono proprio
         // quando serve guardarli per confermare o annullare.
-        const qs = new URLSearchParams({ limit: "100", include_reserved: "true" });
-        if (status) qs.set("status", status);
-        if (debouncedQuery) qs.set("search", debouncedQuery);
-        const data = await adminApi.get<ArticleListResponse>(`/api/articles/?${qs}`);
+        const data = await adminApi.get<ArticleListResponse>(`/api/articles/?${filtri(0)}`);
         if (!cancelled) {
           setItems(data.items);
           setTotal(data.total);
@@ -71,7 +105,7 @@ function ArticlesListContent() {
     return () => {
       cancelled = true;
     };
-  }, [status, debouncedQuery, reloadBump]);
+  }, [status, debouncedQuery, unlinked, reloadBump]);
 
   // Filtro ulteriore client-side sui campi che il backend non cerca
   // (brand, model, sku, category name): l'utente può digitare anche queste.
@@ -110,7 +144,7 @@ function ArticlesListContent() {
     const perId = new Map([...items, ...extraFiltered].map((a) => [a.id, a]));
     return [...perId.values()].filter((a) => scelti.has(a.id));
   }, [items, extraFiltered, scelti]);
-  const reorderEnabled = !debouncedQuery && !status && !seleziona;
+  const reorderEnabled = !debouncedQuery && !status && !unlinked && !seleziona;
   function scegli(id: number, si: boolean) {
     setScelti((s) => {
       const n = new Set(s);
@@ -248,6 +282,26 @@ function ArticlesListContent() {
         ))}
       </div>
 
+      <div className="flex gap-2 mb-6 -mt-3 flex-wrap items-center">
+        <span className="text-xs text-ink-soft font-semibold">Marketplace:</span>
+        {UNLINKED_OPTIONS.map((o) => (
+          <button
+            key={o.value || "all-links"}
+            type="button"
+            onClick={() => setUnlinked(o.value)}
+            className={`chip cursor-pointer ${unlinked === o.value ? "chip-pink" : ""}`}
+          >
+            {o.label}
+          </button>
+        ))}
+        {unlinked && !loading && (
+          <span className="text-xs text-ink-soft">
+            {total} articol{total === 1 ? "o" : "i"}
+            {total > items.length ? ` (ne vedi ${items.length})` : ""}
+          </span>
+        )}
+      </div>
+
       {error && <p className="text-pink-deep">⚠ {error}</p>}
       {loading && <p className="text-ink-soft">Caricamento…</p>}
 
@@ -325,6 +379,14 @@ function ArticlesListContent() {
         </div>
       )}
 
+      {!loading && items.length < total && (
+        <div className="text-center mt-6">
+          <button type="button" className="btn btn-ghost text-sm" disabled={loadingMore} onClick={caricaAltri}>
+            {loadingMore ? "Caricamento…" : `Carica altri (${items.length} di ${total})`}
+          </button>
+        </div>
+      )}
+
       {snackbar}
 
       <style>{`
@@ -383,8 +445,9 @@ function ArticleRow({
           {a.sku ? ` · ${a.sku}` : ""}
         </p>
       </div>
-      {(a.ebay_status === "LISTED" || a.cardtrader_product_id) && (
+      {(a.ebay_status === "LISTED" || a.cardtrader_product_id || a.vinted_url) && (
         <span className="hidden sm:inline-flex gap-1 text-[10px] font-semibold">
+          {a.vinted_url && <span className="chip chip-sky" title="Collegato a Vinted">Vinted</span>}
           {a.ebay_status === "LISTED" && <span className="chip chip-sky" title="In vendita su eBay">eBay</span>}
           {a.cardtrader_product_id && <span className="chip chip-sky" title="In vendita su CardTrader">CT</span>}
         </span>

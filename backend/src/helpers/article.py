@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import List, Optional, Tuple
 
 from fastapi import Depends
-from sqlalchemy import asc, desc, func, or_
+from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from helpers import BaseHelper
@@ -27,6 +27,32 @@ def vinted_item_id_from_url(url: Optional[str]) -> Optional[int]:
     """https://www.vinted.it/items/5123456789-spearow-61 → 5123456789."""
     m = re.search(r"/items/(\d+)", url or "")
     return int(m.group(1)) if m else None
+
+
+MARKETPLACE = ("vinted", "ebay", "cardtrader")
+
+
+def _collegato_a(unlinked: str) -> list:
+    """Le condizioni "l'articolo e' collegato a ..." per il filtro `unlinked`:
+    "vinted", "ebay", "cardtrader" o "all" (tutti e tre: l'articolo non e' su
+    nessun marketplace). Per le carte dello scanner l'inserzione eBay o
+    CardTrader puo' stare sulla carta della collezione collegata."""
+    from models.db import PersonalCard
+    piattaforme = MARKETPLACE if unlinked == "all" else (unlinked,)
+    condizioni = []
+    if "vinted" in piattaforme:
+        condizioni += [Article.vinted_item_id.isnot(None),
+                       func.coalesce(Article.vinted_url, "") != ""]
+    if "ebay" in piattaforme:
+        condizioni += [func.coalesce(Article.ebay_listing_id, "") != "",
+                       func.coalesce(Article.ebay_url, "") != "",
+                       Article.id.in_(select(PersonalCard.article_id).where(
+                           func.coalesce(PersonalCard.ebay_listing_id, "") != ""))]
+    if "cardtrader" in piattaforme:
+        condizioni += [Article.cardtrader_product_id.isnot(None),
+                       Article.id.in_(select(PersonalCard.article_id).where(
+                           PersonalCard.cardtrader_product_id.isnot(None)))]
+    return condizioni
 
 
 class ArticleHelper(BaseHelper):
@@ -52,6 +78,7 @@ class ArticleHelper(BaseHelper):
         max_price: Optional[Decimal] = None,
         search: Optional[str] = None,
         include_reserved: bool = False,
+        unlinked: Optional[str] = None,
     ) -> Tuple[List[Article], int]:
         query = self.db.query(Article)
 
@@ -79,6 +106,9 @@ class ArticleHelper(BaseHelper):
                 Article.title.ilike(pattern)
                 | Article.description.ilike(pattern)
             )
+
+        if unlinked:
+            query = query.filter(~or_(*_collegato_a(unlinked)))
 
         total = query.count()
         items = (

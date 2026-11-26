@@ -166,3 +166,33 @@ def test_bulk_markup_requires_admin(client):
     r = client.post("/api/articles/bulk-markup", json={"percent": 3.5})
     assert r.status_code == 401
 
+
+
+def test_filter_articles_not_linked_to_marketplaces(client, db_session, admin_user):
+    from models.db import Article, ArticleCondition, ArticleStatus, PersonalCard
+
+    def art(titolo, **kw):
+        a = Article(user_id=admin_user.id, title=titolo, price=5, condition=ArticleCondition.USED,
+                    status=ArticleStatus.PUBLISHED, quantity=1, **kw)
+        db_session.add(a)
+        db_session.commit()
+        return a
+
+    nessuno = art("Nessuno")
+    vinted = art("Vinted", vinted_url="https://www.vinted.it/items/123-x", vinted_item_id=123)
+    ebay = art("eBay", ebay_listing_id="1234567890")
+    ct = art("CardTrader", cardtrader_product_id=99)
+    carta_ebay = art("Carta su eBay")
+    db_session.add(PersonalCard(name="Pikachu", article_id=carta_ebay.id, ebay_listing_id="555"))
+    db_session.commit()
+
+    def titoli(filtro):
+        r = client.get(f"/api/articles/?limit=100&unlinked={filtro}")
+        assert r.status_code == 200
+        return {a["title"] for a in r.json()["items"]}
+
+    assert titoli("all") == {"Nessuno"}
+    assert titoli("vinted") == {"Nessuno", "eBay", "CardTrader", "Carta su eBay"}
+    assert titoli("ebay") == {"Nessuno", "Vinted", "CardTrader"}
+    assert titoli("cardtrader") == {"Nessuno", "Vinted", "eBay", "Carta su eBay"}
+    assert client.get("/api/articles/?unlinked=boh").status_code == 422
