@@ -129,3 +129,16 @@ def test_no_news_posts_one_older_article_going_back(db_session, admin_user, ig):
     assert "ancora disponibile" in [p for _, _, p in ig if "caption" in p][0]["caption"]
     assert instagram.pubblica_carosello(db_session)["articoli"] == [antico.id]
     assert instagram.pubblica_carosello(db_session) is None          # catalogo tutto passato
+
+
+def test_every_article_of_the_post_gets_a_story_once(db_session, admin_user, ig):
+    from helpers.setting import SettingHelper
+    SettingHelper(db=db_session).upsert("instagram_story_min_price", "100")    # nessuna per soglia
+    gia = _articolo(db_session, admin_user, "Gia' con Storia", prezzo=150)
+    instagram.pubblica_storie(db_session)
+    for i in range(3):
+        _articolo(db_session, admin_user, f"Carta {i}", prezzo=2)
+    ig.clear()
+    instagram.pubblica_carosello(db_session)
+    storie = [p["image_url"] for _, _, p in ig if p.get("media_type") == "STORIES"]
+    assert len(storie) == 3 and not any(f"/{gia.id}/" in u for u in storie)

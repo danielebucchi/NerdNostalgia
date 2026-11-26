@@ -6,8 +6,10 @@ Instagram: i nuovi arrivi pubblicati in automatico.
   post solo. Nei giorni senza novita' esce un articolo gia' in catalogo mai
   passato da Instagram, dal piu' recente andando indietro: il profilo resta
   vivo e, un giorno alla volta, il catalogo ci passa tutto.
-- Una Storia per ogni articolo da almeno `instagram_story_min_price` euro,
-  al massimo MAX_STORIE_GIORNO al giorno.
+- Una Storia per ogni articolo del post del giorno, e durante la giornata
+  per ogni nuovo articolo da almeno `instagram_story_min_price` euro (questi
+  al massimo MAX_STORIE_GIORNO al giorno). Mai due Storie per lo stesso
+  articolo.
 
 Configurazione: INSTAGRAM_USER_ID (l'id dell'account Instagram) e
 INSTAGRAM_ACCESS_TOKEN (env, dal vault di garganacl) e la spunta
@@ -399,6 +401,9 @@ def pubblica_carosello(db: Session) -> Optional[Dict[str, object]]:
     for a in articoli:
         _segna(db, a, "instagram_carousel", media)
     db.commit()
+    # Una Storia per ogni articolo del post, se non l'ha gia' avuta: fuori
+    # dal tetto giornaliero, il post ne ha al massimo MAX_CAROSELLO.
+    _storie(db, token, [a for a in articoli if not (a.article_metadata or {}).get("instagram_story")])
     LOGGER.info("Instagram: %s %s con %d articoli", "ripescato" if ripescato else "carosello",
                 media, len(articoli))
     return {"media": media, "articoli": [a.id for a in articoli], "ripescato": ripescato}
@@ -408,9 +413,12 @@ def pubblica_storie(db: Session) -> List[str]:
     """Le Storie dei pezzi sopra soglia non ancora annunciati."""
     if not acceso(db):
         return []
-    token = _token(db)
+    return _storie(db, _token(db), da_storie(db))
+
+
+def _storie(db: Session, token: str, articoli: List[Article]) -> List[str]:
     fatte = []
-    for a in da_storie(db):
+    for a in articoli:
         try:
             media = _pubblica(token, _contenitore(token, media_type="STORIES",
                                                   image_url=url_immagine(a, "storia")))
