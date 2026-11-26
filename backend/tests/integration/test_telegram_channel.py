@@ -58,3 +58,30 @@ def test_topic_of_a_group_with_topics(monkeypatch):
     assert "message_thread_id" not in telegram_channel.payload("ciao")
     monkeypatch.setenv("TELEGRAM_TOPIC_ID", "42")
     assert telegram_channel.payload("ciao")["message_thread_id"] == 42
+
+
+def test_no_news_today_two_older_articles_a_day(db_session, admin_user, canale):
+    from datetime import datetime, timedelta
+    vecchio = _articolo(db_session, admin_user, "Vecchio")
+    vecchio.published_at = datetime.utcnow() - timedelta(days=30)
+    recente = _articolo(db_session, admin_user, "Recente")
+    recente.published_at = datetime.utcnow() - timedelta(days=5)
+    db_session.commit()
+    assert telegram_channel.ripesca(db_session) == recente.id
+    assert telegram_channel.ripesca(db_session) == vecchio.id
+    assert "Ancora disponibile" in canale[0] and "Recente" in canale[0]
+    assert telegram_channel.ripesca(db_session) is None              # tutti postati da poco
+    # Postato 70 giorni fa: si puo' riproporre.
+    meta = dict(vecchio.article_metadata)
+    meta["telegram_posted_at"] = (datetime.now() - timedelta(days=70)).isoformat(timespec="seconds")
+    vecchio.article_metadata = meta
+    db_session.commit()
+    assert telegram_channel.ripesca(db_session) == vecchio.id
+
+
+def test_no_fishing_on_days_with_new_arrivals(db_session, admin_user, canale):
+    vecchio = _articolo(db_session, admin_user, "Vecchio")
+    nuovo = _articolo(db_session, admin_user, "Nuovo")
+    category_alerts.notify_new_article(db_session, nuovo)
+    assert telegram_channel.ripesca(db_session) is None
+    assert len(canale) == 1 and vecchio.id

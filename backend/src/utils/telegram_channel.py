@@ -13,7 +13,10 @@ al link di un messaggio dell'argomento (t.me/gruppo/<id>/...). Vuoto = la
 chat principale.
 
 Un articolo si annuncia una volta sola (article_metadata.telegram_posted),
-anche se torna pubblicato. Al massimo MAX_ORA messaggi l'ora: una sync
+anche se torna pubblicato. Nei giorni senza novita' `ripesca` (alle 13 e
+alle 20) posta un articolo gia' in catalogo, "ancora disponibile": prima
+quelli mai passati da Telegram, dal piu' recente; finiti quelli, quelli
+postati da piu' tempo (mai prima di RIPOSTA_DOPO). Al massimo MAX_ORA messaggi l'ora: una sync
 Vinted con tanti articoli nuovi non deve intasare il canale. L'invio va in
 un thread: la pubblicazione non aspetta Telegram.
 """
@@ -22,6 +25,8 @@ import os
 import threading
 import time
 from collections import deque
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from html import escape
 from typing import Optional
 
@@ -30,6 +35,13 @@ import requests
 LOGGER = logging.getLogger("telegram_channel")
 
 MAX_ORA = 20
+RIPOSTA_DOPO = timedelta(days=60)
+CHIAVE_NOVITA_OGGI = "telegram_new_day"
+ROMA = ZoneInfo("Europe/Rome")
+
+
+def _adesso() -> datetime:
+    return datetime.now(ROMA).replace(tzinfo=None)
 TIMEOUT = 10
 _inviati: deque = deque()
 _lock = threading.Lock()
@@ -55,8 +67,9 @@ def _posto_libero() -> bool:
         return True
 
 
-def testo(titolo: str, prezzo: float, link: str, categoria: Optional[str]) -> str:
-    righe = [f"🆕 <b>{escape(titolo)}</b>", f"💶 {prezzo:.2f} €".replace(".", ",")]
+def testo(titolo: str, prezzo: float, link: str, categoria: Optional[str], ripescato: bool = False) -> str:
+    righe = [f"{'✨ Ancora disponibile: ' if ripescato else '🆕 '}<b>{escape(titolo)}</b>",
+             f"💶 {prezzo:.2f} €".replace(".", ",")]
     if categoria:
         righe.append(f"🏷 {escape(categoria)}")
     righe.append(f'👉 <a href="{escape(link)}">Vedi sul sito</a>')
@@ -94,12 +107,64 @@ def annuncia(db, article) -> bool:
     if not _posto_libero():
         LOGGER.info("Canale Telegram: tetto di %d annunci l'ora, articolo %s saltato", MAX_ORA, article.id)
         return False
+    meta["telegram_posted"] = True
+    meta["telegram_posted_at"] = _adesso().isoformat(timespec="seconds")
+    article.article_metadata = meta
+    db.commit()
+    _segna_novita_oggi(db)
+    threading.Thread(target=_invia, args=(_messaggio(article),), daemon=True).start()
+    return True
+
+
+def _messaggio(article, ripescato: bool = False) -> str:
     cat = article.category
     categoria = (f"{cat.parent.name} › {cat.name}" if cat is not None and cat.parent_id and cat.parent
                  else (cat.name if cat is not None else None))
-    messaggio = testo(article.title, float(article.price or 0), f"{_site_url()}/articles/{article.id}", categoria)
+    return testo(article.title, float(article.price or 0), f"{_site_url()}/articles/{article.id}",
+                 categoria, ripescato)
+
+
+def _segna_novita_oggi(db) -> None:
+    from helpers.setting import SettingHelper
+    SettingHelper(db=db).upsert(CHIAVE_NOVITA_OGGI, _adesso().date().isoformat())
+
+
+def da_ripescare(db):
+    """L'articolo in vendita da riproporre: mai passato da Telegram (dal piu'
+    recente), altrimenti quello postato da piu' tempo, se oltre RIPOSTA_DOPO."""
+    from models.db import Article, ArticleStatus
+    articoli = (db.query(Article)
+                .filter(Article.status == ArticleStatus.PUBLISHED,
+                        Article.reserved_order_id.is_(None),
+                        Article.quantity > 0,
+                        Article.price > 0)
+                .order_by(Article.published_at.desc(), Article.id.desc())
+                .all())
+    mai = [a for a in articoli if not (a.article_metadata or {}).get("telegram_posted")]
+    if mai:
+        return mai[0]
+    limite = (_adesso() - RIPOSTA_DOPO).isoformat(timespec="seconds")
+    postati = [(((a.article_metadata or {}).get("telegram_posted_at") or ""), a) for a in articoli]
+    postati = [(quando, a) for quando, a in postati if quando < limite]
+    return min(postati, key=lambda qa: qa[0])[1] if postati else None
+
+
+def ripesca(db) -> Optional[int]:
+    """Il giro delle 13 e delle 20: se oggi non e' uscito nessun nuovo arrivo,
+    riproponi un articolo del catalogo. Torna l'id dell'articolo postato."""
+    from helpers.setting import SettingHelper
+    if not configurato():
+        return None
+    if SettingHelper(db=db).get_value(CHIAVE_NOVITA_OGGI, default="") == _adesso().date().isoformat():
+        return None
+    article = da_ripescare(db)
+    if article is None:
+        return None
+    meta = dict(article.article_metadata or {})
     meta["telegram_posted"] = True
+    meta["telegram_posted_at"] = _adesso().isoformat(timespec="seconds")
     article.article_metadata = meta
     db.commit()
-    threading.Thread(target=_invia, args=(messaggio,), daemon=True).start()
-    return True
+    _invia(_messaggio(article, ripescato=True))
+    LOGGER.info("Telegram: ripescato l'articolo %s", article.id)
+    return article.id

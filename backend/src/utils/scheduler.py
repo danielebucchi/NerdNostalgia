@@ -171,6 +171,17 @@ def _instagram_token_job():
         db.close()
 
 
+def _telegram_ripesca_job():
+    from utils import telegram_channel
+    db = SessionLocal()
+    try:
+        telegram_channel.ripesca(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Telegram, ripescaggio fallito: %s", exc)
+    finally:
+        db.close()
+
+
 def _italian_names_job():
     """Nomi italiani alle carte che non li hanno (e titoli del sito)."""
     from utils.card_listing import aggiorna_nomi_italiani
@@ -314,6 +325,16 @@ def start_scheduler() -> None:
         _instagram_token_job,
         CronTrigger(day_of_week="mon", hour=5, minute=0),
         id="instagram_token",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    # Telegram: nei giorni senza nuovi arrivi, alle 13 e alle 20 un articolo
+    # dal catalogo in "Nuovi Arrivi" (telegram_channel.ripesca).
+    _scheduler.add_job(
+        _telegram_ripesca_job,
+        CronTrigger(hour="13,20", minute=0),
+        id="telegram_ripesca",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
