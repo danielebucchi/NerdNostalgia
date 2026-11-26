@@ -84,12 +84,14 @@ def _hashtag_di(testo: Optional[str]) -> List[str]:
 # ---------------------------------------------------------------------------
 
 def registra(db: Session, media_id: str, kind: str, testo: str = "", n_items: int = 1,
-             fallback: bool = False, slot: Optional[str] = None) -> None:
+             fallback: bool = False, slot: Optional[str] = None, rubrica: Optional[str] = None,
+             article_ids: Iterable[int] = ()) -> None:
     """Annota un contenuto appena pubblicato: le statistiche arrivano dopo."""
     if db.get(InstagramMedia, media_id) is not None:
         return
     db.add(InstagramMedia(media_id=media_id, kind=kind, published_at=datetime.now(ROMA).replace(tzinfo=None),
-                          slot=slot, n_items=n_items, fallback=fallback,
+                          slot=slot, n_items=n_items, fallback=fallback, rubrica=rubrica,
+                          article_ids=" ".join(str(i) for i in article_ids),
                           hashtags=" ".join(_hashtag_di(testo))))
     db.commit()
 

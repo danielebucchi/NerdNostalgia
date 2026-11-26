@@ -411,7 +411,8 @@ def pubblica_carosello(db: Session, slot: Optional[str] = None) -> Optional[Dict
         _segna(db, a, "instagram_carousel", media)
     db.commit()
     from utils import instagram_stats
-    instagram_stats.registra(db, media, "post", testo, n_items=len(articoli), fallback=ripescato, slot=slot)
+    instagram_stats.registra(db, media, "post", testo, n_items=len(articoli), fallback=ripescato, slot=slot,
+                             article_ids=[a.id for a in articoli])
     # Una Storia per ogni articolo del post, se non l'ha gia' avuta: fuori
     # dal tetto giornaliero, il post ne ha al massimo MAX_CAROSELLO.
     _storie(db, token, [a for a in articoli if not (a.article_metadata or {}).get("instagram_story")])

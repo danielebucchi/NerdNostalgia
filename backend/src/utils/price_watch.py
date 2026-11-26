@@ -49,6 +49,8 @@ def run(db: Session, pausa: float = PAUSA) -> Dict[str, object]:
     carte = da_rivalutare(db)
     for card in carte:
         prima = float(card.list_price or card.estimated_value or 0)
+        mercato_prima = float(card.estimated_value or 0)
+        valutata_il = card.prices_updated_at
         try:
             cp.price_card(card)
             db.commit()
@@ -58,6 +60,15 @@ def run(db: Session, pausa: float = PAUSA) -> Dict[str, object]:
             LOGGER.warning("Rivalutazione carta %s fallita: %s", card.id, exc)
             continue
         dopo = float(card.estimated_value or 0)
+        if dopo > 0:
+            from models.db import CardPriceHistory
+            if (mercato_prima > 0 and valutata_il
+                    and not db.query(CardPriceHistory).filter_by(card_id=card.id).first()):
+                # La prima volta si salva anche il valore di prima: da subito
+                # c'e' un confronto (le carte salite, rubrica del venerdi').
+                db.add(CardPriceHistory(card_id=card.id, value=mercato_prima, recorded_at=valutata_il))
+            db.add(CardPriceHistory(card_id=card.id, value=dopo, recorded_at=datetime.now()))
+            db.commit()
         if prima > 0 and dopo > 0 and abs(dopo - prima) >= MINIMO_EURO and abs(dopo - prima) / prima >= SOGLIA:
             segnalate.append({"card_id": card.id, "nome": cl.nome_vetrina(card),
                               "prezzo": prima, "suggerito": dopo})

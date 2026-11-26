@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from helpers.auth import require_admin
 from models.db import Article, ArticleStatus, User
-from utils import instagram, instagram_reel, instagram_stats
+from utils import instagram, instagram_reel, instagram_rubriche, instagram_stats
 from utils.session import get_db
 
 router = APIRouter(prefix="/api/social", tags=["social"])
@@ -78,10 +78,25 @@ def reel_preview(payload: ReelRequest, db: Session = Depends(get_db), _admin: Us
     return esito
 
 
+@router.get("/instagram/rubrica")
+def rubrica_preview(day: Optional[int] = None, db: Session = Depends(get_db),
+                    _admin: User = Depends(require_admin)):
+    """La rubrica di oggi (o del giorno 0-6, lunedi' = 0) senza pubblicarla:
+    nome, articoli, didascalia e immagini o video."""
+    contenuto = instagram_rubriche.prepara(db, day)
+    if contenuto is None:
+        raise HTTPException(status_code=404, detail="Nessuna rubrica ha materiale oggi.")
+    nome, articoli, testo, (tipo, media) = contenuto
+    return {"rubrica": nome, "type": tipo, "media": media, "caption": testo,
+            "articles": [_voce(a, "post") for a in articoli],
+            "slot": instagram_rubriche.slot_rubrica(db)}
+
+
 class RunRequest(BaseModel):
-    what: Literal["carousel", "stories", "reel"]
+    what: Literal["carousel", "stories", "reel", "rubrica", "comments"]
     year: Optional[int] = None
     month: Optional[int] = None
+    day: Optional[int] = None
 
 
 @router.post("/instagram/run")
@@ -91,6 +106,10 @@ def run(payload: RunRequest, db: Session = Depends(get_db), _admin: User = Depen
     try:
         if payload.what == "carousel":
             return {"carousel": instagram.pubblica_carosello(db)}
+        if payload.what == "rubrica":
+            return {"rubrica": instagram_rubriche.pubblica(db, payload.day)}
+        if payload.what == "comments":
+            return {"replies": instagram_rubriche.rispondi_ai_commenti(db)}
         if payload.what == "reel":
             return {"reel": instagram_reel.pubblica(db, payload.year, payload.month, forza=True)}
         return {"stories": instagram.pubblica_storie(db)}

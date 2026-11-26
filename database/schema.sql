@@ -658,9 +658,27 @@ CREATE TABLE IF NOT EXISTS instagram_media (
     saved INTEGER,
     shares INTEGER,
     interactions INTEGER,
-    insights_at TIMESTAMP
+    insights_at TIMESTAMP,
+    article_ids TEXT NOT NULL DEFAULT '',
+    rubrica VARCHAR(20)
 );
 CREATE INDEX IF NOT EXISTS idx_instagram_media_published ON instagram_media(published_at);
+
+-- ============================================================
+-- instagram_replies, card_price_history (rubriche Instagram, vedi 0039)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS instagram_replies (
+    comment_id VARCHAR(40) PRIMARY KEY,
+    media_id VARCHAR(40) NOT NULL,
+    replied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS card_price_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id INTEGER NOT NULL REFERENCES personal_cards(id) ON DELETE CASCADE,
+    value NUMERIC(10, 2) NOT NULL,
+    recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_card_price_history_card ON card_price_history(card_id, recorded_at);
 
 -- ============================================================
 -- reviews: recensioni del venditore, una per ordine (vedi 0024)

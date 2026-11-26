@@ -103,12 +103,30 @@ def _newsletter_job():
 
 
 def _instagram_carousel_job(slot: str):
-    from utils import instagram
+    """Ogni fascia oraria: il post del giorno e la rubrica, ciascuno solo se
+    e' la sua fascia di oggi."""
+    from utils import instagram, instagram_rubriche
     db = SessionLocal()
     try:
         instagram.post_del_giorno(db, slot)
     except Exception as exc:  # noqa: BLE001
         LOGGER.exception("Instagram, carosello fallito: %s", exc)
+        db.rollback()
+    try:
+        instagram_rubriche.rubrica_del_giorno(db, slot)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Instagram, rubrica fallita: %s", exc)
+    finally:
+        db.close()
+
+
+def _instagram_comments_job():
+    from utils import instagram_rubriche
+    db = SessionLocal()
+    try:
+        instagram_rubriche.rispondi_ai_commenti(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("Instagram, risposte ai commenti non mandate: %s", exc)
     finally:
         db.close()
 
@@ -289,6 +307,14 @@ def start_scheduler() -> None:
             max_instances=1,
             coalesce=True,
         )
+    _scheduler.add_job(
+        _instagram_comments_job,
+        CronTrigger(minute="*/10"),
+        id="instagram_comments",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
     _scheduler.add_job(
         _instagram_stats_job,
         CronTrigger(hour="*/2", minute=50),

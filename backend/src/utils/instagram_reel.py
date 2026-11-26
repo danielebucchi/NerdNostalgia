@@ -120,12 +120,18 @@ def _outro() -> Image.Image:
 # ---------------------------------------------------------------------------
 
 def video(articoli: List[Article], anno: int, mese: int) -> bytes:
-    """L'MP4 del Reel: H.264 + AAC, 1080x1920, come lo vuole Instagram."""
-    import imageio_ffmpeg
+    """Il Reel dei venduti del mese."""
     pezzi = articoli[:MAX_PEZZI]
     slide = [(_intro(anno, mese, len(articoli)), INTRO)]
     slide += [(_pezzo(a, i + 1, len(pezzi)), PER_PEZZO) for i, a in enumerate(pezzi)]
     slide.append((_outro(), OUTRO))
+    return monta(slide, seme=anno * 100 + mese)
+
+
+def monta(slide: List[Tuple[Image.Image, float]], seme: int) -> bytes:
+    """L'MP4 di un Reel da una sequenza di immagini 1080x1920 con la loro
+    durata, sulla musichetta 8-bit `seme`: H.264 + AAC, come lo vuole Instagram."""
+    import imageio_ffmpeg
     durata = sum(d for _, d in slide)
     with tempfile.TemporaryDirectory() as cartella:
         tmp = Path(cartella)
@@ -137,7 +143,7 @@ def video(articoli: List[Article], anno: int, mese: int) -> bytes:
         # Il concat di ffmpeg vuole l'ultima immagine ripetuta, o ne ignora la durata.
         elenco.append(f"file '{tmp / f's{len(slide) - 1:03d}.png'}'")
         (tmp / "elenco.txt").write_text("\n".join(elenco))
-        (tmp / "musica.wav").write_bytes(chiptune.musica(math.ceil(durata), seme=anno * 100 + mese))
+        (tmp / "musica.wav").write_bytes(chiptune.musica(math.ceil(durata), seme=seme))
         uscita = tmp / "reel.mp4"
         subprocess.run(
             [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error",
@@ -163,13 +169,17 @@ def didascalia(articoli: List[Article], mese: int) -> str:
 
 
 def _salva(contenuto: bytes, anno: int, mese: int) -> str:
-    """Salva il video tra i file statici e ne torna l'URL pubblico."""
+    return salva(contenuto, f"reel-{anno}-{mese:02d}")
+
+
+def salva(contenuto: bytes, nome: str, estensione: str = "mp4") -> str:
+    """Salva un file tra quelli statici e ne torna l'URL pubblico: Instagram
+    scarica da li' video e immagini."""
     from utils.storage import UPLOADS_DIR
     cartella = UPLOADS_DIR / "social"
     cartella.mkdir(parents=True, exist_ok=True)
-    nome = f"reel-{anno}-{mese:02d}.mp4"
-    (cartella / nome).write_bytes(contenuto)
-    return f"{instagram._api_url()}/static/social/{nome}"
+    (cartella / f"{nome}.{estensione}").write_bytes(contenuto)
+    return f"{instagram._api_url()}/static/social/{nome}.{estensione}"
 
 
 def anteprima(db: Session, anno: int, mese: int) -> Optional[Dict[str, object]]:
