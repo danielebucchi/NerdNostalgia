@@ -35,6 +35,18 @@ export interface GuideCard {
   available: GuideAvailable | null;
   /** Quanto diamo al massimo per una copia in ottime condizioni (Impostazioni). */
   buy_offer: number | null;
+  /** Sotto 0,50 €: non singola ma a peso, al prezzo della sua epoca. */
+  buy_bulk: { era: string; eur_per_kg: number } | null;
+  /** Energie sotto 0,50 €: non le compriamo. */
+  buy_none: boolean;
+}
+
+/** L'offerta in una riga, per testi e oggetto della richiesta. */
+export function testoOfferta(c: GuideCard): string | null {
+  if (c.buy_offer != null) return `Ti diamo fino a ${euro(c.buy_offer)}`;
+  if (c.buy_bulk) return `La compriamo a peso: ${euro(c.buy_bulk.eur_per_kg)} al kg (carte ${c.buy_bulk.era})`;
+  if (c.buy_none) return "Le energie a peso non le compriamo";
+  return null;
 }
 
 export interface GuideSetDetail extends GuideSet {

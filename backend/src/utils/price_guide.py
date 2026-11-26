@@ -171,23 +171,55 @@ def _numero_setting(db: Session, chiave: str, predefinito: float) -> float:
         return predefinito
 
 
-def regola_offerta(db: Session) -> tuple:
-    """(cifra fissa, soglia, percentuale) da Impostazioni."""
-    return (_numero_setting(db, "buy_offer_fixed", 0.50), _numero_setting(db, "buy_offer_threshold", 4.0),
-            _numero_setting(db, "buy_offer_percent", 60.0))
+def regola_offerta(db: Session) -> dict:
+    """La regola di "Valuta la tua carta", da Impostazioni."""
+    return {"fissa": _numero_setting(db, "buy_offer_fixed", 0.50),
+            "soglia": _numero_setting(db, "buy_offer_threshold", 4.0),
+            "percentuale": _numero_setting(db, "buy_offer_percent", 60.0),
+            "kg": {"vintage": _numero_setting(db, "buy_bulk_vintage", 7.0),
+                   "medio": _numero_setting(db, "buy_bulk_medio", 5.0),
+                   "modern": _numero_setting(db, "buy_bulk_modern", 3.0)}}
 
 
-def offerta(centesimi: Optional[int], regola: tuple) -> Optional[float]:
+# Le epoche delle carte a peso, dalla data di uscita del set: il bordo giallo
+# arriva con Rubino e Zaffiro (luglio 2003, prima Wizards of the Coast ed
+# e-Card), quello argentato con Scarlatto e Violetto (31 marzo 2023).
+INIZIO_MEDIO = "2003-06-01"
+INIZIO_MODERN = "2023-03-31"
+NOMI_EPOCA = {"vintage": "vintage", "medio": "bordo giallo", "modern": "modern"}
+
+
+def epoca(data_uscita: Optional[str]) -> str:
+    if data_uscita and data_uscita < INIZIO_MEDIO:
+        return "vintage"
+    if data_uscita and data_uscita < INIZIO_MODERN:
+        return "medio"
+    return "modern"
+
+
+def energia(nome: str) -> bool:
+    return bool(re.search(r"\benerg(y|ia)\b", nome or "", re.IGNORECASE))
+
+
+def offerta(centesimi: Optional[int], regola: dict, data_uscita: Optional[str] = None,
+            nome: str = "") -> dict:
     """Quanto diamo, al massimo, per una carta che vale `centesimi` sul
-    mercato: la cifra fissa fino alla soglia, poi la percentuale,
-    arrotondata per difetto ai 10 centesimi."""
+    mercato. Sotto la cifra fissa (0,50 €) non si compra singola: va a
+    peso, al prezzo della sua epoca (le energie a peso no). Fino alla
+    soglia la cifra fissa, oltre la percentuale arrotondata per difetto ai
+    10 centesimi. Torna {"tipo": "singola", "euro": ...},
+    {"tipo": "peso", "epoca": ..., "euro_kg": ...}, {"tipo": "no"} o {}."""
     if not centesimi:
-        return None
-    fissa, soglia, percentuale = regola
+        return {}
     valore = centesimi / 100
-    if valore <= soglia:
-        return round(fissa, 2)
-    return int(valore * percentuale / 100 * 10) / 10
+    if valore < regola["fissa"]:
+        if energia(nome):
+            return {"tipo": "no"}
+        e = epoca(data_uscita)
+        return {"tipo": "peso", "epoca": NOMI_EPOCA[e], "euro_kg": regola["kg"][e]}
+    if valore <= regola["soglia"]:
+        return {"tipo": "singola", "euro": round(regola["fissa"], 2)}
+    return {"tipo": "singola", "euro": int(valore * regola["percentuale"] / 100 * 10) / 10}
 
 
 def da_rifare(db: Session) -> bool:

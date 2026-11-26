@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { VendilaANoi } from "@/components/guida/VendilaANoi";
-import { euro, searchGuide, type GuideCard } from "@/lib/price-guide";
+import { Offerta } from "@/components/guida/Offerta";
+import { euro, searchGuide, testoOfferta, type GuideCard } from "@/lib/price-guide";
 
 /* "Valuta la tua carta": si scrive il nome (anche con il set o il numero),
  * si vede quanto vale e la si puo' proporre a noi. Cerca nella guida prezzi. */
@@ -83,16 +84,16 @@ export default function ValutaCartePage() {
                 </Link>
                 <p className="text-sm text-ink-soft truncate">{c.set_name}</p>
                 <p className="text-sm text-ink-soft">Valore di mercato da {euro(c.min_price)}</p>
-                {c.buy_offer != null && (
-                  <p className="font-bold text-pink-deep">💰 Ti diamo fino a {euro(c.buy_offer)}</p>
-                )}
+                <Offerta carta={c} />
               </div>
               <div className="flex flex-col gap-2 items-end">
                 {c.available && (
                   <Link href={`/articles/${c.available.id}`} className="chip chip-mint text-xs">Da noi {euro(c.available.price)}</Link>
                 )}
-                <VendilaANoi carta={`${c.name} #${c.number} – ${c.set_name}`} offerta={c.buy_offer}
-                  className="btn btn-ghost text-xs sm:text-sm" />
+                {!c.buy_none && (
+                  <VendilaANoi carta={`${c.name} #${c.number} – ${c.set_name}`} offerta={testoOfferta(c)}
+                    className="btn btn-ghost text-xs sm:text-sm" />
+                )}
               </div>
             </div>
           ))}
@@ -101,7 +102,8 @@ export default function ValutaCartePage() {
 
       <p className="text-xs text-ink-soft mt-8 text-center">
         Prezzi: l&apos;offerta più bassa su CardTrader, aggiornata ogni settimana. &quot;Fino a&quot; è quanto
-        diamo per una copia in ottime condizioni: la cifra esatta la confermiamo dopo aver visto le foto.{" "}
+        diamo per una copia in ottime condizioni: la cifra esatta la confermiamo dopo aver visto le foto.
+        Le carte sotto i 50 centesimi le compriamo a peso (energie escluse).{" "}
         <Link href="/prezzi-carte-pokemon" className="underline">Sfoglia tutti i set</Link>.
       </p>
     </section>

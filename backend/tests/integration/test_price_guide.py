@@ -66,13 +66,18 @@ def test_public_pages_and_search(client, db_session, admin_user, fonti):
 def test_buy_offer_rule(client, db_session, fonti):
     from helpers.setting import SettingHelper
     regola = price_guide.regola_offerta(db_session)
-    assert regola == (0.5, 4.0, 60.0)
-    assert price_guide.offerta(399, regola) == 0.5                 # 3,99 €: cifra fissa
-    assert price_guide.offerta(400, regola) == 0.5                 # 4 € compresi
-    assert price_guide.offerta(12063, regola) == 72.3              # 60% di 120,63 = 72,37 → 72,30
-    assert price_guide.offerta(None, regola) is None
+    o = lambda cent, data="1999-01-09", nome="Charizard": price_guide.offerta(cent, regola, data, nome)
+    assert o(399) == {"tipo": "singola", "euro": 0.5}                 # 3,99 €: cifra fissa
+    assert o(50) == {"tipo": "singola", "euro": 0.5}                  # 0,50 € esatti: singola
+    assert o(12063) == {"tipo": "singola", "euro": 72.3}              # 60% di 120,63 → 72,30
+    assert o(49) == {"tipo": "peso", "epoca": "vintage", "euro_kg": 7.0}
+    assert o(20, "2010-05-01") == {"tipo": "peso", "epoca": "bordo giallo", "euro_kg": 5.0}
+    assert o(20, "2024-01-26") == {"tipo": "peso", "epoca": "modern", "euro_kg": 3.0}
+    assert o(10, "2010-05-01", "Fire Energy") == {"tipo": "no"}       # energie a peso: no
+    assert o(None) == {}
     price_guide.aggiorna(db_session, pausa=0)
-    assert client.get("/api/price-guide/cards/set-base/4-charizard").json()["buy_offer"] == 72.3
+    carta = client.get("/api/price-guide/cards/set-base/4-charizard").json()
+    assert carta["buy_offer"] == 72.3 and carta["buy_bulk"] is None
     SettingHelper(db=db_session).upsert("buy_offer_percent", "50")
     assert client.get("/api/price-guide/search?q=blastoise").json()[0]["buy_offer"] == 19.7   # 50% di 39,51
 

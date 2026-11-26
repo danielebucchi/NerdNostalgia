@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { CartaTile } from "@/components/guida/CartaTile";
 import { VendilaANoi } from "@/components/guida/VendilaANoi";
 import { absUrl } from "@/lib/seo";
-import { anno, dataItaliana, euro, formatDataBreve, getGuideCard } from "@/lib/price-guide";
+import { Offerta } from "@/components/guida/Offerta";
+import { anno, dataItaliana, euro, formatDataBreve, getGuideCard, testoOfferta } from "@/lib/price-guide";
 
 export const revalidate = 3600;
 
@@ -89,15 +90,12 @@ export default async function CartaPage({ params }: Params) {
           )}
 
           <div className="card p-5 mt-4">
-            {c.buy_offer != null && (
-              <>
-                <p className="display text-2xl text-ink">💰 Ti diamo fino a {euro(c.buy_offer)}</p>
-                <p className="text-xs text-ink-soft mt-1 mb-3">
-                  Per una copia in ottime condizioni: la cifra esatta la confermiamo dopo aver visto le foto.
-                </p>
-              </>
+            <Offerta carta={c} grande />
+            {!c.buy_none && (
+              <div className="mt-3">
+                <VendilaANoi carta={`${c.name} #${c.number} – ${c.set.name}`} offerta={testoOfferta(c)} />
+              </div>
             )}
-            <VendilaANoi carta={`${c.name} #${c.number} – ${c.set.name}`} offerta={c.buy_offer} />
           </div>
         </div>
       </div>

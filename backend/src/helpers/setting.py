@@ -75,6 +75,25 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "help": "Quanto offriamo per una carta che vale fino alla soglia qui sotto "
                 "(pagina pubblica Valuta la tua carta).",
     },
+    "buy_bulk_vintage": {
+        "default": "7",
+        "public": False,
+        "label": "Valuta carte — a peso, vintage (€/kg)",
+        "help": "Carte sotto i 0,50 € dei set usciti prima di meta' 2003 (Wizards of the Coast, e-Card).",
+    },
+    "buy_bulk_medio": {
+        "default": "5",
+        "public": False,
+        "label": "Valuta carte — a peso, bordo giallo (€/kg)",
+        "help": "Carte sotto i 0,50 € dei set da Rubino e Zaffiro (2003) a Spada e Scudo.",
+    },
+    "buy_bulk_modern": {
+        "default": "3",
+        "public": False,
+        "label": "Valuta carte — a peso, modern (€/kg)",
+        "help": "Carte sotto i 0,50 € dei set da Scarlatto e Violetto (2023) in poi. Le energie a peso "
+                "non si comprano.",
+    },
     "buy_offer_threshold": {
         "default": "4",
         "public": False,
