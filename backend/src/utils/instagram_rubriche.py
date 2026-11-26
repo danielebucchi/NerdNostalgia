@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import random
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Callable, Dict, List, Optional, Tuple
 
 from PIL import Image, ImageDraw
@@ -196,6 +196,31 @@ def sotto_i_5(db: Session) -> Optional[Contenuto]:
     return _carosello("sotto5", "Sotto i 5 €", "piccoli prezzi, grande nostalgia", scelti, righe, db, "OCCASIONI")
 
 
+def _seconda_domenica_di_maggio(anno: int) -> date:
+    primo = date(anno, 5, 1)
+    return primo + timedelta(days=(6 - primo.weekday()) % 7 + 7)
+
+
+def ricorrenza(giorno: date) -> str:
+    """Il sottotitolo delle idee regalo: la prossima ricorrenza, se e' vicina."""
+    m, d = giorno.month, giorno.day
+    if (m == 11 and d >= 15) or (m == 12 and d <= 24):
+        return "per Natale"
+    if (m == 12 and d >= 25) or (m == 1 and d <= 6):
+        return "per la Befana"
+    if m == 2 and d <= 14:
+        return "per San Valentino"
+    if m == 3 and d <= 19:
+        return "per la Festa del papà"
+    if m == 5 and giorno <= _seconda_domenica_di_maggio(giorno.year):
+        return "per la Festa della mamma"
+    if (m == 8 and d >= 25) or (m == 9 and d <= 15):
+        return "per il ritorno a scuola"
+    if m == 10 and d >= 15:
+        return "per Halloween"
+    return "per chi ama collezionare"
+
+
 def idee_regalo(db: Session) -> Optional[Contenuto]:
     settimana = _ora().isocalendar()[1]
     usati = _usati_di_recente(db, "regalo")
@@ -220,9 +245,8 @@ def idee_regalo(db: Session) -> Optional[Contenuto]:
             if lista and len(scelti) < MAX_SLIDE - 2:
                 scelti.append(lista.pop())
     fascia = f"sotto i {a_} €" if a_ is not None else f"oltre i {da} €"
-    natale = _ora().month == 12 or (_ora().month == 11 and _ora().day >= 15)
     titolo = f"Idee regalo nerd {fascia}"
-    sotto = "per Natale" if natale else "per chi ama collezionare"
+    sotto = ricorrenza(_ora().date())
     righe = [f"🎁 {titolo} {sotto}!", ""] + [f"▪️ {x.title} — {instagram._prezzo(x)}" for x in scelti]
     return _carosello("regalo", titolo, sotto, scelti, righe, db, "GUIDA AI REGALI")
 
