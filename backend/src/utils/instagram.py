@@ -258,7 +258,7 @@ def _hashtag(articoli: List[Article]) -> str:
 def didascalia(articoli: List[Article]) -> str:
     righe = ["🆕 Nuovi arrivi su NerdNostalgia!" if len(articoli) > 1 else "🆕 Nuovo arrivo su NerdNostalgia!", ""]
     righe += [f"▪️ {a.title} — {_prezzo(a)}" for a in articoli]
-    righe += ["", "🛒 Li trovi su nerdnostalgia.store (link in bio)",
+    righe += ["", f"🛒 {'Li' if len(articoli) > 1 else 'Lo'} trovi su nerdnostalgia.store (link in bio)",
               f"💬 Le novità in tempo reale nel gruppo Telegram: {TELEGRAM_URL}", "", _hashtag(articoli)]
     return "\n".join(righe)[:2200]
 
