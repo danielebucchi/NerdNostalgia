@@ -10,11 +10,7 @@ import { useSettings } from "@/lib/settings-context";
 const ALL_NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: "📊", exact: true },
   { href: "/admin/articles", label: "Articoli", icon: "🎮" },
-  { href: "/admin/lotti", label: "Lotti (interno)", icon: "📦" },
-  { href: "/admin/carico-carte", label: "Carico carte", icon: "🎴" },
   { href: "/admin/scanner-carte", label: "Scanner carte", icon: "🔍" },
-  { href: "/admin/vendite", label: "Vendite", icon: "💰" },
-  { href: "/admin/spese", label: "Spese", icon: "💰" },
   { href: "/admin/ordini", label: "Ordini", icon: "📥", requiresPayments: true },
   { href: "/admin/inquiries", label: "Richieste", icon: "💬" },
   { href: "/admin/wanted", label: "Cerco/Compro", icon: "🔍" },
@@ -31,7 +27,7 @@ const ALL_NAV_ITEMS = [
 const BOTTOM_NAV = [
   { href: "/admin", label: "Home", icon: "📊", exact: true },
   { href: "/admin/articles", label: "Articoli", icon: "🎮" },
-  { href: "/admin/lotti", label: "Lotti", icon: "📦" },
+  { href: "/admin/scanner-carte", label: "Scanner", icon: "🔍" },
   { href: "/admin/inquiries", label: "Richieste", icon: "💬" },
 ];
 
