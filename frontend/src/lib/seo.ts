@@ -31,3 +31,16 @@ export function clip(text: string | null | undefined, max = 160): string {
   if (clean.length <= max) return clean;
   return clean.slice(0, max - 1).replace(/\s\S*$/, "") + "…";
 }
+
+/** Le sottocategorie che sono anche una marca, per i dati strutturati
+ *  (Google chiede la marca quando manca il codice EAN). Le altre (Console,
+ *  Giochi, Peluche...) no. Stessa tabella in backend/src/api/feeds.py. */
+export const BRAND_BY_CATEGORY: Record<string, string> = {
+  "Pokémon": "Pokémon",
+  "Magic the Gathering": "Magic: The Gathering",
+  "Yu-Gi-Oh!": "Yu-Gi-Oh!",
+  "Funko Pop": "Funko",
+  Gormiti: "Gormiti",
+  Bakugan: "Bakugan",
+  Beyblade: "Beyblade",
+};

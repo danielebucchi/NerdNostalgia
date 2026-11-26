@@ -68,14 +68,28 @@ def _categoria(article: Article) -> Optional[str]:
     return f"{padre.name} > {cat.name}" if padre is not None else cat.name
 
 
+# Le sottocategorie che sono anche una marca. Le altre (Console, Giochi,
+# Peluche...) no: meglio nessuna marca che una sbagliata. Stessa tabella in
+# frontend/src/lib/seo.ts (BRAND_BY_CATEGORY).
+MARCA_DA_CATEGORIA = {
+    "Pokémon": "Pokémon",
+    "Magic the Gathering": "Magic: The Gathering",
+    "Yu-Gi-Oh!": "Yu-Gi-Oh!",
+    "Funko Pop": "Funko",
+    "Gormiti": "Gormiti",
+    "Bakugan": "Bakugan",
+    "Beyblade": "Beyblade",
+}
+
+
 def _marca(article: Article) -> Optional[str]:
-    """La marca, o il nome della sottocategoria (Pokémon, Nintendo, Gormiti...):
-    senza codice EAN Google la chiede. Come nei dati strutturati della scheda."""
+    """La marca, o quella della sottocategoria (Pokémon, Funko, Gormiti...):
+    senza codice EAN Google la chiede."""
     marca = _testo(article.brand, 70)
     if marca:
         return marca
     cat = article.category
-    return _testo(cat.name, 70) or None if cat is not None and cat.parent_id else None
+    return MARCA_DA_CATEGORIA.get(cat.name) if cat is not None else None
 
 
 def _voce(article: Article) -> Optional[str]:

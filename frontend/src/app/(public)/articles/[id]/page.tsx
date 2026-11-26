@@ -11,7 +11,7 @@ import { BuyControls } from "@/components/BuyControls";
 import { ShareButtons } from "@/components/ShareButtons";
 import { StickyCtaBar } from "@/components/StickyCtaBar";
 import { WishlistButton } from "@/components/WishlistButton";
-import { absUrl, clip, SITE_NAME } from "@/lib/seo";
+import { absUrl, BRAND_BY_CATEGORY, clip, SITE_NAME } from "@/lib/seo";
 import { baseShippingFor } from "@/lib/shipping";
 
 interface PageProps {
@@ -128,12 +128,12 @@ export default async function ArticleDetailPage({ params }: PageProps) {
     description: article.description ?? article.title,
     image: article.images ?? [],
     sku: article.sku ?? `nn-${article.id}`,
-    // Senza codice EAN Google chiede almeno la marca: se manca, quella
-    // della sottocategoria (Pokémon, Nintendo, Gormiti...).
-    brand:
-      article.brand || article.parent_category
-        ? { "@type": "Brand", name: article.brand || article.category?.name }
-        : undefined,
+    brand: (() => {
+      // Senza codice EAN Google chiede almeno la marca: se manca, quella
+      // della sottocategoria, quando la sottocategoria e' una marca.
+      const nome = article.brand || BRAND_BY_CATEGORY[article.category?.name ?? ""];
+      return nome ? { "@type": "Brand", name: nome } : undefined;
+    })(),
     category: article.category?.name ?? undefined,
     itemCondition: CONDITION_SCHEMA[article.condition] ?? CONDITION_SCHEMA.USED,
     offers: {

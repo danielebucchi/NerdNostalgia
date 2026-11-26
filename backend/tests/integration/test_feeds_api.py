@@ -55,8 +55,13 @@ def test_brand_falls_back_to_the_subcategory(client, db_session, admin_user):
     pokemon = Category(name="Pokémon", slug="pokemon-t", parent_id=carte.id)
     db_session.add(pokemon)
     db_session.commit()
+    giochi = Category(name="Giochi", slug="giochi-t", parent_id=carte.id)
+    db_session.add(giochi)
+    db_session.commit()
     figlia = _art(db_session, admin_user, "Pikachu", category_id=pokemon.id)
     radice = _art(db_session, admin_user, "Sfuso", category_id=carte.id)
+    generica = _art(db_session, admin_user, "Zelda", category_id=giochi.id)
     voci = _voci(client)
     assert voci[f"nn-{figlia.id}"].find(f"{G}brand").text == "Pokémon"
     assert voci[f"nn-{radice.id}"].find(f"{G}brand") is None
+    assert voci[f"nn-{generica.id}"].find(f"{G}brand") is None       # "Giochi" non e' una marca
