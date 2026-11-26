@@ -206,18 +206,12 @@ def ricorrenza(giorno: date) -> str:
     m, d = giorno.month, giorno.day
     if (m == 11 and d >= 15) or (m == 12 and d <= 24):
         return "per Natale"
-    if (m == 12 and d >= 25) or (m == 1 and d <= 6):
-        return "per la Befana"
     if m == 2 and d <= 14:
         return "per San Valentino"
     if m == 3 and d <= 19:
         return "per la Festa del papà"
     if m == 5 and giorno <= _seconda_domenica_di_maggio(giorno.year):
         return "per la Festa della mamma"
-    if (m == 8 and d >= 25) or (m == 9 and d <= 15):
-        return "per il ritorno a scuola"
-    if m == 10 and d >= 15:
-        return "per Halloween"
     return "per chi ama collezionare"
 
 

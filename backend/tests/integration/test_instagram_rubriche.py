@@ -117,10 +117,10 @@ def test_comment_lista_gets_the_links_in_private_once(db_session, admin_user, ig
 def test_gift_ideas_follow_the_italian_occasions():
     from datetime import date
     attese = {date(2026, 11, 26): "per Natale", date(2026, 12, 24): "per Natale",
-              date(2026, 12, 27): "per la Befana", date(2027, 1, 6): "per la Befana",
+              date(2026, 12, 27): "per chi ama collezionare", date(2027, 1, 6): "per chi ama collezionare",
               date(2027, 1, 20): "per chi ama collezionare", date(2027, 2, 10): "per San Valentino",
               date(2027, 3, 19): "per la Festa del papà", date(2027, 5, 9): "per la Festa della mamma",
-              date(2027, 5, 10): "per chi ama collezionare", date(2027, 9, 1): "per il ritorno a scuola",
-              date(2027, 10, 20): "per Halloween"}
+              date(2027, 5, 10): "per chi ama collezionare", date(2027, 9, 1): "per chi ama collezionare",
+              date(2027, 10, 20): "per chi ama collezionare"}
     for giorno, testo in attese.items():
         assert rub.ricorrenza(giorno) == testo, giorno
