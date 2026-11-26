@@ -301,14 +301,14 @@ def scheda_set(info_it: dict, info_en: dict, anno: int) -> Image.Image:
     return tela.convert("RGB")
 
 
-def finale_racconto(anno: int) -> Image.Image:
+def finale_racconto(anno: int, domanda: str = "Quante ne avevi? Qual era la tua preferita?") -> Image.Image:
     """L'ultima slide del sabato: niente vendita, si chiacchiera."""
     from utils import social_grafica as g
     w, h = instagram.POST
     tela = g.sfondo(instagram.POST, seme=anno + 1, colori=(g.LILLA, g.ROSA, g.MENTA))
     g.logo(tela, (w - 240) // 2, 150, 240)
     y = g.testo_centrato(tela, "E tu?", 450, "titolo", 110, g.INK, 1)
-    y = g.testo_centrato(tela, "Quante ne avevi? Qual era la tua preferita?", y + 20, "titolo", 64, g.INK, 3,
+    y = g.testo_centrato(tela, domanda, y + 20, "titolo", 64, g.INK, 3,
                          larghezza=w - 200)
     g.pillola(tela, "Raccontacelo nei commenti", w // 2, y + 50, 52, g.ROSA_FORTE, g.BIANCO, "testo")
     return tela.convert("RGB")
@@ -383,8 +383,8 @@ def slide_carta(foto: Optional[Image.Image], nome: str, sotto: str, seme: int) -
     return tela.convert("RGB")
 
 
-def anni_fa(db: Session) -> Optional[Contenuto]:
-    """Il sabato si informa, non si vende: un set Pokémon di cui abbiamo
+def _anni_fa_carte(db: Session) -> Optional[Contenuto]:
+    """Un set Pokémon di cui abbiamo
     almeno una carta, con data di uscita, numero di carte e serie da TCGdex,
     le carte piu' ricercate del set (anche se non le abbiamo: immagini
     ufficiali TCGdex, scelte per valore su CardTrader) e un paio delle
@@ -458,6 +458,135 @@ def anni_fa(db: Session) -> Optional[Contenuto]:
               "", "E tu? Quante ne avevi, qual era la tua preferita? Raccontacelo nei commenti 👇",
               "", instagram._tag(nostre, db)]
     return "annifa", nostre, "\n".join(righe)[:2200], ("carosello", immagini)
+
+
+# ---------------------------------------------------------------------------
+# Il sabato oltre le carte: videogiochi, console, giocattoli (utils/nostalgia)
+# ---------------------------------------------------------------------------
+
+ANNI_MINIMI = 10        # sotto i dieci anni non e' ancora nostalgia
+TENTATIVI = 15          # articoli provati per tema: ogni prova sono 3-4 chiamate a Wikipedia
+TEMI_LINEE = ["Gormiti", "Bakugan", "Beyblade"]
+
+
+def _in_categoria(db: Session, *nomi: str) -> List[Article]:
+    nomi = {n.lower() for n in nomi}
+    return [a for a in _con_foto(_in_vendita(db).all())
+            if a.category is not None and (a.category.name or "").lower() in nomi]
+
+
+def scheda_voce(v, etichetta: str) -> Image.Image:
+    """La slide con la storia: nome, uscita e due frasi da Wikipedia."""
+    from utils import nostalgia
+    from utils import social_grafica as g
+    w, h = instagram.POST
+    tela = g.sfondo(instagram.POST, seme=v.anno, colori=(g.CIELO, g.LILLA, g.ROSA))
+    g.logo(tela, 50, 50, 120)
+    y = g.testo_centrato(tela, v.titolo, 200, "titolo", 80, g.INK, 2)
+    g.etichetta(tela, etichetta.upper(), w // 2, y + 20, g.LILLA_FORTE, g.BIANCO, 30, "centro")
+    y = g.testo_centrato(tela, _data_italiana(v.data) if v.data else str(v.anno), y + 90, "titolo", 64, g.INK, 1)
+    y = g.testo_centrato(tela, nostalgia.frasi(v.riassunto), y + 40, "testo", 40, g.INK, 8,
+                         larghezza=w - 160, peso="SemiBold", interlinea=14)
+    g.etichetta(tela, "Fonte: Wikipedia", w // 2, h - 110, g.BIANCO, g.INK_SOFT, 26, "centro")
+    return tela.convert("RGB")
+
+
+def _carosello_nostalgia(db: Session, v, articoli: List[Article], verbo: str, domanda: str,
+                         etichetta: str) -> Contenuto:
+    from utils import nostalgia
+    from utils import social_grafica as g
+    quanti_anni = _ora().year - v.anno
+    titolo = f"{quanti_anni} anni fa {verbo} {v.titolo}"
+    giorno = f"{_ora():%Y%m%d}"
+    foto_libera = _scarica(v.foto) if v.foto else None
+    nostre = articoli[:MAX_SLIDE - 3 - (1 if foto_libera else 0)]
+    cover = copertina(titolo, f"era il {v.anno}", emoji_testo="NOSTALGIA",
+                      articoli=None if foto_libera else nostre).convert("RGBA")
+    if foto_libera is not None:
+        g.carta(cover, foto_libera, (110, 560, instagram.POST[0] - 110, instagram.POST[1] - 160), inclinazione=-3)
+    immagini = [instagram_reel.salva(_jpeg(cover.convert("RGB")), f"annifa-{giorno}", "jpg"),
+                instagram_reel.salva(_jpeg(scheda_voce(v, etichetta)), f"annifa-{giorno}-scheda", "jpg")]
+    if foto_libera is not None:
+        immagini.append(instagram_reel.salva(
+            _jpeg(slide_carta(foto_libera, v.titolo, "foto: Wikimedia Commons", v.anno)),
+            f"annifa-{giorno}-foto", "jpg"))
+    immagini += [instagram.url_immagine(a, "post", prezzo=False) for a in nostre]
+    immagini.append(instagram_reel.salva(_jpeg(finale_racconto(v.anno, domanda)), f"annifa-{giorno}-fine", "jpg"))
+    righe = [f"⏳ {titolo}!", ""]
+    righe.append(f"📅 {'Uscita: ' + _data_italiana(v.data) if v.data else 'Anno: ' + str(v.anno)}")
+    righe += ["", nostalgia.frasi(v.riassunto, quante=3, massimo=500), f"(Fonte: Wikipedia, {v.pagina})"]
+    if nostre:
+        righe += ["", "Nelle foto, pezzi passati dalle nostre mani."]
+    righe += ["", f"E tu? {domanda} Raccontacelo nei commenti 👇", "", instagram._tag(nostre, db)]
+    return "annifa", nostre, "\n".join(righe)[:2200], ("carosello", immagini)
+
+
+def _prova(db: Session, articoli: List[Article], tipo: str) -> Optional[Tuple[object, Article]]:
+    from utils import nostalgia
+    usati = _usati_di_recente(db, "annifa")
+    candidati = [a for a in articoli if a.id not in usati]
+    random.Random(_ora().toordinal()).shuffle(candidati)
+    for a in candidati[:TENTATIVI]:
+        try:
+            v = nostalgia.per_articolo(a.title or "", tipo)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("Nostalgia: %s non cercato (%s)", a.title, exc)
+            continue
+        if v is not None and _ora().year - v.anno >= ANNI_MINIMI:
+            return v, a
+    return None
+
+
+def _anni_fa_videogiochi(db: Session) -> Optional[Contenuto]:
+    trovato = _prova(db, _in_categoria(db, "Giochi"), "videogioco")
+    if trovato is None:
+        return None
+    v, a = trovato
+    return _carosello_nostalgia(db, v, [a], "usciva", "Ci hai giocato? Fin dove sei arrivato?", "videogioco")
+
+
+def _anni_fa_console(db: Session) -> Optional[Contenuto]:
+    trovato = _prova(db, _in_categoria(db, "Console"), "console")
+    if trovato is None:
+        return None
+    v, a = trovato
+    return _carosello_nostalgia(db, v, [a], "arrivava", "L'avevi? Qual era il tuo gioco preferito?", "console")
+
+
+def _anni_fa_giocattoli(db: Session) -> Optional[Contenuto]:
+    from utils import nostalgia
+    linee = TEMI_LINEE[:]
+    random.Random(_ora().toordinal()).shuffle(linee)
+    for linea in linee:
+        articoli = _in_categoria(db, linea)
+        if not articoli:
+            continue
+        v = nostalgia.per_linea(linea)
+        if v is not None and _ora().year - v.anno >= ANNI_MINIMI:
+            v.titolo = linea      # la voce puo' essere quella della serie TV: si parla della linea
+            return _carosello_nostalgia(db, v, articoli, "nascevano i", "Ci giocavi? Qual era il tuo preferito?",
+                                        "giocattoli")
+    return None
+
+
+TEMI_SABATO = [_anni_fa_carte, _anni_fa_videogiochi, _anni_fa_console, _anni_fa_giocattoli]
+
+
+def anni_fa(db: Session) -> Optional[Contenuto]:
+    """Il sabato si informa, non si vende: ogni settimana un tema diverso
+    (carte, videogiochi, console, giocattoli); se il tema della settimana non
+    trova niente di sicuro si prova il successivo."""
+    settimana = _ora().isocalendar()[1]
+    for i in range(len(TEMI_SABATO)):
+        tema = TEMI_SABATO[(settimana + i) % len(TEMI_SABATO)]
+        try:
+            contenuto = tema(db)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("Sabato, tema %s non preparato: %s", tema.__name__, exc)
+            continue
+        if contenuto is not None:
+            return contenuto
+    return None
 
 
 def rara_della_settimana(db: Session) -> Optional[Contenuto]:

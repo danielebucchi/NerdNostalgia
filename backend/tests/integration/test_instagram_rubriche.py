@@ -163,3 +163,22 @@ def test_iconic_cards_are_the_most_valuable_of_the_set(monkeypatch):
                       {"localId": "98", "name": "Energy", "image": "https://assets/98"}]}
     assert rub.carte_iconiche(1472, info, quante=2) == [
         ("4", "Charizard", "https://assets/4/high.png"), ("2", "Blastoise", "https://assets/2/high.png")]
+
+
+def test_saturday_also_videogames_with_wikipedia(db_session, admin_user, ig, monkeypatch):
+    from models.db import Category
+    from utils import nostalgia
+    cat = Category(name="Giochi", slug="giochi-x")
+    db_session.add(cat)
+    db_session.commit()
+    a = _art(db_session, admin_user, "Final fantasy ix ps1", 25)
+    a.category_id = cat.id
+    db_session.commit()
+    monkeypatch.setattr(rub, "TEMI_SABATO", [rub._anni_fa_videogiochi])
+    monkeypatch.setattr(nostalgia, "per_articolo", lambda titolo, tipo: nostalgia.Voce(
+        titolo="Final Fantasy IX", anno=2000, data="2000-07-07", riassunto="Un videogioco di ruolo. Il nono.",
+        pagina="https://it.wikipedia.org/wiki/Final_Fantasy_IX"))
+    nome, articoli, testo, (tipo, media) = rub.prepara(db_session, giorno=5)
+    assert nome == "annifa" and "anni fa usciva Final Fantasy IX" in testo and "7 luglio 2000" in testo
+    assert "Fonte: Wikipedia" in testo and "€" not in testo and "Ci hai giocato?" in testo
+    assert any("prezzo=0" in u for u in media)
