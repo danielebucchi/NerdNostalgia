@@ -21,7 +21,9 @@ def test_without_vinted_the_other_jobs_still_run(monkeypatch):
     jobs = _avvia(monkeypatch, DISABLE_VINTED_SYNC="1")
     assert jobs == {"daily_backup", "marketplace_sales_sync", "weekly_price_watch", "italian_names",
                     "ebay_listings_watch", "weekly_newsletter",
-                    "instagram_carousel", "instagram_stories", "instagram_token"}
+                    "instagram_post_1230", "instagram_post_1830", "instagram_post_2100",
+                    "instagram_stories", "instagram_stats", "instagram_report", "instagram_reel",
+                    "instagram_token"}
 
 
 def test_everything_by_default(monkeypatch):

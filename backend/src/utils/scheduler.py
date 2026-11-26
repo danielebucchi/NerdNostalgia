@@ -102,13 +102,49 @@ def _newsletter_job():
         db.close()
 
 
-def _instagram_carousel_job():
+def _instagram_carousel_job(slot: str):
     from utils import instagram
     db = SessionLocal()
     try:
-        instagram.pubblica_carosello(db)
+        instagram.post_del_giorno(db, slot)
     except Exception as exc:  # noqa: BLE001
         LOGGER.exception("Instagram, carosello fallito: %s", exc)
+    finally:
+        db.close()
+
+
+def _instagram_stats_job():
+    from utils import instagram, instagram_stats
+    db = SessionLocal()
+    try:
+        if instagram.acceso(db):
+            instagram_stats.importa_storico(db)
+            instagram_stats.aggiorna(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("Instagram, statistiche non lette: %s", exc)
+    finally:
+        db.close()
+
+
+def _instagram_report_job():
+    from utils import instagram, instagram_stats
+    db = SessionLocal()
+    try:
+        if instagram.acceso(db):
+            instagram_stats.manda_report(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Instagram, report fallito: %s", exc)
+    finally:
+        db.close()
+
+
+def _instagram_reel_job():
+    from utils import instagram_reel
+    db = SessionLocal()
+    try:
+        instagram_reel.pubblica(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.exception("Instagram, Reel del mese fallito: %s", exc)
     finally:
         db.close()
 
@@ -223,13 +259,45 @@ def start_scheduler() -> None:
         max_instances=1,
         coalesce=True,
     )
-    # Instagram (parte solo se acceso in Impostazioni): il carosello del
-    # giorno alle 18:30, le Storie dei pezzi sopra soglia ogni mezz'ora di
-    # giorno, il rinnovo del token (dura 60 giorni) il lunedi' alle 05:00.
+    # Instagram (parte solo se acceso in Impostazioni): il post del giorno
+    # in una delle fasce orarie, quella che le statistiche dicono raggiunga
+    # piu' persone (instagram_stats.slot_di_oggi); le Storie dei pezzi sopra
+    # soglia ogni mezz'ora di giorno; le statistiche ogni due ore (quelle
+    # delle Storie Instagram le tiene solo 24 ore); il report il lunedi'
+    # mattina; il Reel dei venduti il primo del mese; il rinnovo del token
+    # il lunedi' alle 05:00.
+    from utils.instagram_stats import SLOT
+    for slot in SLOT:
+        ora, minuto = slot.split(":")
+        _scheduler.add_job(
+            _instagram_carousel_job,
+            CronTrigger(hour=int(ora), minute=int(minuto)),
+            args=[slot],
+            id=f"instagram_post_{ora}{minuto}",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
     _scheduler.add_job(
-        _instagram_carousel_job,
-        CronTrigger(hour=18, minute=30),
-        id="instagram_carousel",
+        _instagram_stats_job,
+        CronTrigger(hour="*/2", minute=50),
+        id="instagram_stats",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    _scheduler.add_job(
+        _instagram_report_job,
+        CronTrigger(day_of_week="mon", hour=9, minute=0),
+        id="instagram_report",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    _scheduler.add_job(
+        _instagram_reel_job,
+        CronTrigger(day=1, hour=18, minute=0),
+        id="instagram_reel",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

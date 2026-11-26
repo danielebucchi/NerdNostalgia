@@ -259,7 +259,16 @@ def _hashtag(articoli: List[Article]) -> str:
     return " ".join(tag[:20])
 
 
-def didascalia(articoli: List[Article], ripescato: bool = False) -> str:
+def _tag(articoli: List[Article], db: Optional[Session]) -> str:
+    """Con il db, gli hashtag scelti dalle statistiche (instagram_stats);
+    senza, quelli fissi per categoria."""
+    if db is None:
+        return _hashtag(articoli)
+    from utils import instagram_stats
+    return instagram_stats.hashtag_per(db, articoli, seme=_ora().toordinal())
+
+
+def didascalia(articoli: List[Article], ripescato: bool = False, db: Optional[Session] = None) -> str:
     if ripescato:
         titolo = "✨ Dal catalogo di NerdNostalgia, ancora disponibile!"
     else:
@@ -267,7 +276,7 @@ def didascalia(articoli: List[Article], ripescato: bool = False) -> str:
     righe = [titolo, ""]
     righe += [f"▪️ {a.title} — {_prezzo(a)}" for a in articoli]
     righe += ["", f"🛒 {'Li' if len(articoli) > 1 else 'Lo'} trovi su nerdnostalgia.store (link in bio)",
-              f"💬 Le novità in tempo reale nel gruppo Telegram: {TELEGRAM_URL}", "", _hashtag(articoli)]
+              f"💬 Le novità in tempo reale nel gruppo Telegram: {TELEGRAM_URL}", "", _tag(articoli, db)]
     return "\n".join(righe)[:2200]
 
 
@@ -375,7 +384,7 @@ def da_storie(db: Session) -> List[Article]:
     return articoli[:max(MAX_STORIE_GIORNO - _storie_oggi(db), 0)]
 
 
-def pubblica_carosello(db: Session) -> Optional[Dict[str, object]]:
+def pubblica_carosello(db: Session, slot: Optional[str] = None) -> Optional[Dict[str, object]]:
     """Il post del giorno: i nuovi arrivi o, se non ce ne sono, un articolo
     ripescato dal catalogo. None se spento o se non resta niente da postare."""
     if not acceso(db):
@@ -388,7 +397,7 @@ def pubblica_carosello(db: Session) -> Optional[Dict[str, object]]:
             return None
         articoli, ripescato = [vecchio], True
     token = _token(db)
-    testo = didascalia(articoli, ripescato)
+    testo = didascalia(articoli, ripescato, db)
     if len(articoli) == 1:
         contenitore = _contenitore(token, image_url=url_immagine(articoli[0], "post"), caption=testo)
     else:
@@ -401,12 +410,35 @@ def pubblica_carosello(db: Session) -> Optional[Dict[str, object]]:
     for a in articoli:
         _segna(db, a, "instagram_carousel", media)
     db.commit()
+    from utils import instagram_stats
+    instagram_stats.registra(db, media, "post", testo, n_items=len(articoli), fallback=ripescato, slot=slot)
     # Una Storia per ogni articolo del post, se non l'ha gia' avuta: fuori
     # dal tetto giornaliero, il post ne ha al massimo MAX_CAROSELLO.
     _storie(db, token, [a for a in articoli if not (a.article_metadata or {}).get("instagram_story")])
     LOGGER.info("Instagram: %s %s con %d articoli", "ripescato" if ripescato else "carosello",
                 media, len(articoli))
     return {"media": media, "articoli": [a.id for a in articoli], "ripescato": ripescato}
+
+
+CHIAVE_POST_OGGI = "instagram_post_day"
+
+
+def post_del_giorno(db: Session, slot: str) -> Optional[Dict[str, object]]:
+    """Il job di ogni fascia oraria: pubblica solo se e' la fascia scelta per
+    oggi dalle statistiche (instagram_stats.slot_di_oggi) e se oggi il post
+    non e' ancora uscito."""
+    if not acceso(db):
+        return None
+    from utils import instagram_stats
+    oggi = instagram_stats.datetime.now(instagram_stats.ROMA).date().isoformat()
+    impostazioni = _impostazioni(db)
+    if impostazioni.get_value(CHIAVE_POST_OGGI, default="") == oggi:
+        return None
+    if instagram_stats.slot_di_oggi(db) != slot:
+        return None
+    esito = pubblica_carosello(db, slot=slot)
+    impostazioni.upsert(CHIAVE_POST_OGGI, oggi)
+    return esito
 
 
 def pubblica_storie(db: Session) -> List[str]:
@@ -428,6 +460,8 @@ def _storie(db: Session, token: str, articoli: List[Article]) -> List[str]:
         _segna(db, a, "instagram_story", media)
         _impostazioni(db).upsert(CHIAVE_STORIE_OGGI, f"{_ora().date().isoformat()}:{_storie_oggi(db) + 1}")
         db.commit()
+        from utils import instagram_stats
+        instagram_stats.registra(db, media, "story")
         fatte.append(media)
     if fatte:
         LOGGER.info("Instagram: %d Storie pubblicate", len(fatte))

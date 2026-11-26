@@ -643,6 +643,26 @@ CREATE INDEX IF NOT EXISTS idx_newsletter_subscribers_confirm
     ON newsletter_subscribers(confirm_token);
 
 -- ============================================================
+-- instagram_media (post, Storie e Reel con statistiche, vedi 0038)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS instagram_media (
+    media_id VARCHAR(40) PRIMARY KEY,
+    kind VARCHAR(10) NOT NULL,
+    published_at TIMESTAMP NOT NULL,
+    slot VARCHAR(5),
+    n_items INTEGER NOT NULL DEFAULT 1,
+    fallback BOOLEAN NOT NULL DEFAULT 0,
+    hashtags TEXT NOT NULL DEFAULT '',
+    reach INTEGER,
+    views INTEGER,
+    saved INTEGER,
+    shares INTEGER,
+    interactions INTEGER,
+    insights_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_instagram_media_published ON instagram_media(published_at);
+
+-- ============================================================
 -- reviews: recensioni del venditore, una per ordine (vedi 0024)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS reviews (
