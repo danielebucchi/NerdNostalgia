@@ -45,3 +45,18 @@ def test_fields_google_needs(client, db_session, admin_user):
     assert v.find(f"{G}link").text.endswith(f"/articles/{a.id}")
     assert v.find(f"{G}image_link").text.startswith("http") and v.find(f"{G}image_link").text.endswith("/static/articles/1/a.webp")
     assert v.find(f"{G}additional_image_link").text == "https://cdn.example.test/b.webp"
+
+
+def test_brand_falls_back_to_the_subcategory(client, db_session, admin_user):
+    from models.db import Category
+    carte = Category(name="Carte", slug="carte-t")
+    db_session.add(carte)
+    db_session.commit()
+    pokemon = Category(name="Pokémon", slug="pokemon-t", parent_id=carte.id)
+    db_session.add(pokemon)
+    db_session.commit()
+    figlia = _art(db_session, admin_user, "Pikachu", category_id=pokemon.id)
+    radice = _art(db_session, admin_user, "Sfuso", category_id=carte.id)
+    voci = _voci(client)
+    assert voci[f"nn-{figlia.id}"].find(f"{G}brand").text == "Pokémon"
+    assert voci[f"nn-{radice.id}"].find(f"{G}brand") is None

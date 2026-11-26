@@ -68,6 +68,16 @@ def _categoria(article: Article) -> Optional[str]:
     return f"{padre.name} > {cat.name}" if padre is not None else cat.name
 
 
+def _marca(article: Article) -> Optional[str]:
+    """La marca, o il nome della sottocategoria (Pokémon, Nintendo, Gormiti...):
+    senza codice EAN Google la chiede. Come nei dati strutturati della scheda."""
+    marca = _testo(article.brand, 70)
+    if marca:
+        return marca
+    cat = article.category
+    return _testo(cat.name, 70) or None if cat is not None and cat.parent_id else None
+
+
 def _voce(article: Article) -> Optional[str]:
     foto = [u for u in (_assoluto(x) for x in (article.images or [])) if u]
     if not foto or not article.price or float(article.price) <= 0:
@@ -83,7 +93,7 @@ def _voce(article: Article) -> Optional[str]:
         ("g:price", f"{float(article.price):.2f} {article.currency or 'EUR'}"),
         ("g:condition", CONDIZIONI_GOOGLE.get(article.condition, "used")),
         ("g:product_type", _categoria(article)),
-        ("g:brand", _testo(article.brand, 70) or None),
+        ("g:brand", _marca(article)),
         # Pezzi usati e da collezione: niente codice EAN/GTIN.
         ("g:identifier_exists", "no"),
     ]

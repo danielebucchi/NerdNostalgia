@@ -12,6 +12,7 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { StickyCtaBar } from "@/components/StickyCtaBar";
 import { WishlistButton } from "@/components/WishlistButton";
 import { absUrl, clip, SITE_NAME } from "@/lib/seo";
+import { baseShippingFor } from "@/lib/shipping";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -116,6 +117,7 @@ export default async function ArticleDetailPage({ params }: PageProps) {
   // runtime, vale per TUTTI gli articoli senza toccarne il testo.
   const settings = await getPublicSettings();
   const descriptionFooter = (settings.article_description_footer ?? "Spedizione veloce").trim();
+  const freeShippingAll = (settings.free_shipping_all ?? "").trim().toLowerCase() === "true";
 
   const cover = article.images?.[0];
 
@@ -126,9 +128,12 @@ export default async function ArticleDetailPage({ params }: PageProps) {
     description: article.description ?? article.title,
     image: article.images ?? [],
     sku: article.sku ?? `nn-${article.id}`,
-    brand: article.brand
-      ? { "@type": "Brand", name: article.brand }
-      : undefined,
+    // Senza codice EAN Google chiede almeno la marca: se manca, quella
+    // della sottocategoria (Pokémon, Nintendo, Gormiti...).
+    brand:
+      article.brand || article.parent_category
+        ? { "@type": "Brand", name: article.brand || article.category?.name }
+        : undefined,
     category: article.category?.name ?? undefined,
     itemCondition: CONDITION_SCHEMA[article.condition] ?? CONDITION_SCHEMA.USED,
     offers: {
@@ -143,6 +148,31 @@ export default async function ArticleDetailPage({ params }: PageProps) {
             ? "https://schema.org/SoldOut"
             : "https://schema.org/OutOfStock",
       seller: { "@type": "Organization", name: SITE_NAME },
+      // Spedizione e resi come in /resi e nel carrello: Google li mostra
+      // accanto al prezzo.
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        shippingRate: {
+          "@type": "MonetaryAmount",
+          value: freeShippingAll ? 0 : baseShippingFor(Number(article.price) || 0),
+          currency: "EUR",
+        },
+        shippingDestination: { "@type": "DefinedRegion", addressCountry: "IT" },
+        deliveryTime: {
+          "@type": "ShippingDeliveryTime",
+          handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: 2, unitCode: "DAY" },
+          transitTime: { "@type": "QuantitativeValue", minValue: 1, maxValue: 4, unitCode: "DAY" },
+        },
+      },
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        applicableCountry: "IT",
+        returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+        merchantReturnDays: 14,
+        returnMethod: "https://schema.org/ReturnByMail",
+        returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+        merchantReturnLink: absUrl("/resi"),
+      },
     },
   };
 
