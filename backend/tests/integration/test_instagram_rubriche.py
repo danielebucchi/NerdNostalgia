@@ -46,11 +46,12 @@ def _art(db, admin_user, titolo, prezzo, giorni_fa=30, carta=None):
     return a
 
 
-def test_monday_falls_back_when_there_are_no_new_arrivals(db_session, admin_user, ig):
+def test_no_material_no_rubric_that_day(db_session, admin_user, ig):
     for i in range(4):
         _art(db_session, admin_user, f"Economica {i}", 2 + i)
-    # Lunedi' niente nuovi, martedi' niente carte con prezzo di mercato: mercoledi' (sotto i 5).
-    nome, articoli, testo, (tipo, media) = rub.prepara(db_session, giorno=0)
+    assert rub.prepara(db_session, giorno=0) is None              # lunedi': nessun nuovo arrivo
+    assert rub.pubblica(db_session, giorno=0) is None and ig == []
+    nome, articoli, testo, (tipo, media) = rub.prepara(db_session, giorno=2)
     assert nome == "sotto5" and tipo == "carosello" and len(media) == len(articoli) + 1
     assert "Commenta LISTA" in testo
 
@@ -89,6 +90,8 @@ def test_rubric_once_a_day_in_its_slot(db_session, admin_user, ig, monkeypatch):
     from utils import instagram_stats
     _art(db_session, admin_user, "Costosa", 200)
     monkeypatch.setattr(instagram_stats, "slot_di_oggi", lambda db: "18:30")
+    originale = rub.prepara
+    monkeypatch.setattr(rub, "prepara", lambda db, giorno=None: originale(db, 6))   # domenica: la rara
     assert rub.slot_rubrica(db_session) == "12:30"
     assert rub.rubrica_del_giorno(db_session, "18:30") is None
     assert rub.rubrica_del_giorno(db_session, "12:30") is not None

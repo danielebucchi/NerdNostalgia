@@ -11,7 +11,8 @@ giorno della settimana, tutti presi dal catalogo.
     domenica   post "La rara della settimana"
 
 Se la rubrica del giorno non ha materiale (niente nuovi arrivi, niente
-storico dei prezzi...) si ripiega sulla prossima della lista che ce l'ha.
+storico dei prezzi...) quel giorno non esce niente: non si anticipa quella
+del giorno dopo.
 Esce nella fascia oraria buona che non e' quella del post del giorno
 (instagram_stats). Ogni rubrica invita a commentare LISTA: `rispondi_ai_commenti`
 manda in privato i link degli articoli del post.
@@ -303,7 +304,7 @@ def rara_della_settimana(db: Session) -> Optional[Contenuto]:
     return "rara", [a], _didascalia(righe, [a], db), ("foto", instagram.url_immagine(a, "post"))
 
 
-# Lunedi' = 0. Se la rubrica del giorno non ha materiale, si prova la successiva.
+# Lunedi' = 0.
 CALENDARIO: List[Tuple[str, Callable[[Session], Optional[Contenuto]]]] = [
     ("nuovi", nuovi_della_settimana),
     ("quiz", indovina_il_prezzo),
@@ -317,16 +318,15 @@ CALENDARIO: List[Tuple[str, Callable[[Session], Optional[Contenuto]]]] = [
 
 def prepara(db: Session, giorno: Optional[int] = None) -> Optional[Contenuto]:
     giorno = _ora().weekday() if giorno is None else giorno
-    for i in range(len(CALENDARIO)):
-        nome, funzione = CALENDARIO[(giorno + i) % len(CALENDARIO)]
-        try:
-            contenuto = funzione(db)
-        except Exception as exc:  # noqa: BLE001 — una rubrica rotta non ferma le altre
-            LOGGER.warning("Rubrica %s non preparata: %s", nome, exc)
-            continue
-        if contenuto is not None:
-            return contenuto
-    return None
+    nome, funzione = CALENDARIO[giorno % len(CALENDARIO)]
+    try:
+        contenuto = funzione(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("Rubrica %s non preparata: %s", nome, exc)
+        return None
+    if contenuto is None:
+        LOGGER.info("Rubrica %s: niente da pubblicare oggi", nome)
+    return contenuto
 
 
 def pubblica(db: Session, giorno: Optional[int] = None) -> Optional[Dict[str, object]]:
