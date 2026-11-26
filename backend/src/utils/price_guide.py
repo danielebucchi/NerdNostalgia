@@ -144,6 +144,33 @@ def aggiorna(db: Session, pausa: float = PAUSA, limite: Optional[int] = None) ->
     return {"set": fatti, "carte": carte, "errori": errori}
 
 
+def _numero_setting(db: Session, chiave: str, predefinito: float) -> float:
+    from helpers.setting import SettingHelper
+    try:
+        return float((SettingHelper(db=db).get_value(chiave) or "").replace(",", "."))
+    except ValueError:
+        return predefinito
+
+
+def regola_offerta(db: Session) -> tuple:
+    """(cifra fissa, soglia, percentuale) da Impostazioni."""
+    return (_numero_setting(db, "buy_offer_fixed", 0.50), _numero_setting(db, "buy_offer_threshold", 4.0),
+            _numero_setting(db, "buy_offer_percent", 60.0))
+
+
+def offerta(centesimi: Optional[int], regola: tuple) -> Optional[float]:
+    """Quanto diamo, al massimo, per una carta che vale `centesimi` sul
+    mercato: la cifra fissa fino alla soglia, poi la percentuale,
+    arrotondata per difetto ai 10 centesimi."""
+    if not centesimi:
+        return None
+    fissa, soglia, percentuale = regola
+    valore = centesimi / 100
+    if valore <= soglia:
+        return round(fissa, 2)
+    return int(valore * percentuale / 100 * 10) / 10
+
+
 def euro(centesimi: Optional[int]) -> Optional[float]:
     return round(centesimi / 100, 2) if centesimi else None
 

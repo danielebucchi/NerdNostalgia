@@ -32,10 +32,11 @@ def _set(s: PriceGuideSet, carte: Optional[int] = None) -> dict:
             "cards_priced": carte, "updated_at": s.updated_at.isoformat() if s.updated_at else None}
 
 
-def _carta(c: PriceGuideCard, disponibile: Optional[dict] = None) -> dict:
+def _carta(c: PriceGuideCard, disponibile: Optional[dict] = None, regola: Optional[tuple] = None) -> dict:
     return {"slug": c.slug, "set_slug": c.set.slug, "set_name": c.set.nome, "number": c.number,
             "name": c.nome, "name_en": c.name_en, "image": c.image_url, "min_price": pg.euro(c.min_price_cents),
-            "offers": c.offers, "available": disponibile}
+            "offers": c.offers, "available": disponibile,
+            "buy_offer": pg.offerta(c.min_price_cents, regola) if regola else None}
 
 
 @router.get("/sets")
@@ -53,8 +54,9 @@ def set_dettaglio(slug: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Set non trovato")
     carte = sorted(s.cards, key=lambda c: (int(c.number) if c.number.isdigit() else 10**6, c.number, c.slug))
     nostre = pg.disponibili(db, [c.blueprint_id for c in carte])
+    regola = pg.regola_offerta(db)
     return JSONResponse({**_set(s, sum(1 for c in carte if c.min_price_cents)),
-                         "cards": [_carta(c, nostre.get(c.blueprint_id)) for c in carte]}, headers=CACHE)
+                         "cards": [_carta(c, nostre.get(c.blueprint_id), regola) for c in carte]}, headers=CACHE)
 
 
 @router.get("/cards/{set_slug}/{slug}")
@@ -68,9 +70,11 @@ def carta(set_slug: str, slug: str, db: Session = Depends(get_db)):
                                              PriceGuideCard.min_price_cents.isnot(None))
              .order_by(PriceGuideCard.min_price_cents.desc()).limit(12).all())
     nostre = pg.disponibili(db, [c.blueprint_id] + [a.blueprint_id for a in altre])
-    return JSONResponse({**_carta(c, nostre.get(c.blueprint_id)), "set": _set(c.set),
+    regola = pg.regola_offerta(db)
+    return JSONResponse({**_carta(c, nostre.get(c.blueprint_id), regola), "set": _set(c.set),
                          "updated_at": c.updated_at.isoformat() if c.updated_at else None,
-                         "other_versions": [_carta(a, nostre.get(a.blueprint_id)) for a in altre]}, headers=CACHE)
+                         "other_versions": [_carta(a, nostre.get(a.blueprint_id), regola) for a in altre]},
+                        headers=CACHE)
 
 
 @router.get("/search")
@@ -86,7 +90,8 @@ def cerca(request: Request, q: str = Query(..., min_length=2, max_length=80), db
     risultati = (query.filter(PriceGuideCard.min_price_cents.isnot(None))
                  .order_by(PriceGuideCard.min_price_cents.desc()).limit(30).all())
     nostre = pg.disponibili(db, [c.blueprint_id for c in risultati])
-    return [_carta(c, nostre.get(c.blueprint_id)) for c in risultati]
+    regola = pg.regola_offerta(db)
+    return [_carta(c, nostre.get(c.blueprint_id), regola) for c in risultati]
 
 
 @router.get("/sitemap")

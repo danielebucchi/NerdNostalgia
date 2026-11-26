@@ -82,13 +82,17 @@ export default function ValutaCartePage() {
                   {c.name} <span className="text-ink-soft">#{c.number}</span>
                 </Link>
                 <p className="text-sm text-ink-soft truncate">{c.set_name}</p>
-                <p className="font-bold text-pink-deep">da {euro(c.min_price)}</p>
+                <p className="text-sm text-ink-soft">Valore di mercato da {euro(c.min_price)}</p>
+                {c.buy_offer != null && (
+                  <p className="font-bold text-pink-deep">💰 Ti diamo fino a {euro(c.buy_offer)}</p>
+                )}
               </div>
               <div className="flex flex-col gap-2 items-end">
                 {c.available && (
                   <Link href={`/articles/${c.available.id}`} className="chip chip-mint text-xs">Da noi {euro(c.available.price)}</Link>
                 )}
-                <VendilaANoi carta={`${c.name} #${c.number} – ${c.set_name}`} className="btn btn-ghost text-xs sm:text-sm" />
+                <VendilaANoi carta={`${c.name} #${c.number} – ${c.set_name}`} offerta={c.buy_offer}
+                  className="btn btn-ghost text-xs sm:text-sm" />
               </div>
             </div>
           ))}
@@ -96,7 +100,8 @@ export default function ValutaCartePage() {
       )}
 
       <p className="text-xs text-ink-soft mt-8 text-center">
-        Prezzi: l&apos;offerta più bassa su CardTrader, aggiornata ogni settimana.{" "}
+        Prezzi: l&apos;offerta più bassa su CardTrader, aggiornata ogni settimana. &quot;Fino a&quot; è quanto
+        diamo per una copia in ottime condizioni: la cifra esatta la confermiamo dopo aver visto le foto.{" "}
         <Link href="/prezzi-carte-pokemon" className="underline">Sfoglia tutti i set</Link>.
       </p>
     </section>

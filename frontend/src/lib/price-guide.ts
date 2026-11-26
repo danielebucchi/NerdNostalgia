@@ -33,6 +33,8 @@ export interface GuideCard {
   min_price: number | null;
   offers: number;
   available: GuideAvailable | null;
+  /** Quanto diamo al massimo per una copia in ottime condizioni (Impostazioni). */
+  buy_offer: number | null;
 }
 
 export interface GuideSetDetail extends GuideSet {

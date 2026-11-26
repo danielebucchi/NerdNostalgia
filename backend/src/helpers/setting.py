@@ -68,6 +68,26 @@ SETTINGS_SPEC: Dict[str, dict] = {
         "help": "Gli articoli da questo prezzo in su hanno anche una Storia "
                 "(al massimo 10 al giorno).",
     },
+    "buy_offer_fixed": {
+        "default": "0.50",
+        "public": False,
+        "label": "Valuta carte — offerta per le carte economiche (€)",
+        "help": "Quanto offriamo per una carta che vale fino alla soglia qui sotto "
+                "(pagina pubblica Valuta la tua carta).",
+    },
+    "buy_offer_threshold": {
+        "default": "4",
+        "public": False,
+        "label": "Valuta carte — soglia (€)",
+        "help": "Fino a questo valore di mercato si offre la cifra fissa, oltre la percentuale.",
+    },
+    "buy_offer_percent": {
+        "default": "60",
+        "public": False,
+        "label": "Valuta carte — percentuale oltre la soglia (%)",
+        "help": "Oltre la soglia offriamo questa percentuale del valore di mercato "
+                "(l'offerta piu' bassa su CardTrader). Si mostra come \"fino a X €\".",
+    },
     "free_shipping_all": {
         "default": "",
         "public": True,

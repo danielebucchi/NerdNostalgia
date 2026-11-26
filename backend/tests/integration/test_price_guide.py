@@ -61,3 +61,17 @@ def test_public_pages_and_search(client, db_session, admin_user, fonti):
     assert [c["name"] for c in trovate] == ["Charizard"]
     mappa = client.get("/api/price-guide/sitemap").json()
     assert {c["slug"] for c in mappa["cards"]} == {"4-charizard", "2-blastoise"}
+
+
+def test_buy_offer_rule(client, db_session, fonti):
+    from helpers.setting import SettingHelper
+    regola = price_guide.regola_offerta(db_session)
+    assert regola == (0.5, 4.0, 60.0)
+    assert price_guide.offerta(399, regola) == 0.5                 # 3,99 €: cifra fissa
+    assert price_guide.offerta(400, regola) == 0.5                 # 4 € compresi
+    assert price_guide.offerta(12063, regola) == 72.3              # 60% di 120,63 = 72,37 → 72,30
+    assert price_guide.offerta(None, regola) is None
+    price_guide.aggiorna(db_session, pausa=0)
+    assert client.get("/api/price-guide/cards/set-base/4-charizard").json()["buy_offer"] == 72.3
+    SettingHelper(db=db_session).upsert("buy_offer_percent", "50")
+    assert client.get("/api/price-guide/search?q=blastoise").json()[0]["buy_offer"] == 19.7   # 50% di 39,51

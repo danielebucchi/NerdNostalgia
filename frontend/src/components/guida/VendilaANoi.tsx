@@ -5,7 +5,11 @@ import { InquiryDialog } from "@/components/InquiryDialog";
 
 /* "Ce l'hai? Vendila a noi": apre il modulo richieste con l'oggetto gia'
  * scritto. Le richieste arrivano come le altre (admin → Richieste). */
-export function VendilaANoi({ carta, className = "btn btn-primary" }: { carta: string; className?: string }) {
+export function VendilaANoi({ carta, offerta, className = "btn btn-primary" }: {
+  carta: string;
+  offerta?: number | null;
+  className?: string;
+}) {
   const [aperto, setAperto] = useState(false);
   return (
     <>
@@ -15,7 +19,7 @@ export function VendilaANoi({ carta, className = "btn btn-primary" }: { carta: s
       <InquiryDialog
         open={aperto}
         onClose={() => setAperto(false)}
-        customSubject={`Vorrei vendere: ${carta}`}
+        customSubject={`Vorrei vendere: ${carta}${offerta ? ` (offerta fino a ${offerta.toFixed(2).replace(".", ",")} €)` : ""}`}
         dialogTitle="Vendila a noi"
         subtitle={<>Ci dica condizioni e lingua della carta (meglio con qualche foto): Le rispondiamo con un&apos;offerta.</>}
         messagePlaceholder="Es. italiana, condizioni buone, piccolo graffio sul retro…"

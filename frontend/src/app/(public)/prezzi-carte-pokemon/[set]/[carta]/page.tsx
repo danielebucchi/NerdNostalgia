@@ -88,8 +88,16 @@ export default async function CartaPage({ params }: Params) {
             </p>
           )}
 
-          <div className="mt-6">
-            <VendilaANoi carta={`${c.name} #${c.number} – ${c.set.name}`} />
+          <div className="card p-5 mt-4">
+            {c.buy_offer != null && (
+              <>
+                <p className="display text-2xl text-ink">💰 Ti diamo fino a {euro(c.buy_offer)}</p>
+                <p className="text-xs text-ink-soft mt-1 mb-3">
+                  Per una copia in ottime condizioni: la cifra esatta la confermiamo dopo aver visto le foto.
+                </p>
+              </>
+            )}
+            <VendilaANoi carta={`${c.name} #${c.number} – ${c.set.name}`} offerta={c.buy_offer} />
           </div>
         </div>
       </div>
