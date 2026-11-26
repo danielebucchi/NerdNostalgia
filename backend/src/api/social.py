@@ -23,12 +23,14 @@ router = APIRouter(prefix="/api/social", tags=["social"])
 
 
 @router.get("/instagram/{article_id}/{formato}.jpg")
-def immagine(article_id: int, formato: Literal["post", "storia"], db: Session = Depends(get_db)):
+def immagine(article_id: int, formato: Literal["post", "storia"], prezzo: int = 1,
+             db: Session = Depends(get_db)):
     article = db.query(Article).filter(Article.id == article_id,
                                        Article.status == ArticleStatus.PUBLISHED).first()
     if article is None:
         raise HTTPException(status_code=404, detail="Articolo non trovato")
-    return Response(content=instagram.immagine(article, formato), media_type="image/jpeg",
+    return Response(content=instagram.immagine(article, formato, mostra_prezzo=bool(prezzo)),
+                    media_type="image/jpeg",
                     headers={"Cache-Control": "public, max-age=86400"})
 
 

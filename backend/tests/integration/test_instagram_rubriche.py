@@ -124,3 +124,25 @@ def test_gift_ideas_follow_the_italian_occasions():
               date(2027, 10, 20): "per chi ama collezionare"}
     for giorno, testo in attese.items():
         assert rub.ricorrenza(giorno) == testo, giorno
+
+
+def test_saturday_informs_without_selling(db_session, admin_user, ig, monkeypatch):
+    from utils import card_names_it
+    monkeypatch.setattr(card_names_it, "_set_pokemon", lambda nome: "base1")
+    info = {"tcgdex:en:base1": {"name": "Base Set", "releaseDate": "1999-01-09", "cardCount": {"official": 102}},
+            "tcgdex:it:base1": {"name": "Set Base", "serie": {"name": "Originale"}, "cardCount": {"official": 102}}}
+    monkeypatch.setattr(card_names_it, "_in_cache", lambda chiave, funzione: info[chiave])
+    for i in range(4):
+        _art(db_session, admin_user, f"Carta {i}", 7 + i, carta={"collection": "Base Set"})
+    nome, articoli, testo, (tipo, media) = rub.prepara(db_session, giorno=5)
+    assert nome == "annifa" and "anni fa usciva Set Base" in testo and "9 gennaio 1999" in testo
+    assert "€" not in testo and "LISTA" not in testo
+    assert all("prezzo=0" in u for u in media if "/api/social/instagram/" in u)
+    assert len(media) == len(articoli) + 3                                           # copertina, scheda, finale
+    rub.pubblica(db_session, giorno=5)
+    assert not any(p.get("media_type") == "STORIES" for _, _, p in ig)              # niente Storie
+
+
+def test_image_without_price(client, db_session, admin_user):
+    a = _art(db_session, admin_user, "Pikachu", 3)
+    assert client.get(f"/api/social/instagram/{a.id}/post.jpg?prezzo=0").status_code == 200

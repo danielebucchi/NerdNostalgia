@@ -270,8 +270,54 @@ def carte_salite(db: Session) -> Optional[Contenuto]:
                       righe, db, "IN SALITA")
 
 
+def _data_italiana(iso: str) -> str:
+    anno, mese, giorno = (int(x) for x in iso[:10].split("-"))
+    return f"{giorno} {instagram_reel.MESI[mese - 1]} {anno}"
+
+
+def scheda_set(info_it: dict, info_en: dict, anno: int) -> Image.Image:
+    """La slide delle curiosita' sul set: uscita, numero di carte, serie."""
+    from utils import social_grafica as g
+    w, h = instagram.POST
+    tela = g.sfondo(instagram.POST, seme=anno, colori=(g.CIELO, g.LILLA, g.ROSA))
+    g.logo(tela, 50, 50, 120)
+    y = g.testo_centrato(tela, info_it.get("name") or info_en.get("name") or "", 230, "titolo", 88, g.INK, 2)
+    righe = []
+    if info_en.get("releaseDate"):
+        righe.append(("Prima uscita", _data_italiana(info_en["releaseDate"])))
+    conta = (info_it.get("cardCount") or info_en.get("cardCount") or {}).get("official")
+    if conta:
+        righe.append(("Carte nel set", str(conta)))
+    serie = (info_it.get("serie") or {}).get("name") or (info_en.get("serie") or {}).get("name")
+    if serie:
+        righe.append(("Serie", serie))
+    sigla = (info_en.get("abbreviation") or {}).get("official")
+    if sigla:
+        righe.append(("Sigla", sigla))
+    y += 50
+    for etichetta, valore in righe:
+        g.etichetta(tela, etichetta.upper(), w // 2, y, g.LILLA_FORTE, g.BIANCO, 30, "centro")
+        y = g.testo_centrato(tela, valore, y + 70, "titolo", 64, g.INK, 1) + 30
+    return tela.convert("RGB")
+
+
+def finale_racconto(anno: int) -> Image.Image:
+    """L'ultima slide del sabato: niente vendita, si chiacchiera."""
+    from utils import social_grafica as g
+    w, h = instagram.POST
+    tela = g.sfondo(instagram.POST, seme=anno + 1, colori=(g.LILLA, g.ROSA, g.MENTA))
+    g.logo(tela, (w - 240) // 2, 150, 240)
+    y = g.testo_centrato(tela, "E tu?", 450, "titolo", 110, g.INK, 1)
+    y = g.testo_centrato(tela, "Quante ne avevi? Qual era la tua preferita?", y + 20, "titolo", 64, g.INK, 3,
+                         larghezza=w - 200)
+    g.pillola(tela, "Raccontacelo nei commenti", w // 2, y + 50, 52, g.ROSA_FORTE, g.BIANCO, "testo")
+    return tela.convert("RGB")
+
+
 def anni_fa(db: Session) -> Optional[Contenuto]:
-    """Un set Pokémon di cui abbiamo carte, con il suo anno di uscita."""
+    """Il sabato si informa, non si vende: un set Pokémon di cui abbiamo
+    carte (le foto sono le nostre), con data di uscita, numero di carte e
+    serie da TCGdex. Niente prezzi, niente LISTA, niente Storie."""
     from utils import card_names_it
     usati = _usati_di_recente(db, "annifa")
     per_set: Dict[str, List[Article]] = {}
@@ -290,18 +336,39 @@ def anni_fa(db: Session) -> Optional[Contenuto]:
                                        lambda s=set_id: card_names_it._get(f"https://api.tcgdex.net/v2/en/sets/{s}"))
         uscita = info.get("releaseDate") if isinstance(info, dict) else None
         if uscita and uscita[:4].isdigit():
-            candidati.append((int(uscita[:4]), nome, articoli))
+            candidati.append((int(uscita[:4]), nome, set_id, info, articoli))
     if not candidati:
         return None
-    candidati.sort()
-    anno, nome, articoli = random.Random(_ora().toordinal()).choice(candidati[:5])
+    candidati.sort(key=lambda c: c[0])
+    anno, nome, set_id, info_en, articoli = random.Random(_ora().toordinal()).choice(candidati[:5])
+    info_it = card_names_it._in_cache(f"tcgdex:it:{set_id}",
+                                      lambda: card_names_it._get(f"https://api.tcgdex.net/v2/it/sets/{set_id}"))
+    info_it = info_it if isinstance(info_it, dict) else {}
+    nome_it = info_it.get("name") or nome
     quanti_anni = _ora().year - anno
-    nome_it = next((c.collection_it for c in (_carta(x) for x in articoli) if c and c.collection_it), None) or nome
-    articoli.sort(key=lambda a: float(a.price), reverse=True)
     titolo = f"{quanti_anni} anni fa usciva {nome_it}" if quanti_anni > 0 else f"{nome_it}, uscito quest'anno"
-    righe = [f"⏳ {titolo} ({anno})! Quante di queste carte avevi?", ""]
-    righe += [f"▪️ {a.title} — {instagram._prezzo(a)}" for a in articoli[:MAX_SLIDE - 2]]
-    return _carosello("annifa", titolo, f"il set del {anno}", articoli, righe, db, "NOSTALGIA")
+    articoli = articoli[:MAX_SLIDE - 3]
+    giorno = f"{_ora():%Y%m%d}"
+    immagini = [
+        instagram_reel.salva(_jpeg(copertina(titolo, f"il set del {anno}", emoji_testo="NOSTALGIA",
+                                             articoli=articoli)), f"annifa-{giorno}", "jpg"),
+        instagram_reel.salva(_jpeg(scheda_set(info_it, info_en, anno)), f"annifa-{giorno}-scheda", "jpg"),
+    ]
+    immagini += [instagram.url_immagine(a, "post", prezzo=False) for a in articoli]
+    immagini.append(instagram_reel.salva(_jpeg(finale_racconto(anno)), f"annifa-{giorno}-fine", "jpg"))
+    righe = [f"⏳ {titolo}!", ""]
+    if info_en.get("releaseDate"):
+        righe.append(f"📅 Prima uscita: {_data_italiana(info_en['releaseDate'])}")
+    conta = (info_it.get("cardCount") or info_en.get("cardCount") or {}).get("official")
+    if conta:
+        righe.append(f"🃏 {conta} carte nel set")
+    serie = (info_it.get("serie") or {}).get("name")
+    if serie:
+        righe.append(f"📚 Serie: {serie}")
+    righe += ["", "Nelle foto alcune carte di questo set passate dalle nostre mani.",
+              "E tu? Quante ne avevi, qual era la tua preferita? Raccontacelo nei commenti 👇",
+              "", instagram._tag(articoli, db)]
+    return "annifa", articoli, "\n".join(righe)[:2200], ("carosello", immagini)
 
 
 def rara_della_settimana(db: Session) -> Optional[Contenuto]:
@@ -369,7 +436,7 @@ def pubblica(db: Session, giorno: Optional[int] = None) -> Optional[Dict[str, ob
                              slot=slot_rubrica(db), rubrica=nome, article_ids=[a.id for a in articoli])
     # Come per il post del giorno, una Storia per ogni pezzo che non l'ha
     # ancora avuta. Non per il quiz: la Storia mostrerebbe il prezzo.
-    if nome != "quiz":
+    if nome not in ("quiz", "annifa"):
         instagram._storie(db, token, [a for a in articoli
                                       if not (a.article_metadata or {}).get("instagram_story")])
     LOGGER.info("Instagram: rubrica %s pubblicata (%s)", nome, media)

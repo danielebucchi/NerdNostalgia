@@ -225,11 +225,12 @@ def immagine(article: Article, formato: str = "post", mostra_prezzo: bool = True
 GRAFICA = "2"
 
 
-def url_immagine(article: Article, formato: str) -> str:
+def url_immagine(article: Article, formato: str, prezzo: bool = True) -> str:
     # Il parametro cambia quando cambia l'articolo: Instagram non deve
     # riusare un'immagine vecchia rimasta in cache.
     versione = int((article.updated_at or article.published_at or _ora()).timestamp())
-    return f"{_api_url()}/api/social/instagram/{article.id}/{formato}.jpg?v={versione}{GRAFICA}"
+    senza = "" if prezzo else "&prezzo=0"
+    return f"{_api_url()}/api/social/instagram/{article.id}/{formato}.jpg?v={versione}{GRAFICA}{senza}"
 
 
 # ---------------------------------------------------------------------------
