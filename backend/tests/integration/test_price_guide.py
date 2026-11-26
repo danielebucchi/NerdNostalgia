@@ -74,6 +74,9 @@ def test_buy_offer_rule(client, db_session, fonti):
     assert o(20, "2010-05-01") == {"tipo": "peso", "epoca": "bordo giallo", "euro_kg": 5.0}
     assert o(20, "2024-01-26") == {"tipo": "peso", "epoca": "modern", "euro_kg": 3.0}
     assert o(10, "2010-05-01", "Fire Energy") == {"tipo": "no"}       # energie a peso: no
+    assert o(10, "2010-05-01", "Double Colorless Energy (Holo)") == {"tipo": "no"}
+    assert o(45, "1999-01-09", "Super Energy Removal")["tipo"] == "peso"   # Allenatore, non energia
+    assert o(45, "1999-01-09", "Energy Search")["tipo"] == "peso"
     assert o(None) == {}
     price_guide.aggiorna(db_session, pausa=0)
     carta = client.get("/api/price-guide/cards/set-base/4-charizard").json()

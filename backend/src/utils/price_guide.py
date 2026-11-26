@@ -198,7 +198,11 @@ def epoca(data_uscita: Optional[str]) -> str:
 
 
 def energia(nome: str) -> bool:
-    return bool(re.search(r"\benerg(y|ia)\b", nome or "", re.IGNORECASE))
+    """Le carte Energia si chiamano "... Energy" ("Fire Energy", "Double
+    Colorless Energy"); "Super Energy Removal" o "Energy Search" sono
+    Allenatori. Il nome e' quello inglese, senza la variante tra parentesi."""
+    nome = re.sub(r"\(.*?\)", "", nome or "").strip()
+    return bool(re.search(r"\benergy$", nome, re.IGNORECASE))
 
 
 def offerta(centesimi: Optional[int], regola: dict, data_uscita: Optional[str] = None,
