@@ -146,3 +146,20 @@ def test_saturday_informs_without_selling(db_session, admin_user, ig, monkeypatc
 def test_image_without_price(client, db_session, admin_user):
     a = _art(db_session, admin_user, "Pikachu", 3)
     assert client.get(f"/api/social/instagram/{a.id}/post.jpg?prezzo=0").status_code == 200
+
+
+def test_iconic_cards_are_the_most_valuable_of_the_set(monkeypatch):
+    from utils import cardtrader_client as ct
+    monkeypatch.setattr(ct, "is_configured", lambda: True)
+    monkeypatch.setattr(ct, "expansion_min_prices_cents",
+                        lambda e: {1: 70000, 2: 12000, 3: 3900, 4: 50})          # 1 = mazzo sigillato
+    monkeypatch.setattr(ct, "blueprints_cached", lambda e: [
+        {"id": 1, "name": "Theme Deck", "fixed_properties": {}},
+        {"id": 2, "name": "Charizard", "fixed_properties": {"collector_number": "004"}},
+        {"id": 3, "name": "Blastoise", "fixed_properties": {"collector_number": "002/102"}},
+        {"id": 4, "name": "Energia", "fixed_properties": {"collector_number": "098"}}])
+    info = {"cards": [{"localId": "4", "name": "Charizard", "image": "https://assets/4"},
+                      {"localId": "2", "name": "Blastoise", "image": "https://assets/2"},
+                      {"localId": "98", "name": "Energy", "image": "https://assets/98"}]}
+    assert rub.carte_iconiche(1472, info, quante=2) == [
+        ("4", "Charizard", "https://assets/4/high.png"), ("2", "Blastoise", "https://assets/2/high.png")]

@@ -196,6 +196,9 @@ def mosaico(tela: Image.Image, foto: List[Optional[Image.Image]], box: Tuple[int
     if len(foto) == 1:
         carta(tela, foto[0], box, inclinazione=-3)
         return
+    if all(f.height > f.width * 1.15 for f in foto):
+        _ventaglio(tela, foto, box)
+        return
     meta_w, meta_h = (x1 - x0) // 2, (y1 - y0) // 2
     posti = [(x0, y0), (x0 + meta_w, y0), (x0, y0 + meta_h), (x0 + meta_w, y0 + meta_h)]
     if len(foto) <= 2:
@@ -203,6 +206,24 @@ def mosaico(tela: Image.Image, foto: List[Optional[Image.Image]], box: Tuple[int
     angoli = [-5, 4, 3, -4]
     for i, (f, (px, py)) in enumerate(zip(foto, posti)):
         carta(tela, f, (px, py, px + meta_w, py + meta_h), margine=14, raggio=24, inclinazione=angoli[i])
+
+
+def _ventaglio(tela: Image.Image, foto: List[Image.Image], box: Tuple[int, int, int, int]) -> None:
+    """Foto verticali (carte da gioco) in fila, sovrapposte e un po' ruotate,
+    come un ventaglio di carte in mano: riempiono lo spazio molto meglio
+    della griglia."""
+    x0, y0, x1, y1 = box
+    n = len(foto)
+    larga = int((x1 - x0) / (n * 0.78 + 0.22))
+    passo = (x1 - x0 - larga) / max(1, n - 1)
+    angoli = {2: [-6, 6], 3: [-9, 0, 9], 4: [-11, -4, 4, 11]}[n]
+    alzate = {2: [0, 0], 3: [30, 0, 30], 4: [40, 8, 8, 40]}[n]
+    # Prima i laterali, poi quelli centrali sopra.
+    ordine = sorted(range(n), key=lambda i: -abs(i - (n - 1) / 2))
+    for i in ordine:
+        px = int(x0 + i * passo)
+        carta(tela, foto[i], (px, y0 + alzate[i], px + larga, y1 + alzate[i] - 40),
+              margine=14, raggio=24, inclinazione=angoli[i])
 
 
 def finale(misure: Tuple[int, int], seme: int = 0) -> Image.Image:

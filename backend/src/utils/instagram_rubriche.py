@@ -314,21 +314,92 @@ def finale_racconto(anno: int) -> Image.Image:
     return tela.convert("RGB")
 
 
+ICONICHE = 5
+
+
+def _numero(fixed_properties: Optional[dict]) -> Optional[str]:
+    numero = str((fixed_properties or {}).get("collector_number") or "").split("/")[0].strip()
+    return numero.lstrip("0") or numero or None
+
+
+def carte_iconiche(expansion_id: Optional[int], info_en: dict, quante: int = ICONICHE) -> List[Tuple[str, str, str]]:
+    """Le carte piu' ricercate del set, anche se non le abbiamo: le piu' care
+    su CardTrader, con l'immagine ufficiale di TCGdex.
+    [(numero nel set, nome inglese, url immagine)]."""
+    from utils import cardtrader_client as ct
+    if not expansion_id or not ct.is_configured():
+        return []
+    try:
+        prezzi = ct.expansion_min_prices_cents(expansion_id)
+        blueprint = {b["id"]: b for b in ct.blueprints_cached(expansion_id)}
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("Carte iconiche: CardTrader non risponde (%s)", exc)
+        return []
+    per_numero = {(c.get("localId") or "").lstrip("0") or c.get("localId"): c
+                  for c in info_en.get("cards") or []}
+    scelte, visti = [], set()
+    for bp_id, _ in sorted(prezzi.items(), key=lambda kv: kv[1], reverse=True):
+        bp = blueprint.get(bp_id)
+        numero = _numero(bp.get("fixed_properties")) if bp else None
+        carta = per_numero.get(numero) if numero else None
+        if not carta or not carta.get("image") or numero in visti:
+            continue
+        visti.add(numero)
+        scelte.append((carta.get("localId") or numero, carta.get("name") or bp.get("name") or "",
+                       f"{carta['image']}/high.png"))
+        if len(scelte) == quante:
+            break
+    return scelte
+
+
+def _scarica(url: str, tentativi: int = 2) -> Optional[Image.Image]:
+    """Un'immagine da TCGdex. Il loro server ogni tanto risponde 503 per
+    qualche secondo: si riprova una volta, poi si fa senza."""
+    import time
+
+    import requests
+    for tentativo in range(tentativi):
+        try:
+            r = requests.get(url, timeout=20)
+            r.raise_for_status()
+            return Image.open(io.BytesIO(r.content)).convert("RGB")
+        except Exception as exc:  # noqa: BLE001
+            if tentativo + 1 == tentativi:
+                LOGGER.warning("Immagine %s non scaricata: %s", url, exc)
+            else:
+                time.sleep(5)
+    return None
+
+
+def slide_carta(foto: Optional[Image.Image], nome: str, sotto: str, seme: int) -> Image.Image:
+    """Una carta del set, senza prezzo: foto, nome e una riga di contesto."""
+    from utils import social_grafica as g
+    w, h = instagram.POST
+    tela = g.sfondo(instagram.POST, seme=seme)
+    g.logo(tela, 40, 34, 120)
+    g.carta(tela, foto, (60, 140, w - 60, 1060))
+    y = g.testo_centrato(tela, nome, 1080, "titolo", 58, g.INK, 1)
+    g.testo_centrato(tela, sotto, y + 4, "testo", 40, g.INK_SOFT, 1, peso="SemiBold")
+    return tela.convert("RGB")
+
+
 def anni_fa(db: Session) -> Optional[Contenuto]:
     """Il sabato si informa, non si vende: un set Pokémon di cui abbiamo
-    carte (le foto sono le nostre), con data di uscita, numero di carte e
-    serie da TCGdex. Niente prezzi, niente LISTA, niente Storie."""
+    almeno una carta, con data di uscita, numero di carte e serie da TCGdex,
+    le carte piu' ricercate del set (anche se non le abbiamo: immagini
+    ufficiali TCGdex, scelte per valore su CardTrader) e un paio delle
+    nostre. Niente prezzi, niente LISTA, niente Storie."""
     from utils import card_names_it
     usati = _usati_di_recente(db, "annifa")
-    per_set: Dict[str, List[Article]] = {}
+    per_set: Dict[str, Tuple[List[Article], Optional[int]]] = {}
     for a in _con_foto(_in_vendita(db).all()):
         carta = _carta(a)
         if carta is not None and carta.collection and a.id not in usati:
-            per_set.setdefault(carta.collection, []).append(a)
+            articoli, espansione = per_set.get(carta.collection, ([], None))
+            articoli.append(a)
+            per_set[carta.collection] = (articoli, espansione or carta.cardtrader_expansion_id)
     candidati = []
-    for nome, articoli in per_set.items():
-        if len(articoli) < 3:
-            continue
+    for nome, (articoli, espansione) in per_set.items():
         set_id = card_names_it._set_pokemon(nome)
         if not set_id:
             continue
@@ -336,26 +407,42 @@ def anni_fa(db: Session) -> Optional[Contenuto]:
                                        lambda s=set_id: card_names_it._get(f"https://api.tcgdex.net/v2/en/sets/{s}"))
         uscita = info.get("releaseDate") if isinstance(info, dict) else None
         if uscita and uscita[:4].isdigit():
-            candidati.append((int(uscita[:4]), nome, set_id, info, articoli))
+            candidati.append((int(uscita[:4]), nome, set_id, info, articoli, espansione))
     if not candidati:
         return None
     candidati.sort(key=lambda c: c[0])
-    anno, nome, set_id, info_en, articoli = random.Random(_ora().toordinal()).choice(candidati[:5])
+    anno, nome, set_id, info_en, articoli, espansione = random.Random(_ora().toordinal()).choice(candidati[:5])
     info_it = card_names_it._in_cache(f"tcgdex:it:{set_id}",
                                       lambda: card_names_it._get(f"https://api.tcgdex.net/v2/it/sets/{set_id}"))
     info_it = info_it if isinstance(info_it, dict) else {}
     nome_it = info_it.get("name") or nome
+    nomi_it = {(c.get("localId") or ""): c.get("name") for c in info_it.get("cards") or []}
     quanti_anni = _ora().year - anno
     titolo = f"{quanti_anni} anni fa usciva {nome_it}" if quanti_anni > 0 else f"{nome_it}, uscito quest'anno"
-    articoli = articoli[:MAX_SLIDE - 3]
+
+    from utils import social_grafica as g
+    foto_iconiche = []
+    for numero, nome_en, url in carte_iconiche(espansione, info_en):
+        foto = _scarica(url)
+        if foto is not None:
+            foto_iconiche.append((nomi_it.get(numero) or nome_en, foto))
+    nostre = articoli[:max(1, MAX_SLIDE - 3 - len(foto_iconiche))]
     giorno = f"{_ora():%Y%m%d}"
-    immagini = [
-        instagram_reel.salva(_jpeg(copertina(titolo, f"il set del {anno}", emoji_testo="NOSTALGIA",
-                                             articoli=articoli)), f"annifa-{giorno}", "jpg"),
-        instagram_reel.salva(_jpeg(scheda_set(info_it, info_en, anno)), f"annifa-{giorno}-scheda", "jpg"),
-    ]
-    immagini += [instagram.url_immagine(a, "post", prezzo=False) for a in articoli]
+    if foto_iconiche:
+        # In copertina le carte famose, non le nostre.
+        cover = copertina(titolo, f"il set del {anno}", emoji_testo="NOSTALGIA").convert("RGBA")
+        g.mosaico(cover, [f for _, f in foto_iconiche[:4]], (90, 600, instagram.POST[0] - 90, instagram.POST[1] - 150))
+        cover = cover.convert("RGB")
+    else:
+        cover = copertina(titolo, f"il set del {anno}", emoji_testo="NOSTALGIA", articoli=nostre)
+    immagini = [instagram_reel.salva(_jpeg(cover), f"annifa-{giorno}", "jpg"),
+                instagram_reel.salva(_jpeg(scheda_set(info_it, info_en, anno)), f"annifa-{giorno}-scheda", "jpg")]
+    for i, (n, f) in enumerate(foto_iconiche):
+        immagini.append(instagram_reel.salva(_jpeg(slide_carta(f, n, "una delle più ricercate del set", anno + i)),
+                                             f"annifa-{giorno}-carta{i}", "jpg"))
+    immagini += [instagram.url_immagine(a, "post", prezzo=False) for a in nostre]
     immagini.append(instagram_reel.salva(_jpeg(finale_racconto(anno)), f"annifa-{giorno}-fine", "jpg"))
+
     righe = [f"⏳ {titolo}!", ""]
     if info_en.get("releaseDate"):
         righe.append(f"📅 Prima uscita: {_data_italiana(info_en['releaseDate'])}")
@@ -365,10 +452,12 @@ def anni_fa(db: Session) -> Optional[Contenuto]:
     serie = (info_it.get("serie") or {}).get("name")
     if serie:
         righe.append(f"📚 Serie: {serie}")
-    righe += ["", "Nelle foto alcune carte di questo set passate dalle nostre mani.",
-              "E tu? Quante ne avevi, qual era la tua preferita? Raccontacelo nei commenti 👇",
-              "", instagram._tag(articoli, db)]
-    return "annifa", articoli, "\n".join(righe)[:2200], ("carosello", immagini)
+    if foto_iconiche:
+        righe += ["", "Le più ricercate: " + ", ".join(n for n, _ in foto_iconiche) + "."]
+    righe += ["Nelle ultime foto, alcune carte di questo set passate dalle nostre mani.",
+              "", "E tu? Quante ne avevi, qual era la tua preferita? Raccontacelo nei commenti 👇",
+              "", instagram._tag(nostre, db)]
+    return "annifa", nostre, "\n".join(righe)[:2200], ("carosello", immagini)
 
 
 def rara_della_settimana(db: Session) -> Optional[Contenuto]:

@@ -233,6 +233,19 @@ def marketplace_products(blueprint_id: int) -> List[dict]:
     return data or []
 
 
+def expansion_min_prices_cents(expansion_id: int) -> Dict[int, int]:
+    """Il prezzo piu' basso in vendita di ogni carta di un'espansione, con una
+    sola chiamata: {blueprint_id: centesimi}."""
+    data = _request("GET", "/marketplace/products", params={"expansion_id": expansion_id})
+    prezzi: Dict[int, int] = {}
+    if isinstance(data, dict):
+        for chiave, prodotti in data.items():
+            valori = [c for c in (_price_to_cents(p.get("price")) for p in prodotti or []) if c]
+            if valori:
+                prezzi[int(chiave)] = min(valori)
+    return prezzi
+
+
 def suggested_price_cents(
     blueprint_id: int,
     position: int = 4,
