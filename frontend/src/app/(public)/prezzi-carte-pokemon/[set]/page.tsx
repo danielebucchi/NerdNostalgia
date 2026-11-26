@@ -57,7 +57,7 @@ export default async function SetPage({ params }: Params) {
           </p>
           {top.length > 0 && (
             <p className="text-sm text-ink mt-3">
-              Le più ricercate: {top.map((c) => `${c.name} (da ${euro(c.min_price)})`).join(", ")}.
+              Le più ricercate: {top.map((c) => `${c.name} (${euro(c.min_price)})`).join(", ")}.
             </p>
           )}
           {disponibili > 0 && (
@@ -73,8 +73,8 @@ export default async function SetPage({ params }: Params) {
       </div>
 
       <p className="text-xs text-ink-soft mt-8">
-        Prezzi: l&apos;offerta più bassa su CardTrader in qualsiasi lingua e condizione, aggiornata ogni settimana.
-        Il valore della tua copia dipende da condizioni, lingua ed edizione. Immagini: TCGdex.
+        Prezzi: l&apos;offerta più bassa su CardTrader per una copia Near Mint (italiana se c&apos;è, se no inglese),
+        aggiornata ogni settimana. Nella pagina di ogni carta i prezzi per tutte le condizioni. Immagini: TCGdex.
       </p>
     </section>
   );

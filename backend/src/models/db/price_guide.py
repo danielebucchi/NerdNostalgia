@@ -2,7 +2,7 @@
 La guida prezzi pubblica delle carte Pokémon: set e carte con il prezzo
 CardTrader piu' basso, aggiornati ogni settimana (utils/price_guide.py).
 """
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from .base import Base
@@ -42,6 +42,9 @@ class PriceGuideCard(Base):
     image_url = Column(String(500))
     min_price_cents = Column(Integer)
     offers = Column(Integer, nullable=False, default=0)
+    # {"it": {"NM": centesimi, "SP": ..., ...}, "en": {...}}: il prezzo piu'
+    # basso per condizione e lingua (utils/price_guide.py).
+    prices = Column(JSON)
     updated_at = Column(DateTime, nullable=False)
 
     set = relationship("PriceGuideSet", back_populates="cards")

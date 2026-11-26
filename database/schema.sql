@@ -706,6 +706,7 @@ CREATE TABLE IF NOT EXISTS price_guide_cards (
     image_url VARCHAR(500),
     min_price_cents INTEGER,
     offers INTEGER NOT NULL DEFAULT 0,
+    prices TEXT,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (set_id, slug)
 );

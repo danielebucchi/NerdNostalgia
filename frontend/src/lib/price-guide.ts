@@ -22,6 +22,31 @@ export interface GuideAvailable {
   image: string | null;
 }
 
+/** Prezzo di mercato e offerta per una lingua e una condizione. */
+export interface GuideCell {
+  price: number | null;
+  buy_offer: number | null;
+  buy_bulk: { era: string; eur_per_kg: number } | null;
+  buy_none: boolean;
+}
+
+export type Lingua = "it" | "en";
+export type Condizione = "NM" | "SP" | "MP" | "PL" | "PO";
+
+export const LINGUE: { id: Lingua; nome: string }[] = [
+  { id: "it", nome: "Italiana" },
+  { id: "en", nome: "Inglese" },
+];
+
+/** Le condizioni, dalla migliore, con una spiegazione per chi vende. */
+export const CONDIZIONI: { id: Condizione; nome: string; spiegazione: string }[] = [
+  { id: "NM", nome: "Near Mint", spiegazione: "Come nuova: angoli e bordi perfetti, nessun graffio." },
+  { id: "SP", nome: "Slightly Played", spiegazione: "Quasi perfetta: qualche segno leggero sui bordi o sul retro." },
+  { id: "MP", nome: "Moderately Played", spiegazione: "Usata: bordi e angoli consumati, graffi visibili, nessuna piega." },
+  { id: "PL", nome: "Played", spiegazione: "Molto usata: usura forte, graffi evidenti, piccole pieghe." },
+  { id: "PO", nome: "Poor", spiegazione: "Rovinata: pieghe, strappi, macchie o scritte." },
+];
+
 export interface GuideCard {
   slug: string;
   set_slug: string;
@@ -39,10 +64,12 @@ export interface GuideCard {
   buy_bulk: { era: string; eur_per_kg: number } | null;
   /** Energie sotto 0,50 €: non le compriamo. */
   buy_none: boolean;
+  /** Prezzo e offerta per lingua e condizione. */
+  prices: Partial<Record<Lingua, Partial<Record<Condizione, GuideCell>>>>;
 }
 
 /** L'offerta in una riga, per testi e oggetto della richiesta. */
-export function testoOfferta(c: GuideCard): string | null {
+export function testoOfferta(c: GuideCell): string | null {
   if (c.buy_offer != null) return `Ti diamo fino a ${euro(c.buy_offer)}`;
   if (c.buy_bulk) return `La compriamo a peso: ${euro(c.buy_bulk.eur_per_kg)} al kg (carte ${c.buy_bulk.era})`;
   if (c.buy_none) return "Le energie a peso non le compriamo";

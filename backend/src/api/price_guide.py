@@ -32,19 +32,25 @@ def _set(s: PriceGuideSet, carte: Optional[int] = None) -> dict:
             "cards_priced": carte, "updated_at": s.updated_at.isoformat() if s.updated_at else None}
 
 
-def _carta(c: PriceGuideCard, disponibile: Optional[dict] = None, regola: Optional[tuple] = None) -> dict:
+def _carta(c: PriceGuideCard, disponibile: Optional[dict] = None, regola: Optional[dict] = None) -> dict:
+    """min_price e buy_* sono per il prezzo in evidenza (Near Mint, italiana
+    se c'e'); prices ha il prezzo e l'offerta per lingua e condizione:
+    {"it": {"NM": {"price": 551.28, "buy_offer": ..., "buy_bulk": ..., "buy_none": ...}}}."""
+    tabella = {}
+    for lingua, righe in (c.prices or {}).items():
+        tabella[lingua] = {s: {"price": pg.euro(cent), **_offerta(c, cent, regola)} for s, cent in righe.items()}
     return {"slug": c.slug, "set_slug": c.set.slug, "set_name": c.set.nome, "number": c.number,
             "name": c.nome, "name_en": c.name_en, "image": c.image_url, "min_price": pg.euro(c.min_price_cents),
-            "offers": c.offers, "available": disponibile,
-            **_offerta(c, regola)}
+            "offers": c.offers, "available": disponibile, "prices": tabella,
+            **_offerta(c, c.min_price_cents, regola)}
 
 
-def _offerta(c: PriceGuideCard, regola: Optional[dict]) -> dict:
+def _offerta(c: PriceGuideCard, centesimi: Optional[int], regola: Optional[dict]) -> dict:
     """buy_offer: euro per la carta singola; buy_bulk: {epoca, euro_kg} se va a peso;
     buy_none: True se non la compriamo (energie a peso)."""
     if not regola:
         return {"buy_offer": None, "buy_bulk": None, "buy_none": False}
-    o = pg.offerta(c.min_price_cents, regola, c.set.release_date, c.name_en)
+    o = pg.offerta(centesimi, regola, c.set.release_date, c.name_en)
     return {"buy_offer": o.get("euro"),
             "buy_bulk": {"era": o["epoca"], "eur_per_kg": o["euro_kg"]} if o.get("tipo") == "peso" else None,
             "buy_none": o.get("tipo") == "no"}

@@ -29,7 +29,7 @@ LOGGER = logging.getLogger("price_guide")
 PAUSA = 1.0     # fra un'espansione e l'altra: CardTrader e TCGdex hanno limiti
 # Cambia quando cambia il modo di costruire i dati (nomi, indirizzi): al
 # riavvio il server rifa' la guida senza aspettare la domenica.
-VERSIONE = "2"
+VERSIONE = "3"
 CHIAVE_VERSIONE = "price_guide_version"
 
 
@@ -49,16 +49,63 @@ def _tcgdex(lingua: str, set_id: str) -> dict:
     return info if isinstance(info, dict) else {}
 
 
+# Le condizioni, dalla migliore alla peggiore, con la sigla usata nel sito.
+CONDIZIONI = [("NM", ("Mint", "Near Mint")), ("SP", ("Slightly Played",)), ("MP", ("Moderately Played",)),
+              ("PL", ("Played",)), ("PO", ("Poor",))]
+LINGUE = ("it", "en")
+
+
+def tabella_prezzi(prodotti: List[dict]) -> Dict[str, Dict[str, int]]:
+    """Il prezzo piu' basso per lingua (italiana, inglese) e condizione.
+    Fuori le copie che non sono "la carta normale": gradate, firmate,
+    alterate, prima edizione, reverse. Una condizione peggiore non puo'
+    costare piu' di una migliore: se succede (un'offerta alta isolata) vale
+    il prezzo della migliore."""
+    from utils import cardtrader_client as ct
+    sigla = {nome: s for s, nomi in CONDIZIONI for nome in nomi}
+    grezzi: Dict[str, Dict[str, int]] = {l: {} for l in LINGUE}
+    for p in prodotti or []:
+        h = p.get("properties_hash") or {}
+        if p.get("graded") or h.get("signed") or h.get("altered") or h.get("first_edition") or h.get("pokemon_reverse"):
+            continue
+        lingua, cond = h.get("pokemon_language"), sigla.get(h.get("condition"))
+        cent = ct._price_to_cents(p.get("price"))
+        if lingua in grezzi and cond and cent:
+            grezzi[lingua][cond] = min(cent, grezzi[lingua].get(cond, cent))
+    tabella: Dict[str, Dict[str, int]] = {}
+    for lingua, valori in grezzi.items():
+        tetto, righe = None, {}
+        for s, _ in CONDIZIONI:
+            if s in valori:
+                righe[s] = valori[s] if tetto is None else min(valori[s], tetto)
+                tetto = righe[s]
+        if righe:
+            tabella[lingua] = righe
+    return tabella
+
+
+def prezzo_in_evidenza(tabella: Dict[str, Dict[str, int]]) -> Optional[int]:
+    """Il prezzo da mostrare in griglia: Near Mint italiana, se no inglese,
+    se no la condizione migliore che c'e'."""
+    for lingua in LINGUE:
+        if (tabella.get(lingua) or {}).get("NM"):
+            return tabella[lingua]["NM"]
+    for s, _ in CONDIZIONI:
+        for lingua in LINGUE:
+            if (tabella.get(lingua) or {}).get(s):
+                return tabella[lingua][s]
+    return None
+
+
 def _prezzi(expansion_id: int) -> Dict[int, tuple]:
-    """{blueprint_id: (centesimi minimi, offerte)} da una chiamata sola."""
+    """{blueprint_id: (tabella per lingua e condizione, offerte)} da una chiamata sola."""
     from utils import cardtrader_client as ct
     data = ct._request("GET", "/marketplace/products", params={"expansion_id": expansion_id})
     out = {}
     if isinstance(data, dict):
         for chiave, prodotti in data.items():
-            valori = [c for c in (ct._price_to_cents(p.get("price")) for p in prodotti or []) if c]
-            if valori:
-                out[int(chiave)] = (min(valori), len(valori))
+            if prodotti:
+                out[int(chiave)] = (tabella_prezzi(prodotti), len(prodotti))
     return out
 
 
@@ -122,8 +169,9 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
             carta.name_en = f"{carta.name_en} ({variante})"[:200]
         carta.name_it = nomi_it.get(numero)
         carta.image_url = f"{tcg['image']}/high.webp" if tcg.get("image") else None
-        minimo, offerte = prezzi.get(bp["id"], (None, 0))
-        carta.min_price_cents = minimo
+        tabella, offerte = prezzi.get(bp["id"], ({}, 0))
+        carta.prices = tabella or None
+        carta.min_price_cents = prezzo_in_evidenza(tabella)
         carta.offers = offerte
         carta.updated_at = adesso
         salvate += 1

@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CartaTile } from "@/components/guida/CartaTile";
-import { VendilaANoi } from "@/components/guida/VendilaANoi";
 import { absUrl } from "@/lib/seo";
-import { Offerta } from "@/components/guida/Offerta";
-import { anno, dataItaliana, euro, formatDataBreve, getGuideCard, testoOfferta } from "@/lib/price-guide";
+import { TabellaPrezzi } from "@/components/guida/TabellaPrezzi";
+import { ValutaCarta } from "@/components/guida/ValutaCarta";
+import { anno, dataItaliana, euro, formatDataBreve, getGuideCard } from "@/lib/price-guide";
 
 export const revalidate = 3600;
 
@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title: titolo,
     description: `Quanto vale ${c.name} (${c.set.name}, ${anno(c.set.release_date)}, n. ${c.number})? ` +
-      `Da ${euro(c.min_price)} su CardTrader, aggiornato ogni settimana.` +
+      `${euro(c.min_price)} in Near Mint, i prezzi per ogni condizione e quanto ti diamo se ce l'hai.` +
       (c.available ? ` Disponibile su NerdNostalgia a ${euro(c.available.price)}.` : ""),
     alternates: { canonical: `/prezzi-carte-pokemon/${c.set_slug}/${c.slug}` },
     openGraph: { title: titolo, url: `/prezzi-carte-pokemon/${c.set_slug}/${c.slug}`, images: c.image ? [c.image] : undefined },
@@ -67,11 +67,12 @@ export default async function CartaPage({ params }: Params) {
           </p>
 
           <div className="card p-5 mt-6">
-            <p className="text-sm text-ink-soft">Valore di mercato</p>
-            <p className="display text-4xl text-pink-deep">da {euro(c.min_price)}</p>
-            <p className="text-xs text-ink-soft mt-1">
-              L&apos;offerta più bassa su CardTrader ({c.offers} in vendita), aggiornata il {formatDataBreve(c.updated_at)}.
-              Il valore della tua copia dipende da condizioni, lingua ed edizione.
+            <p className="text-sm text-ink-soft">Valore di mercato, Near Mint</p>
+            <p className="display text-4xl text-pink-deep">{euro(c.min_price)}</p>
+            <div className="mt-4"><TabellaPrezzi carta={c} /></div>
+            <p className="text-xs text-ink-soft mt-3">
+              Per ogni lingua e condizione, l&apos;offerta più bassa su CardTrader ({c.offers} copie in vendita),
+              aggiornata il {formatDataBreve(c.updated_at)}. Escluse prima edizione, reverse e copie gradate.
             </p>
           </div>
 
@@ -90,12 +91,8 @@ export default async function CartaPage({ params }: Params) {
           )}
 
           <div className="card p-5 mt-4">
-            <Offerta carta={c} grande />
-            {!c.buy_none && (
-              <div className="mt-3">
-                <VendilaANoi carta={`${c.name} #${c.number} – ${c.set.name}`} offerta={testoOfferta(c)} />
-              </div>
-            )}
+            <p className="display text-xl text-ink mb-3">Ce l&apos;hai? Quanto ti diamo</p>
+            <ValutaCarta carta={c} />
           </div>
         </div>
       </div>

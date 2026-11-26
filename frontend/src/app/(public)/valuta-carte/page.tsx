@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { VendilaANoi } from "@/components/guida/VendilaANoi";
-import { Offerta } from "@/components/guida/Offerta";
-import { euro, searchGuide, testoOfferta, type GuideCard } from "@/lib/price-guide";
+import { RISERVA } from "@/components/guida/Offerta";
+import { ValutaCarta } from "@/components/guida/ValutaCarta";
+import { euro, searchGuide, type GuideCard } from "@/lib/price-guide";
 
 /* "Valuta la tua carta": si scrive il nome (anche con il set o il numero),
  * si vede quanto vale e la si puo' proporre a noi. Cerca nella guida prezzi. */
@@ -83,17 +84,12 @@ export default function ValutaCartePage() {
                   {c.name} <span className="text-ink-soft">#{c.number}</span>
                 </Link>
                 <p className="text-sm text-ink-soft truncate">{c.set_name}</p>
-                <p className="text-sm text-ink-soft">Valore di mercato da {euro(c.min_price)}</p>
-                <Offerta carta={c} />
-              </div>
-              <div className="flex flex-col gap-2 items-end">
                 {c.available && (
-                  <Link href={`/articles/${c.available.id}`} className="chip chip-mint text-xs">Da noi {euro(c.available.price)}</Link>
+                  <Link href={`/articles/${c.available.id}`} className="chip chip-mint text-xs mb-1 inline-flex">
+                    Da noi {euro(c.available.price)}
+                  </Link>
                 )}
-                {!c.buy_none && (
-                  <VendilaANoi carta={`${c.name} #${c.number} – ${c.set_name}`} offerta={testoOfferta(c)}
-                    className="btn btn-ghost text-xs sm:text-sm" />
-                )}
+                <ValutaCarta carta={c} compatto />
               </div>
             </div>
           ))}
@@ -101,9 +97,8 @@ export default function ValutaCartePage() {
       )}
 
       <p className="text-xs text-ink-soft mt-8 text-center">
-        Prezzi: l&apos;offerta più bassa su CardTrader, aggiornata ogni settimana. &quot;Fino a&quot; è quanto
-        diamo per una copia in ottime condizioni: la cifra esatta la confermiamo dopo aver visto le foto.
-        Le carte sotto i 50 centesimi le compriamo a peso (energie escluse).{" "}
+        Prezzi: l&apos;offerta più bassa su CardTrader per lingua e condizione, aggiornata ogni settimana.
+        Le carte sotto i 50 centesimi le compriamo a peso (energie escluse). {RISERVA}{" "}
         <Link href="/prezzi-carte-pokemon" className="underline">Sfoglia tutti i set</Link>.
       </p>
     </section>
