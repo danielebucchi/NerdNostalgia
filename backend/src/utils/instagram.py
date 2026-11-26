@@ -3,7 +3,9 @@ Instagram: i nuovi arrivi pubblicati in automatico.
 
 - Un carosello al giorno (18:30) con fino a 10 articoli pubblicati da poco,
   i piu' cari per primi: anche nei giorni da 50 carte il profilo riceve un
-  post solo.
+  post solo. Nei giorni senza novita' esce un articolo gia' in catalogo mai
+  passato da Instagram, dal piu' recente andando indietro: il profilo resta
+  vivo e, un giorno alla volta, il catalogo ci passa tutto.
 - Una Storia per ogni articolo da almeno `instagram_story_min_price` euro,
   al massimo MAX_STORIE_GIORNO al giorno.
 
@@ -255,8 +257,12 @@ def _hashtag(articoli: List[Article]) -> str:
     return " ".join(tag[:20])
 
 
-def didascalia(articoli: List[Article]) -> str:
-    righe = ["🆕 Nuovi arrivi su NerdNostalgia!" if len(articoli) > 1 else "🆕 Nuovo arrivo su NerdNostalgia!", ""]
+def didascalia(articoli: List[Article], ripescato: bool = False) -> str:
+    if ripescato:
+        titolo = "✨ Dal catalogo di NerdNostalgia, ancora disponibile!"
+    else:
+        titolo = "🆕 Nuovi arrivi su NerdNostalgia!" if len(articoli) > 1 else "🆕 Nuovo arrivo su NerdNostalgia!"
+    righe = [titolo, ""]
     righe += [f"▪️ {a.title} — {_prezzo(a)}" for a in articoli]
     righe += ["", f"🛒 {'Li' if len(articoli) > 1 else 'Lo'} trovi su nerdnostalgia.store (link in bio)",
               f"💬 Le novità in tempo reale nel gruppo Telegram: {TELEGRAM_URL}", "", _hashtag(articoli)]
@@ -338,6 +344,20 @@ def da_carosello(db: Session) -> List[Article]:
     return articoli[:MAX_CAROSELLO]
 
 
+def da_ripescare(db: Session) -> Optional[Article]:
+    """Per i giorni senza novita': l'articolo in vendita piu' recente che non
+    e' mai uscito su Instagram (ne' come nuovo arrivo ne' ripescato)."""
+    articoli = (db.query(Article)
+                .filter(Article.status == ArticleStatus.PUBLISHED,
+                        Article.reserved_order_id.is_(None),
+                        Article.quantity > 0,
+                        Article.price > 0)
+                .order_by(Article.published_at.desc(), Article.id.desc())
+                .all())
+    return next((a for a in articoli
+                 if a.images and not (a.article_metadata or {}).get("instagram_carousel")), None)
+
+
 def _storie_oggi(db: Session) -> int:
     oggi = _ora().date().isoformat()
     valore = _impostazioni(db).get_value(CHIAVE_STORIE_OGGI, default="") or ""
@@ -354,14 +374,19 @@ def da_storie(db: Session) -> List[Article]:
 
 
 def pubblica_carosello(db: Session) -> Optional[Dict[str, object]]:
-    """Il post del giorno. None se spento o se non c'e' niente di nuovo."""
+    """Il post del giorno: i nuovi arrivi o, se non ce ne sono, un articolo
+    ripescato dal catalogo. None se spento o se non resta niente da postare."""
     if not acceso(db):
         return None
     articoli = da_carosello(db)
+    ripescato = False
     if not articoli:
-        return None
+        vecchio = da_ripescare(db)
+        if vecchio is None:
+            return None
+        articoli, ripescato = [vecchio], True
     token = _token(db)
-    testo = didascalia(articoli)
+    testo = didascalia(articoli, ripescato)
     if len(articoli) == 1:
         contenitore = _contenitore(token, image_url=url_immagine(articoli[0], "post"), caption=testo)
     else:
@@ -374,8 +399,9 @@ def pubblica_carosello(db: Session) -> Optional[Dict[str, object]]:
     for a in articoli:
         _segna(db, a, "instagram_carousel", media)
     db.commit()
-    LOGGER.info("Instagram: carosello %s con %d articoli", media, len(articoli))
-    return {"media": media, "articoli": [a.id for a in articoli]}
+    LOGGER.info("Instagram: %s %s con %d articoli", "ripescato" if ripescato else "carosello",
+                media, len(articoli))
+    return {"media": media, "articoli": [a.id for a in articoli], "ripescato": ripescato}
 
 
 def pubblica_storie(db: Session) -> List[str]:

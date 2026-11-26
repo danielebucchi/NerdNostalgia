@@ -70,8 +70,7 @@ def test_daily_carousel_most_expensive_first_and_only_once(db_session, admin_use
     # Il giorno dopo restano le due piu' economiche: un post singolo.
     ig.clear()
     esito = instagram.pubblica_carosello(db_session)
-    assert len(esito["articoli"]) == 2
-    assert instagram.pubblica_carosello(db_session) is None
+    assert len(esito["articoli"]) == 2 and esito["ripescato"] is False
 
 
 def test_single_article_is_a_plain_post(db_session, admin_user, ig):
@@ -117,3 +116,16 @@ def test_token_refresh_only_for_instagram_login(db_session, monkeypatch):
     monkeypatch.setattr(instagram.requests, "get", lambda *a, **k: chiamate.append(a) or None)
     monkeypatch.delenv("INSTAGRAM_GRAPH_URL", raising=False)
     assert instagram.rinnova_token(db_session) is False and chiamate == []   # utente di sistema: non scade
+
+
+def test_no_news_posts_one_older_article_going_back(db_session, admin_user, ig):
+    antico = _articolo(db_session, admin_user, "Antico", giorni_fa=40)
+    vecchio = _articolo(db_session, admin_user, "Vecchio", giorni_fa=10)
+    venduto = _articolo(db_session, admin_user, "Venduto", giorni_fa=5)
+    venduto.status = ArticleStatus.SOLD
+    db_session.commit()
+    primo = instagram.pubblica_carosello(db_session)
+    assert primo["articoli"] == [vecchio.id] and primo["ripescato"] is True
+    assert "ancora disponibile" in [p for _, _, p in ig if "caption" in p][0]["caption"]
+    assert instagram.pubblica_carosello(db_session)["articoli"] == [antico.id]
+    assert instagram.pubblica_carosello(db_session) is None          # catalogo tutto passato

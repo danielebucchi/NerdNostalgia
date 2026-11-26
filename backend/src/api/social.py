@@ -44,6 +44,8 @@ def status(db: Session = Depends(get_db), _admin: User = Depends(require_admin))
         "next_carousel": [_voce(a, "post") for a in instagram.da_carosello(db)],
         "next_stories": [_voce(a, "storia") for a in instagram.da_storie(db)],
         "caption": instagram.didascalia(instagram.da_carosello(db)) if instagram.da_carosello(db) else None,
+        # Se oggi non ci sono novita', esce questo.
+        "fallback": (_voce(instagram.da_ripescare(db), "post") if instagram.da_ripescare(db) else None),
     }
 
 
