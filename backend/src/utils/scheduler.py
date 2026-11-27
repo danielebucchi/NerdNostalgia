@@ -222,6 +222,19 @@ def _price_guide_abbina_job():
         db.close()
 
 
+def _cardtrader_collega_job():
+    from utils import cardtrader_client, cardtrader_sync
+    if not cardtrader_client.is_configured():
+        return
+    db = SessionLocal()
+    try:
+        cardtrader_sync.collega_prodotti(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("CardTrader, collegamento prodotti fallito: %s", exc)
+    finally:
+        db.close()
+
+
 def _price_guide_da_rifare() -> bool:
     from utils import price_guide
     db = SessionLocal()
@@ -417,6 +430,16 @@ def start_scheduler() -> None:
         _price_guide_abbina_job,
         CronTrigger(minute=25),
         id="price_guide_match",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    # Ogni ora, dopo l'abbinamento: i blueprint appena trovati si collegano
+    # ai prodotti messi a mano su CardTrader, cosi' alla vendita si ritirano.
+    _scheduler.add_job(
+        _cardtrader_collega_job,
+        CronTrigger(minute=35),
+        id="cardtrader_link_products",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

@@ -33,6 +33,7 @@ import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 # Ci si appoggia ai moduli del backend per il client Vinted: assume di
@@ -166,6 +167,9 @@ def reconcile(api_url: str, token: str, candidate_ids: list[int]) -> None:
     e non viene toccato.
     """
     LOGGER.info("Riconciliazione: controllo %d candidati su Vinted…", len(candidate_ids))
+    # Subito dopo lo scraping del guardaroba Vinted risponde 429 a tutto:
+    # un minuto di respiro prima di aprire le pagine degli annunci.
+    time.sleep(60)
     try:
         stato = classify_items(candidate_ids)
     except Exception as exc:  # noqa: BLE001

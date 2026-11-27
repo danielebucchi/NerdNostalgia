@@ -397,10 +397,63 @@ def auto_publish_if_card(
         return {"status": "error", "reason": str(exc)}
 
 
+def _prodotti_collegati(db) -> set:
+    from models.db import PersonalCard
+    ids = {r[0] for r in db.query(Article.cardtrader_product_id)
+           .filter(Article.cardtrader_product_id.isnot(None)).all()}
+    ids |= {r[0] for r in db.query(PersonalCard.cardtrader_product_id)
+            .filter(PersonalCard.cardtrader_product_id.isnot(None)).all()}
+    return ids
+
+
+def collega_prodotti(db, prodotti: Optional[List[dict]] = None, venduto: Optional[Article] = None) -> int:
+    """Articoli con il blueprint ma senza prodotto CardTrader (messi in
+    vendita a mano su CardTrader): si collegano al prodotto del nostro
+    inventario con lo stesso blueprint, cosi' alla vendita si tolgono anche
+    da li'. Solo se l'abbinamento e' certo: un solo articolo disponibile e
+    un solo prodotto libero per quel blueprint. `venduto`: l'articolo
+    appena venduto, che conta anche se non e' piu' disponibile."""
+    from models.db import ArticleStatus
+    articoli = (db.query(Article)
+                .filter(Article.cardtrader_blueprint_id.isnot(None),
+                        Article.cardtrader_product_id.is_(None),
+                        Article.status == ArticleStatus.PUBLISHED).all())
+    if venduto is not None and venduto not in articoli:
+        articoli.append(venduto)
+    if not articoli:
+        return 0
+    if prodotti is None:
+        prodotti = ct.my_products()
+    collegati = _prodotti_collegati(db)
+    liberi: Dict[int, List[int]] = {}
+    for p in prodotti:
+        if p.get("id") and p["id"] not in collegati:
+            liberi.setdefault(p.get("blueprint_id"), []).append(p["id"])
+    per_blueprint: Dict[int, List[Article]] = {}
+    for a in articoli:
+        per_blueprint.setdefault(a.cardtrader_blueprint_id, []).append(a)
+    n = 0
+    for blueprint, gruppo in per_blueprint.items():
+        trovati = liberi.get(blueprint, [])
+        if len(gruppo) == 1 and len(trovati) == 1:
+            gruppo[0].cardtrader_product_id = trovati[0]
+            LOGGER.info("CardTrader: articolo %s collegato al prodotto %s (blueprint %s)",
+                        gruppo[0].id, trovati[0], blueprint)
+            n += 1
+    if n:
+        db.commit()
+    return n
+
+
 def auto_unpublish_on_sold(db, article: Article, piattaforma: str = "sito") -> None:
     """Hook alla vendita: toglie la carta da CardTrader per non venderla
     due volte. Best-effort."""
     try:
+        if (not article.cardtrader_product_id and article.cardtrader_blueprint_id
+                and ct.is_configured()):
+            # Messa su CardTrader a mano e non ancora collegata dal job.
+            collega_prodotti(db, ct.my_products(article.cardtrader_blueprint_id), venduto=article)
+            db.refresh(article)
         if article.cardtrader_product_id and ct.is_configured():
             unpublish_article(db, article)
             LOGGER.info("Auto-unpublish CardTrader su vendita: articolo %s", article.id)

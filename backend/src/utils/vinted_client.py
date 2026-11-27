@@ -761,12 +761,53 @@ def download_photo(url: str, max_bytes: int = 10 * 1024 * 1024) -> bytes:
     return bytes(chunks)
 
 
+def _classify_one(page, item_id: int, sold_markers, err_markers) -> tuple[str, Optional[int]]:
+    """Stato di un annuncio (vedi classify_items) e status HTTP della pagina."""
+    try:
+        resp = page.goto(
+            f"{BASE_HOST}/items/{item_id}",
+            wait_until="domcontentloaded", timeout=15_000,
+        )
+        status = resp.status if resp else None
+
+        if status in (403, 429) or (status or 0) >= 500:
+            return "unknown", status
+
+        if status == 200:
+            # Il badge "venduto" arriva con l'idratazione lato client:
+            # leggere il body subito dopo domcontentloaded fa passare per
+            # ancora-in-vendita un annuncio venduto.
+            try:
+                page.wait_for_load_state("networkidle", timeout=8_000)
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(1.0)
+
+        body = (page.inner_text("body") or "").lower()
+
+        if status in (404, 410):
+            return ("missing" if any(m in body for m in err_markers) else "unknown"), status
+        if status == 200:
+            title = (page.title() or "").lower()
+            if not title or "vinted" not in title:
+                return "unknown", status
+            if any(m in body for m in sold_markers):
+                return "sold", status
+            return "live", status
+        return "unknown", status
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("classify_items #%d fail: %s", item_id, exc)
+        return "unknown", None
+
+
 def classify_items(
     item_ids: list[int],
     *,
     delay: float = 1.2,
     pause_every: int = 25,
     pause_seconds: float = 45.0,
+    backoff: tuple[float, ...] = (60.0, 180.0),
+    max_blocked: int = 3,
 ) -> dict[int, str]:
     """Per ogni item_id dice in che stato si trova su Vinted.
 
@@ -788,8 +829,12 @@ def classify_items(
     decina di richieste ravvicinate, e il risultato degenera in "unknown"
     a catena. `pause_every`/`pause_seconds` inseriscono una pausa lunga
     ogni N item; con i default, 130 item richiedono circa 7 minuti.
+    Su 403/429 lo stesso item si riprova dopo le attese di `backoff`; dopo
+    `max_blocked` item di fila ancora bloccati si smette e il resto resta
+    "unknown" per la sync successiva.
     """
     out: dict[int, str] = {}
+    bloccati = 0
     if not item_ids:
         return out
 
@@ -829,55 +874,36 @@ def classify_items(
                     pass
                 page = fresh_page()
 
-            try:
-                resp = page.goto(
-                    f"{BASE_HOST}/items/{item_id}",
-                    wait_until="domcontentloaded", timeout=15_000,
+            stato, status = _classify_one(page, item_id, sold_markers, err_markers)
+            for attesa in backoff:
+                if status not in (403, 429):
+                    break
+                # Vinted rallenta chi chiede troppo: riprovare subito da'
+                # solo altri 429. Si aspetta, si cambia contesto, si riprova.
+                LOGGER.warning(
+                    "classify_items #%d: HTTP %s, riprovo tra %.0fs",
+                    item_id, status, attesa,
                 )
-                status = resp.status if resp else None
-
-                if status in (403, 429) or (status or 0) >= 500:
-                    out[item_id] = "unknown"
-                    LOGGER.warning(
-                        "classify_items #%d: HTTP %s (blocco/errore server)",
-                        item_id, status,
-                    )
-                    continue
-
-                if status == 200:
-                    # Il badge "venduto" arriva con l'idratazione lato
-                    # client: leggere il body subito dopo domcontentloaded
-                    # fa passare per ancora-in-vendita un annuncio venduto.
-                    try:
-                        page.wait_for_load_state("networkidle", timeout=8_000)
-                    except Exception:  # noqa: BLE001
-                        pass
-                    time.sleep(1.0)
-
-                body = (page.inner_text("body") or "").lower()
-
-                if status in (404, 410):
-                    out[item_id] = (
-                        "missing" if any(m in body for m in err_markers)
-                        else "unknown"
-                    )
-                elif status == 200:
-                    title = (page.title() or "").lower()
-                    if not title or "vinted" not in title:
-                        out[item_id] = "unknown"
-                    elif any(m in body for m in sold_markers):
-                        out[item_id] = "sold"
-                    else:
-                        out[item_id] = "live"
-                else:
-                    out[item_id] = "unknown"
-
-                LOGGER.info("Item %d: %s", item_id, out[item_id])
+                time.sleep(attesa)
+                try:
+                    page.context.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                page = fresh_page()
+                stato, status = _classify_one(page, item_id, sold_markers, err_markers)
+            out[item_id] = stato
+            bloccati = bloccati + 1 if status in (403, 429) else 0
+            if bloccati >= max_blocked:
+                restanti = [x for x in item_ids if x not in out]
+                LOGGER.warning(
+                    "Vinted continua a bloccare: lascio %d item alla prossima sync",
+                    len(restanti),
+                )
+                out.update({x: "unknown" for x in restanti})
+                break
+            if status not in (403, 429):
+                LOGGER.info("Item %d: %s", item_id, stato)
                 time.sleep(delay + random.uniform(0, 0.5))
-            except Exception as exc:  # noqa: BLE001
-                out[item_id] = "unknown"
-                LOGGER.warning("classify_items #%d fail: %s", item_id, exc)
-                continue
 
         browser.close()
 

@@ -23,7 +23,8 @@ def test_without_vinted_the_other_jobs_still_run(monkeypatch):
                     "ebay_listings_watch", "weekly_newsletter",
                     "instagram_post_1230", "instagram_post_1830", "instagram_post_2100",
                     "instagram_stories", "instagram_stats", "instagram_report", "instagram_reel",
-                    "instagram_token", "telegram_ripesca", "instagram_comments", "price_guide", "price_guide_match"}
+                    "instagram_token", "telegram_ripesca", "instagram_comments", "price_guide", "price_guide_match",
+                    "cardtrader_link_products"}
 
 
 def test_everything_by_default(monkeypatch):

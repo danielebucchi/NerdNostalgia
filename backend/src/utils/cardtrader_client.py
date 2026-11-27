@@ -291,6 +291,12 @@ def suggested_price_cents(
     }
 
 
+def my_products(blueprint_id: Optional[int] = None) -> List[dict]:
+    """I prodotti in vendita nel nostro inventario (tutti, o di un blueprint)."""
+    params = {"blueprint_id": blueprint_id} if blueprint_id else None
+    return _request("GET", "/products/export", params=params) or []
+
+
 # ── Scrittura prodotti ─────────────────────────────────────────────
 
 def create_product(
