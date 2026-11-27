@@ -129,6 +129,22 @@ def _setting(db: Session, key: str) -> str:
     return (SettingHelper(db=db).get_value(key) or "").strip()
 
 
+# Sul sito una carta costa almeno 0,20 €, e sopra i 0,20 almeno 0,50 €:
+# sotto, il guadagno se ne va in imballo e tempo. Solo sito: CardTrader,
+# eBay e Vinted hanno le loro regole.
+SITO_MINIMO = 0.20
+SITO_SCALINO = 0.50
+
+
+def prezzo_sito(prezzo: float) -> float:
+    """0,20 → 0,20; 0,11 → 0,20; 0,21-0,49 → 0,50; da 0,50 in su invariato."""
+    if prezzo <= SITO_MINIMO:
+        return SITO_MINIMO
+    if prezzo < SITO_SCALINO:
+        return SITO_SCALINO
+    return round(prezzo, 2)
+
+
 def sale_price(card: PersonalCard) -> float:
     prezzo = card.list_price if card.list_price is not None else card.estimated_value
     if prezzo is None or float(prezzo) <= 0:
@@ -680,7 +696,7 @@ def _copia_foto(card: PersonalCard, article: Article) -> list:
 def publish_site(db: Session, card: PersonalCard, admin_id: int) -> Dict[str, Any]:
     """Mette la carta in vetrina. Se l'articolo c'e' gia' lo riallinea
     (prezzo, quantita', testi) e lo ripubblica."""
-    prezzo = sale_price(card)
+    prezzo = prezzo_sito(sale_price(card))
     if card.status == PersonalCardStatus.SOLD:
         raise ValueError("La carta risulta gia' venduta")
     article = card.article

@@ -333,6 +333,8 @@ export interface PersonalCard {
   /** A quanto va senza un prezzo scritto: CardTrader come il sito, eBay con
    *  commissioni e minimo 1 euro. */
   cardtrader_price_auto?: number | null;
+  /** Il prezzo con cui la carta va sul sito: minimo 0,20 €, poi almeno 0,50 €. */
+  site_price?: number | null;
   ebay_price_auto?: number | null;
   cardtrader_product_id?: number | null;
   cardtrader_synced_at?: string | null;

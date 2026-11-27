@@ -860,7 +860,7 @@ def test_ebay_price_is_never_under_one_euro_the_other_channels_keep_theirs(
     assert prezzi[0] == "1.00"
 
     art_id = client.post(f"/api/card-scanner/cards/{a['id']}/site", headers=admin_headers).json()["article_id"]
-    assert float(db_session.get(Article, art_id).price) == 0.12
+    assert float(db_session.get(Article, art_id).price) == 0.20   # sul sito minimo 0,20
 
 
 def test_each_platform_can_have_its_own_price(client, admin_headers, db_session, monkeypatch, mondo_finto):

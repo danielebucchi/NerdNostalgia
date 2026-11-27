@@ -2110,8 +2110,15 @@ function RigaCarta({
   const canaliEPrezzi = (
     <div className="grid grid-cols-[auto_auto_1fr] gap-x-3 gap-y-1.5 items-center text-xs text-ink-soft whitespace-nowrap">
       <span>Sito</span>
-      <CampoPrezzo etichetta="Sito" valore={c.list_price} auto={c.estimated_value}
-        onSalva={(v) => salvaPrezzo("list_price", v)} />
+      <span className="inline-flex items-center gap-1">
+        <CampoPrezzo etichetta="Sito" valore={c.list_price} auto={c.estimated_value}
+          onSalva={(v) => salvaPrezzo("list_price", v)} />
+        {c.site_price != null && Math.abs(c.site_price - Number(c.list_price ?? c.estimated_value ?? 0)) > 0.001 && (
+          <span className="text-[10px] text-ink-soft" title="Sul sito: minimo 0,20 €, poi almeno 0,50 €">
+            → {c.site_price.toFixed(2).replace(".", ",")} sul sito
+          </span>
+        )}
+      </span>
       {statoSito}
       <span>CardTrader</span>
       <CampoPrezzo etichetta="CardTrader" valore={c.list_price_cardtrader} auto={c.cardtrader_price_auto}

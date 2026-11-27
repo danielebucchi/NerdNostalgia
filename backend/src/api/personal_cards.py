@@ -51,6 +51,7 @@ def _to_response(card: PersonalCard) -> PersonalCardResponse:
         from utils import card_listing as cl
         try:
             resp.cardtrader_price_auto = cl.sale_price(card)
+            resp.site_price = cl.prezzo_sito(cl.sale_price(card))
             resp.ebay_price_auto = cl.ebay_price_auto(db, card)
         except ValueError:
             pass  # niente prezzo: niente da proporre

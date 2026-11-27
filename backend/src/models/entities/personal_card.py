@@ -150,6 +150,8 @@ class PersonalCardResponse(BaseModel):
     # A quanto va su ogni piattaforma senza un prezzo scritto a mano
     # (eBay: commissioni + minimo 1 euro). Null se la carta non ha prezzo.
     cardtrader_price_auto: Optional[float] = None
+    # Il prezzo con cui va sul sito (minimo 0,20, poi almeno 0,50).
+    site_price: Optional[float] = None
     ebay_price_auto: Optional[float] = None
 
     # Derived
