@@ -121,3 +121,28 @@ def test_condition_table_from_offers():
     assert price_guide.prezzo_in_evidenza(tabella) == 55128
     assert price_guide.prezzo_in_evidenza({"en": {"MP": 36867}}) == 36867          # formato di prima
     assert price_guide.prezzo_in_evidenza({"1ed": {"it": {"NM": 7}}}) == 7
+
+
+def test_scattered_promos_do_not_borrow_a_wrong_tcgdex_set(db_session, fonti, monkeypatch):
+    from utils import cardtrader_client as ct
+    monkeypatch.setattr(ct, "blueprints_cached", lambda e: [
+        {"id": 21, "name": "Ancient Mew", "version": "Brown Prerelease | Starlight Holo | 001/062",
+         "fixed_properties": {"collector_number": "1"}, "image": {"show": {"url": "/uploads/21/show.jpg"}}},
+        {"id": 22, "name": "Ancient Mew", "version": "Build-a-Bear Workshop | 1/108",
+         "fixed_properties": {"collector_number": "1"}},
+        {"id": 23, "name": "Celebi", "version": None, "fixed_properties": {"collector_number": "77"}}])
+    monkeypatch.setattr(price_guide, "_prezzi", lambda e: {21: ({"normale": {"en": {"NM": 4950}}}, 2)})
+    price_guide.aggiorna(db_session, pausa=0)
+    s = db_session.query(PriceGuideSet).one()
+    assert (s.release_date, s.card_count, s.logo_url, s.tcgdex_id) == (None, None, None, None)   # TCGdex sbagliato
+    carte = {c.blueprint_id: c for c in db_session.query(PriceGuideCard)}
+    assert carte[21].name_en == "Ancient Mew (Brown Prerelease)" and carte[21].name_it is None
+    assert carte[21].slug == "1-ancient-mew-brown-prerelease"
+    assert carte[21].image_url == "https://www.cardtrader.com/uploads/21/show.jpg"
+
+
+def test_set_page_lists_only_cards_with_offers(client, db_session, fonti, monkeypatch):
+    monkeypatch.setattr(price_guide, "_prezzi", lambda e: {11: ({"normale": {"it": {"NM": 55128}}}, 4)})
+    price_guide.aggiorna(db_session, pausa=0)
+    carte = client.get("/api/price-guide/sets/set-base").json()["cards"]
+    assert [c["name"] for c in carte] == ["Charizard"]

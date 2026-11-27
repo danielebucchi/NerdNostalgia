@@ -72,7 +72,9 @@ def set_dettaglio(slug: str, db: Session = Depends(get_db)):
     s = db.query(PriceGuideSet).filter(PriceGuideSet.slug == slug).first()
     if s is None:
         raise HTTPException(status_code=404, detail="Set non trovato")
-    carte = sorted(s.cards, key=lambda c: (int(c.number) if c.number.isdigit() else 10**6, c.number, c.slug))
+    # Solo le carte con almeno un'offerta: le altre non hanno niente da dire.
+    carte = sorted((c for c in s.cards if c.min_price_cents),
+                   key=lambda c: (int(c.number) if c.number.isdigit() else 10**6, c.number, c.slug))
     nostre = pg.disponibili(db, [c.blueprint_id for c in carte])
     regola = pg.regola_offerta(db)
     return JSONResponse({**_set(s, sum(1 for c in carte if c.min_price_cents)),

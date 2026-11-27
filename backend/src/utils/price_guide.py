@@ -29,7 +29,7 @@ LOGGER = logging.getLogger("price_guide")
 PAUSA = 1.0     # fra un'espansione e l'altra: CardTrader e TCGdex hanno limiti
 # Cambia quando cambia il modo di costruire i dati (nomi, indirizzi): al
 # riavvio il server rifa' la guida senza aspettare la domenica.
-VERSIONE = "4"
+VERSIONE = "5"
 CHIAVE_VERSIONE = "price_guide_version"
 
 
@@ -135,6 +135,24 @@ def _prezzi(expansion_id: int) -> Dict[int, tuple]:
     return out
 
 
+def _variante(versione: Optional[str]) -> Optional[str]:
+    """"Brown Prerelease | Starlight Holo | 001/062" → "Brown Prerelease": la
+    prima parte dice di che variante si tratta, il resto e' rarita' e numero."""
+    for parte in (versione or "").split("|"):
+        parte = parte.strip()
+        if parte and not re.fullmatch(r"[\d/ ]+", parte):
+            return parte[:80]
+    return None
+
+
+def _immagine_cardtrader(bp: dict) -> Optional[str]:
+    """L'immagine di CardTrader, quando TCGdex non ce l'ha."""
+    url = (((bp.get("image") or {}).get("show") or {}).get("url")) or bp.get("image_url")
+    if not url:
+        return None
+    return url if url.startswith("http") else f"https://www.cardtrader.com{url}"
+
+
 def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
     """Una espansione: torna quante carte ha salvato."""
     from utils import cardtrader_client as ct
@@ -142,6 +160,14 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
     if not en:
         return 0
     adesso = datetime.utcnow()
+    blueprint = [bp for bp in ct.blueprints_cached(espansione["id"]) if _numero(bp.get("fixed_properties"))]
+    carte_en = {(c.get("localId") or "").lstrip("0") or c.get("localId"): c for c in en.get("cards") or []}
+    # Il set TCGdex e' quello giusto solo se le carte tornano per numero:
+    # "Miscellaneous Promos" di CardTrader (promo sparse) ha lo stesso nome di
+    # un set TCGdex di una carta sola. Se no, di TCGdex non si usa niente.
+    trovate = sum(1 for bp in blueprint if _numero(bp["fixed_properties"]) in carte_en)
+    if blueprint and trovate < len(blueprint) / 2:
+        en, it, carte_en = {}, {}, {}
     riga = db.get(PriceGuideSet, espansione["id"])
     nome_it = it.get("name")
     if riga is None:
@@ -151,7 +177,7 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
         db.add(riga)
     riga.name_en = espansione["name"]
     riga.name_it = nome_it
-    riga.tcgdex_id = set_id
+    riga.tcgdex_id = set_id if en else None
     riga.release_date = (en.get("releaseDate") or "")[:10] or None
     riga.card_count = (en.get("cardCount") or {}).get("official")
     riga.serie = (it.get("serie") or {}).get("name") or (en.get("serie") or {}).get("name")
@@ -159,10 +185,8 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
     riga.updated_at = adesso
 
     prezzi = _prezzi(espansione["id"])
-    carte_en = {(c.get("localId") or "").lstrip("0") or c.get("localId"): c for c in en.get("cards") or []}
     nomi_it = {(c.get("localId") or "").lstrip("0") or c.get("localId"): c.get("name") for c in it.get("cards") or []}
     esistenti = {c.blueprint_id: c for c in db.query(PriceGuideCard).filter(PriceGuideCard.set_id == riga.id)}
-    blueprint = [bp for bp in ct.blueprints_cached(espansione["id"]) if _numero(bp.get("fixed_properties"))]
     # Per i Pokémon CardTrader mette nella "versione" rarita' e numero
     # ("Holo Rare | 4/102"): conta solo se due carte del set hanno lo stesso
     # numero (varianti vere), e allora distingue nome e indirizzo.
@@ -179,7 +203,7 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
     for bp in sorted(blueprint, key=lambda b: b["id"]):
         numero = _numero(bp.get("fixed_properties"))
         tcg = carte_en.get(numero) or {}
-        variante = bp.get("version") if per_numero[numero] > 1 else None
+        variante = _variante(bp.get("version")) if per_numero[numero] > 1 else None
         nome = nomi_it.get(numero) or tcg.get("name") or bp.get("name") or ""
         base = slug(f"{numero}-{nome}" + (f"-{variante}" if variante else ""))
         proposto = base if base not in slug_usati else f"{base}-{bp['id']}"
@@ -194,7 +218,7 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
         if variante:
             carta.name_en = f"{carta.name_en} ({variante})"[:200]
         carta.name_it = nomi_it.get(numero)
-        carta.image_url = f"{tcg['image']}/high.webp" if tcg.get("image") else None
+        carta.image_url = f"{tcg['image']}/high.webp" if tcg.get("image") else _immagine_cardtrader(bp)
         tabella, offerte = prezzi.get(bp["id"], ({}, 0))
         carta.prices = tabella or None
         carta.min_price_cents = prezzo_in_evidenza(tabella)
