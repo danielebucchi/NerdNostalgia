@@ -29,7 +29,7 @@ LOGGER = logging.getLogger("price_guide")
 PAUSA = 1.0     # fra un'espansione e l'altra: CardTrader e TCGdex hanno limiti
 # Cambia quando cambia il modo di costruire i dati (nomi, indirizzi): al
 # riavvio il server rifa' la guida senza aspettare la domenica.
-VERSIONE = "5"
+VERSIONE = "6"
 CHIAVE_VERSIONE = "price_guide_version"
 
 
@@ -229,6 +229,10 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
     return salvate
 
 
+# Espansioni CardTrader che TCGdex chiama diversamente.
+ALIAS_SET = {"SV Black Star Promos": "svp"}
+
+
 def aggiorna(db: Session, pausa: float = PAUSA, limite: Optional[int] = None) -> Dict[str, int]:
     """Il giro settimanale su tutte le espansioni Pokémon."""
     from utils import cardtrader_client as ct
@@ -237,7 +241,7 @@ def aggiorna(db: Session, pausa: float = PAUSA, limite: Optional[int] = None) ->
     espansioni = [e for e in ct.expansions_cached() if e.get("game_id") == card_names_it.POKEMON]
     fatti = carte = errori = 0
     for espansione in espansioni:
-        set_id = card_names_it._set_pokemon(espansione.get("name") or "")
+        set_id = card_names_it._set_pokemon(espansione.get("name") or "") or ALIAS_SET.get(espansione.get("name"))
         if not set_id:
             continue
         try:
@@ -369,10 +373,13 @@ def disponibili(db: Session, blueprint_ids: List[int]) -> Dict[int, dict]:
 # Segno sull'articolo: blueprint messo dal titolo, per ritrovarlo e
 # toglierlo se un abbinamento si rivelasse sbagliato.
 CHIAVE_ABBINATO = "blueprint_dal_titolo"
-# Parole del titolo che non dicono quale carta e': condizioni, lingue, finiture.
-PAROLE_VUOTE = {"set", "di", "dei", "del", "della", "the", "of", "and", "e", "pokemon", "card", "carta", "carte",
-                "it", "ita", "eng", "en", "played", "pl", "nm", "near", "mint", "sp", "mp", "po", "poor", "holo",
-                "rare", "reverse", "1ed", "edition", "edizione", "prima", "1st", "lp", "gd", "ex"}
+# Parole del titolo che non dicono quale carta e': condizioni, lingue,
+# finiture, articoli e preposizioni, "black star" delle promo.
+PAROLE_VUOTE = {"set", "di", "dei", "del", "della", "delle", "the", "of", "and", "e", "la", "le", "il", "lo",
+                "i", "gli", "l", "pokemon", "card", "carta", "carte", "it", "ita", "eng", "en", "played", "pl",
+                "nm", "near", "mint", "sp", "mp", "po", "poor", "holo", "rare", "reverse", "1ed", "edition",
+                "edizione", "prima", "1st", "lp", "gd", "ex", "black", "star", "full", "art", "pokeball",
+                "shiny", "cosmo"}
 # Carte asiatiche: hanno set e numeri loro, non quelli della guida.
 LINGUE_ESCLUSE = {"jp", "jap", "jpn", "japanese", "giapponese", "kr", "kor", "korean", "coreana", "cn", "chinese",
                   "cinese"}
@@ -383,13 +390,35 @@ def _parole(testo: str) -> List[str]:
     return [p for p in re.split(r"[^a-z0-9]+", testo) if p]
 
 
-def _nucleo(testo: str) -> set:
-    return {p for p in _parole(re.sub(r"\(.*?\)", "", testo or "")) if p not in PAROLE_VUOTE}
+def _radice(parola: str) -> str:
+    """Le prime sei lettere, senza la s finale: "trionfale" e "trionfali",
+    "nascente" e "nascenti", "promo" e "promos" sono la stessa parola (i
+    titoli sono scritti a mano, gli errori di battitura capitano)."""
+    return (parola.rstrip("s") or parola)[:6]
+
+
+def _nel_titolo(nome: str, parole: List[str], unito: str) -> bool:
+    """Le parole importanti di `nome` (carta o set) sono nel titolo, anche
+    con desinenze diverse; o il nome e' scritto attaccato ("neodestiny")."""
+    nucleo = [p for p in _parole(re.sub(r"\(.*?\)", "", nome or "")) if p not in PAROLE_VUOTE]
+    if not nucleo:
+        return False
+    radici = {_radice(p) for p in parole}
+    if all(_radice(p) in radici for p in nucleo):
+        return True
+    attaccato = "".join(nucleo)
+    return len(attaccato) >= 6 and attaccato in unito
+
+
+def _numero_carta(numero: str) -> str:
+    """"004" → "4", "TG11" → "tg11", "SWSH056" → "swsh56"."""
+    m = re.fullmatch(r"([a-z]*)0*(\d+)", (numero or "").lower())
+    return f"{m.group(1)}{m.group(2)}" if m else (numero or "").lower()
 
 
 def _numeri(titolo: str) -> set:
-    numeri = {p.lstrip("0") or p for p in _parole(titolo) if p.isdigit()}
-    numeri |= {a.lstrip("0") or a for a, _ in re.findall(r"(\d+)\s*/\s*(\d+)", titolo or "")}
+    numeri = {_numero_carta(p) for p in _parole(titolo) if re.fullmatch(r"[a-z]*\d+", p)}
+    numeri |= {_numero_carta(a) for a, _ in re.findall(r"(\d+)\s*/\s*(\d+)", titolo or "")}
     return numeri
 
 
@@ -400,22 +429,23 @@ class Indice:
         self.per_numero: Dict[str, list] = {}
         for c, s in db.query(PriceGuideCard, PriceGuideSet).join(PriceGuideSet):
             set_nomi = [n for n in (s.name_it, s.name_en) if n]
-            self.per_numero.setdefault(c.number, []).append(
+            self.per_numero.setdefault(_numero_carta(c.number), []).append(
                 (c.blueprint_id, [n for n in (c.name_it, c.name_en) if n], set_nomi, "(" in (c.name_en or ""), s.id))
 
     def abbina(self, titolo: str) -> Optional[int]:
         """Il blueprint della carta del titolo, se ce n'e' uno solo sicuro:
         numero, nome della carta (italiano o inglese) e nome del set tutti
         nel titolo, un solo set possibile. Fra le varianti, la normale."""
-        parole = set(_parole(titolo))
-        if parole & LINGUE_ESCLUSE:
+        parole = _parole(titolo)
+        if set(parole) & LINGUE_ESCLUSE:
             return None
+        unito = "".join(parole)
         candidati = []
         for numero in _numeri(titolo):
             for bp, nomi, set_nomi, variante, set_id in self.per_numero.get(numero, []):
-                if not any(_nucleo(n) and _nucleo(n) <= parole for n in nomi):
+                if not any(_nel_titolo(n, parole, unito) for n in nomi):
                     continue
-                if any(_nucleo(n) and _nucleo(n) <= parole for n in set_nomi):
+                if any(_nel_titolo(n, parole, unito) for n in set_nomi):
                     candidati.append((variante, bp, set_id))
         if not candidati or len({set_id for _, _, set_id in candidati}) > 1:
             return None

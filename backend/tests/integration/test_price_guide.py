@@ -184,3 +184,24 @@ def test_titles_without_blueprint_are_matched(client, db_session, admin_user, fo
     assert giusto.cardtrader_product_id is None                            # su CardTrader non pubblica niente
     assert client.get("/api/price-guide/cards/set-base/4-charizard").json()["available"]["id"] == giusto.id
     assert price_guide.abbina_articoli(db_session) == 0                    # gia' collegati
+
+
+@pytest.mark.parametrize("titolo, atteso", [
+    ("Machop 67 battaglie trionfale pokemon reverse", True),       # trionfale/trionfali
+    ("Castform tg11 origine perduta pokemon", True),               # numero TG
+    ("Morpeko v 56 swsh black star promo pokemon", True),          # promo/promos
+    ("Light dragonair 22 neodestiny poor pokemon", True),          # set scritto attaccato
+    ("Morpeko v 56 pokemon", False),                               # manca il set
+    ("Morpeko v 57 swsh black star promo pokemon", False),         # numero sbagliato
+    ("Morpeko v 56 swsh black star promo jp pokemon", False),      # giapponese
+])
+def test_title_matching_rules(titolo, atteso):
+    from types import SimpleNamespace
+    indice = price_guide.Indice.__new__(price_guide.Indice)
+    indice.per_numero = {
+        "67": [(1, ["Machop"], ["Battaglie Trionfali", "Triumphant"], False, 1)],
+        "tg11": [(2, ["Castform"], ["Origine Perduta", "Lost Origin"], False, 2)],
+        "56": [(3, ["Morpeko V"], ["SPSC Promo", "SWSH Black Star Promos"], False, 3)],
+        "22": [(4, ["Light Dragonair"], ["Neo Destiny"], False, 4)],
+    }
+    assert (indice.abbina(titolo) is not None) is atteso
