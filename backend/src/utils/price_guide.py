@@ -343,7 +343,6 @@ def disponibili(db: Session, blueprint_ids: List[int]) -> Dict[int, dict]:
     from models.db import Article, ArticleStatus, PersonalCard
     if not blueprint_ids:
         return {}
-    from sqlalchemy import func
     in_vendita = (Article.status == ArticleStatus.PUBLISHED, Article.reserved_order_id.is_(None),
                   Article.quantity > 0)
     righe = (db.query(PersonalCard.cardtrader_blueprint_id, Article)
@@ -352,10 +351,6 @@ def disponibili(db: Session, blueprint_ids: List[int]) -> Dict[int, dict]:
              .all())
     righe += [(a.cardtrader_blueprint_id, a) for a in
               db.query(Article).filter(Article.cardtrader_blueprint_id.in_(blueprint_ids), *in_vendita).all()]
-    # Gli articoli abbinati dal titolo (abbina_articoli).
-    guida = func.json_extract(Article.article_metadata, f"$.{CHIAVE_ABBINATO}")
-    righe += [((a.article_metadata or {}).get(CHIAVE_ABBINATO), a) for a in
-              db.query(Article).filter(guida.in_(blueprint_ids), *in_vendita).all()]
     out: Dict[int, dict] = {}
     for bp, a in righe:
         if bp not in out or float(a.price) < out[bp]["price"]:
@@ -366,10 +361,14 @@ def disponibili(db: Session, blueprint_ids: List[int]) -> Dict[int, dict]:
 
 # ---------------------------------------------------------------------------
 # Articoli senza collegamento a CardTrader (importati da Vinted, fatti a mano):
-# si abbinano alla guida dal titolo, "Venusaur 15 base set played pokemon".
+# si collegano dal titolo, "Venusaur 15 base set played pokemon", scrivendo il
+# blueprint sull'articolo. Non pubblica niente su CardTrader (quello lo fa
+# solo la pubblicazione dall'inventario, che cosi' sa gia' quale carta e').
 # ---------------------------------------------------------------------------
 
-CHIAVE_ABBINATO = "guida_blueprint"
+# Segno sull'articolo: blueprint messo dal titolo, per ritrovarlo e
+# toglierlo se un abbinamento si rivelasse sbagliato.
+CHIAVE_ABBINATO = "blueprint_dal_titolo"
 # Parole del titolo che non dicono quale carta e': condizioni, lingue, finiture.
 PAROLE_VUOTE = {"set", "di", "dei", "del", "della", "the", "of", "and", "e", "pokemon", "card", "carta", "carte",
                 "it", "ita", "eng", "en", "played", "pl", "nm", "near", "mint", "sp", "mp", "po", "poor", "holo",
@@ -424,10 +423,9 @@ class Indice:
 
 
 def abbina_articoli(db: Session) -> int:
-    """Collega alla guida le carte Pokémon in vendita che non hanno un
-    blueprint CardTrader (ne' sull'articolo ne' su una carta dello scanner).
-    Il collegamento sta in article_metadata, i campi CardTrader non si
-    toccano. Torna quanti articoli ha abbinato di nuovo."""
+    """Collega a CardTrader le carte Pokémon in vendita che non hanno un
+    blueprint (ne' sull'articolo ne' su una carta dello scanner): il
+    blueprint trovato dal titolo va sull'articolo. Torna quanti ne ha collegati."""
     from models.db import Article, ArticleStatus, Category, PersonalCard
     if db.query(PriceGuideCard.id).first() is None:
         return 0
@@ -442,14 +440,11 @@ def abbina_articoli(db: Session) -> int:
         if a.id in collegati:
             continue
         bp = indice.abbina(a.title or "")
-        meta = dict(a.article_metadata or {})
-        if meta.get(CHIAVE_ABBINATO) == bp:
-            continue
         if bp is None:
-            meta.pop(CHIAVE_ABBINATO, None)
-        else:
-            meta[CHIAVE_ABBINATO] = bp
-            nuovi += 1
-        a.article_metadata = meta
+            continue
+        a.cardtrader_blueprint_id = bp
+        a.article_metadata = {**(a.article_metadata or {}), CHIAVE_ABBINATO: True}
+        nuovi += 1
+        LOGGER.warning("Guida prezzi: articolo %s collegato al blueprint %s dal titolo %r", a.id, bp, a.title)
     db.commit()
     return nuovi

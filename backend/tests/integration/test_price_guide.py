@@ -178,7 +178,9 @@ def test_titles_without_blueprint_are_matched(client, db_session, admin_user, fo
     giapponese = art("Charizard 4 base set jp pokemon")                   # giapponese: no
     senza_set = art("Charizard 4 holo pokemon")                          # set mancante: no
     assert price_guide.abbina_articoli(db_session) == 2
-    assert giusto.article_metadata["guida_blueprint"] == 11 and italiano.article_metadata["guida_blueprint"] == 12
-    assert "guida_blueprint" not in (giapponese.article_metadata or {})
-    assert "guida_blueprint" not in (senza_set.article_metadata or {})
+    assert (giusto.cardtrader_blueprint_id, italiano.cardtrader_blueprint_id) == (11, 12)
+    assert giusto.article_metadata["blueprint_dal_titolo"] is True
+    assert giapponese.cardtrader_blueprint_id is None and senza_set.cardtrader_blueprint_id is None
+    assert giusto.cardtrader_product_id is None                            # su CardTrader non pubblica niente
     assert client.get("/api/price-guide/cards/set-base/4-charizard").json()["available"]["id"] == giusto.id
+    assert price_guide.abbina_articoli(db_session) == 0                    # gia' collegati
