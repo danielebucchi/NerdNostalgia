@@ -211,6 +211,17 @@ def _price_guide_job():
         db.close()
 
 
+def _price_guide_abbina_job():
+    from utils import price_guide
+    db = SessionLocal()
+    try:
+        price_guide.abbina_articoli(db)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("Guida prezzi, abbinamento articoli fallito: %s", exc)
+    finally:
+        db.close()
+
+
 def _price_guide_da_rifare() -> bool:
     from utils import price_guide
     db = SessionLocal()
@@ -400,6 +411,15 @@ def start_scheduler() -> None:
         max_instances=1,
         coalesce=True,
         **subito,
+    )
+    # Ogni ora: gli articoli nuovi senza blueprint si abbinano alla guida dal titolo.
+    _scheduler.add_job(
+        _price_guide_abbina_job,
+        CronTrigger(minute=25),
+        id="price_guide_match",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     # Backup giornaliero (SQLite snapshot + tar uploads) alle 03:30 locali
     _scheduler.add_job(

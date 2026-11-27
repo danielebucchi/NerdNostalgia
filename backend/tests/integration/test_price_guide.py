@@ -146,3 +146,39 @@ def test_set_page_lists_only_cards_with_offers(client, db_session, fonti, monkey
     price_guide.aggiorna(db_session, pausa=0)
     carte = client.get("/api/price-guide/sets/set-base").json()["cards"]
     assert [c["name"] for c in carte] == ["Charizard"]
+
+
+def test_available_also_for_articles_made_by_hand(client, db_session, admin_user, fonti):
+    price_guide.aggiorna(db_session, pausa=0)
+    a = Article(user_id=admin_user.id, title="Blastoise 2 base set", price=30, condition=ArticleCondition.USED,
+                status=ArticleStatus.PUBLISHED, quantity=1, images=["/static/x.webp"],
+                published_at=datetime.utcnow(), cardtrader_blueprint_id=12)          # niente carta dello scanner
+    db_session.add(a)
+    db_session.commit()
+    assert client.get("/api/price-guide/cards/set-base/2-blastoise").json()["available"]["id"] == a.id
+
+
+def test_titles_without_blueprint_are_matched(client, db_session, admin_user, fonti):
+    from models.db import Category
+    price_guide.aggiorna(db_session, pausa=0)
+    cat = Category(name="Pokémon", slug="pokemon")
+    db_session.add(cat)
+    db_session.commit()
+
+    def art(titolo):
+        a = Article(user_id=admin_user.id, title=titolo, price=40, condition=ArticleCondition.USED,
+                    status=ArticleStatus.PUBLISHED, quantity=1, images=["/static/x.webp"], category_id=cat.id,
+                    published_at=datetime.utcnow())
+        db_session.add(a)
+        db_session.commit()
+        return a
+
+    giusto = art("Charizard 4 set base played pokemon")
+    italiano = art("Pokémon · Blastoise · Set Base 002/102 (IT, SP)")
+    giapponese = art("Charizard 4 base set jp pokemon")                   # giapponese: no
+    senza_set = art("Charizard 4 holo pokemon")                          # set mancante: no
+    assert price_guide.abbina_articoli(db_session) == 2
+    assert giusto.article_metadata["guida_blueprint"] == 11 and italiano.article_metadata["guida_blueprint"] == 12
+    assert "guida_blueprint" not in (giapponese.article_metadata or {})
+    assert "guida_blueprint" not in (senza_set.article_metadata or {})
+    assert client.get("/api/price-guide/cards/set-base/4-charizard").json()["available"]["id"] == giusto.id

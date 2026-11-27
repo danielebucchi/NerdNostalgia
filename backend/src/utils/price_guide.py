@@ -257,6 +257,7 @@ def aggiorna(db: Session, pausa: float = PAUSA, limite: Optional[int] = None) ->
     if fatti:
         from helpers.setting import SettingHelper
         SettingHelper(db=db).upsert(CHIAVE_VERSIONE, VERSIONE)
+        abbina_articoli(db)
     LOGGER.warning("Guida prezzi: %d set, %d carte, %d errori", fatti, carte, errori)
     return {"set": fatti, "carte": carte, "errori": errori}
 
@@ -336,19 +337,119 @@ def euro(centesimi: Optional[int]) -> Optional[float]:
 
 
 def disponibili(db: Session, blueprint_ids: List[int]) -> Dict[int, dict]:
-    """Le nostre carte in vendita sul sito per quei blueprint: {bp: articolo}."""
+    """Le nostre carte in vendita sul sito per quei blueprint: {bp: articolo}.
+    Il blueprint CardTrader puo' stare sulla carta della collezione (scanner)
+    o direttamente sull'articolo (articoli creati a mano)."""
     from models.db import Article, ArticleStatus, PersonalCard
     if not blueprint_ids:
         return {}
+    from sqlalchemy import func
+    in_vendita = (Article.status == ArticleStatus.PUBLISHED, Article.reserved_order_id.is_(None),
+                  Article.quantity > 0)
     righe = (db.query(PersonalCard.cardtrader_blueprint_id, Article)
              .join(Article, Article.id == PersonalCard.article_id)
-             .filter(PersonalCard.cardtrader_blueprint_id.in_(blueprint_ids),
-                     Article.status == ArticleStatus.PUBLISHED, Article.reserved_order_id.is_(None),
-                     Article.quantity > 0)
+             .filter(PersonalCard.cardtrader_blueprint_id.in_(blueprint_ids), *in_vendita)
              .all())
+    righe += [(a.cardtrader_blueprint_id, a) for a in
+              db.query(Article).filter(Article.cardtrader_blueprint_id.in_(blueprint_ids), *in_vendita).all()]
+    # Gli articoli abbinati dal titolo (abbina_articoli).
+    guida = func.json_extract(Article.article_metadata, f"$.{CHIAVE_ABBINATO}")
+    righe += [((a.article_metadata or {}).get(CHIAVE_ABBINATO), a) for a in
+              db.query(Article).filter(guida.in_(blueprint_ids), *in_vendita).all()]
     out: Dict[int, dict] = {}
     for bp, a in righe:
         if bp not in out or float(a.price) < out[bp]["price"]:
             out[bp] = {"id": a.id, "title": a.title, "price": float(a.price),
                        "image": (a.images or [None])[0]}
     return out
+
+
+# ---------------------------------------------------------------------------
+# Articoli senza collegamento a CardTrader (importati da Vinted, fatti a mano):
+# si abbinano alla guida dal titolo, "Venusaur 15 base set played pokemon".
+# ---------------------------------------------------------------------------
+
+CHIAVE_ABBINATO = "guida_blueprint"
+# Parole del titolo che non dicono quale carta e': condizioni, lingue, finiture.
+PAROLE_VUOTE = {"set", "di", "dei", "del", "della", "the", "of", "and", "e", "pokemon", "card", "carta", "carte",
+                "it", "ita", "eng", "en", "played", "pl", "nm", "near", "mint", "sp", "mp", "po", "poor", "holo",
+                "rare", "reverse", "1ed", "edition", "edizione", "prima", "1st", "lp", "gd", "ex"}
+# Carte asiatiche: hanno set e numeri loro, non quelli della guida.
+LINGUE_ESCLUSE = {"jp", "jap", "jpn", "japanese", "giapponese", "kr", "kor", "korean", "coreana", "cn", "chinese",
+                  "cinese"}
+
+
+def _parole(testo: str) -> List[str]:
+    testo = unicodedata.normalize("NFKD", testo or "").encode("ascii", "ignore").decode().lower()
+    return [p for p in re.split(r"[^a-z0-9]+", testo) if p]
+
+
+def _nucleo(testo: str) -> set:
+    return {p for p in _parole(re.sub(r"\(.*?\)", "", testo or "")) if p not in PAROLE_VUOTE}
+
+
+def _numeri(titolo: str) -> set:
+    numeri = {p.lstrip("0") or p for p in _parole(titolo) if p.isdigit()}
+    numeri |= {a.lstrip("0") or a for a, _ in re.findall(r"(\d+)\s*/\s*(\d+)", titolo or "")}
+    return numeri
+
+
+class Indice:
+    """Le carte della guida per numero, per abbinare molti titoli di seguito."""
+
+    def __init__(self, db: Session):
+        self.per_numero: Dict[str, list] = {}
+        for c, s in db.query(PriceGuideCard, PriceGuideSet).join(PriceGuideSet):
+            set_nomi = [n for n in (s.name_it, s.name_en) if n]
+            self.per_numero.setdefault(c.number, []).append(
+                (c.blueprint_id, [n for n in (c.name_it, c.name_en) if n], set_nomi, "(" in (c.name_en or ""), s.id))
+
+    def abbina(self, titolo: str) -> Optional[int]:
+        """Il blueprint della carta del titolo, se ce n'e' uno solo sicuro:
+        numero, nome della carta (italiano o inglese) e nome del set tutti
+        nel titolo, un solo set possibile. Fra le varianti, la normale."""
+        parole = set(_parole(titolo))
+        if parole & LINGUE_ESCLUSE:
+            return None
+        candidati = []
+        for numero in _numeri(titolo):
+            for bp, nomi, set_nomi, variante, set_id in self.per_numero.get(numero, []):
+                if not any(_nucleo(n) and _nucleo(n) <= parole for n in nomi):
+                    continue
+                if any(_nucleo(n) and _nucleo(n) <= parole for n in set_nomi):
+                    candidati.append((variante, bp, set_id))
+        if not candidati or len({set_id for _, _, set_id in candidati}) > 1:
+            return None
+        return sorted(candidati)[0][1]
+
+
+def abbina_articoli(db: Session) -> int:
+    """Collega alla guida le carte Pokémon in vendita che non hanno un
+    blueprint CardTrader (ne' sull'articolo ne' su una carta dello scanner).
+    Il collegamento sta in article_metadata, i campi CardTrader non si
+    toccano. Torna quanti articoli ha abbinato di nuovo."""
+    from models.db import Article, ArticleStatus, Category, PersonalCard
+    if db.query(PriceGuideCard.id).first() is None:
+        return 0
+    indice = Indice(db)
+    collegati = {i for (i,) in db.query(PersonalCard.article_id)
+                 .filter(PersonalCard.cardtrader_blueprint_id.isnot(None), PersonalCard.article_id.isnot(None))}
+    articoli = (db.query(Article).join(Category, Category.id == Article.category_id)
+                .filter(Category.slug == "pokemon", Article.status == ArticleStatus.PUBLISHED,
+                        Article.cardtrader_blueprint_id.is_(None)).all())
+    nuovi = 0
+    for a in articoli:
+        if a.id in collegati:
+            continue
+        bp = indice.abbina(a.title or "")
+        meta = dict(a.article_metadata or {})
+        if meta.get(CHIAVE_ABBINATO) == bp:
+            continue
+        if bp is None:
+            meta.pop(CHIAVE_ABBINATO, None)
+        else:
+            meta[CHIAVE_ABBINATO] = bp
+            nuovi += 1
+        a.article_metadata = meta
+    db.commit()
+    return nuovi
