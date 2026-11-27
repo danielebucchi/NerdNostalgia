@@ -5,7 +5,10 @@ import { CartaTile } from "@/components/guida/CartaTile";
 import { absUrl } from "@/lib/seo";
 import { TabellaPrezzi } from "@/components/guida/TabellaPrezzi";
 import { ValutaCarta } from "@/components/guida/ValutaCarta";
-import { anno, dataItaliana, euro, formatDataBreve, getGuideCard } from "@/lib/price-guide";
+import { CONDIZIONI, anno, dataItaliana, euro, formatDataBreve, getGuideCard } from "@/lib/price-guide";
+
+const LINGUA: Record<string, string> = { it: "italiana", en: "inglese", fr: "francese", de: "tedesca", es: "spagnola", jp: "giapponese", ja: "giapponese" };
+const nomeLingua = (l: string) => LINGUA[l] ?? l.toUpperCase();
 
 export const revalidate = 3600;
 
@@ -31,6 +34,7 @@ export default async function CartaPage({ params }: Params) {
   const p = await params;
   const c = await getGuideCard(p.set, p.carta);
   if (!c) notFound();
+  const copie = c.available ? (c.available.copies ?? [c.available]) : [];
 
   const breadcrumb = {
     "@context": "https://schema.org",
@@ -77,12 +81,28 @@ export default async function CartaPage({ params }: Params) {
           </div>
 
           {c.available ? (
-            <div className="card p-5 mt-4 flex items-center gap-4">
-              <div className="flex-1">
-                <p className="display text-lg text-ink">Disponibile da noi</p>
-                <p className="text-sm text-ink-soft">{c.available.title}</p>
-              </div>
-              <Link href={`/articles/${c.available.id}`} className="btn btn-primary">{euro(c.available.price)} →</Link>
+            <div className="card p-5 mt-4">
+              <p className="display text-lg text-ink">
+                Disponibile da noi
+                {copie.length > 1 && <span className="text-ink-soft text-sm font-normal"> · {copie.length} copie</span>}
+              </p>
+              <ul className="mt-2 divide-y divide-ink/8">
+                {copie.map((k) => (
+                  <li key={k.id} className="flex items-center gap-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      {k.condition ? (
+                        <p className="text-sm text-ink">
+                          {CONDIZIONI.find((x) => x.id === k.condition)?.nome ?? k.condition}
+                          {k.language && <span className="text-ink-soft"> · {nomeLingua(k.language)}</span>}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-ink-soft truncate">{k.title}</p>
+                      )}
+                    </div>
+                    <Link href={`/articles/${k.id}`} className="btn btn-primary text-sm">{euro(k.price)} →</Link>
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : (
             <p className="text-sm text-ink-soft mt-4">

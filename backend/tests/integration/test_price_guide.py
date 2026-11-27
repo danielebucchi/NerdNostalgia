@@ -246,3 +246,24 @@ def test_set_with_a_big_secret_section_keeps_tcgdex(db_session, fonti, monkeypat
     price_guide.aggiorna(db_session, pausa=0)
     s = db_session.query(PriceGuideSet).one()
     assert (s.name_it, s.release_date) == ("Destino Sfuggente", "2019-08-23")
+
+
+def test_all_our_copies_are_listed(client, db_session, admin_user, fonti):
+    """Quattro Diglett in condizioni diverse: la guida li mostra tutti."""
+    price_guide.aggiorna(db_session, pausa=0)
+    copie = []
+    for cond, prezzo in (("Poor", 0.5), ("Near Mint", 0.5), ("Slightly Played", 0.8)):
+        a = Article(user_id=admin_user.id, title=f"Blastoise ({cond})", price=prezzo, condition=ArticleCondition.USED,
+                    status=ArticleStatus.PUBLISHED, quantity=1, images=["/static/x.webp"], published_at=datetime.utcnow())
+        db_session.add(a)
+        db_session.commit()
+        db_session.add(PersonalCard(name="Blastoise", article_id=a.id, cardtrader_blueprint_id=12,
+                                    condition=cond, language="IT"))
+        copie.append(a)
+    copie[1].cardtrader_blueprint_id = 12               # anche sull'articolo: non conta due volte
+    db_session.commit()
+
+    disp = client.get("/api/price-guide/cards/set-base/2-blastoise").json()["available"]
+    assert disp["id"] == copie[1].id                    # la piu' economica, la migliore a parita' di prezzo
+    assert [(c["id"], c["condition"], c["language"]) for c in disp["copies"]] == [
+        (copie[1].id, "NM", "it"), (copie[0].id, "PO", "it"), (copie[2].id, "SP", "it")]

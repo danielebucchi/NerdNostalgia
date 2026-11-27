@@ -22,7 +22,11 @@ export function CartaTile({ carta, mostraSet = false }: { carta: GuideCard; most
       {mostraSet && <p className="text-xs text-ink-soft truncate">{carta.set_name}</p>}
       <p className="text-sm font-bold text-pink-deep mt-auto pt-1">{euro(carta.min_price)}</p>
       <p className="text-[10px] text-ink-soft">Near Mint</p>
-      {carta.available && <span className="chip chip-mint text-[10px] mt-1 self-start">Disponibile da noi</span>}
+      {carta.available && (
+        <span className="chip chip-mint text-[10px] mt-1 self-start">
+          Disponibile da noi{(carta.available.copies?.length ?? 1) > 1 ? ` · ${carta.available.copies!.length} copie` : ""}
+        </span>
+      )}
     </Link>
   );
 }

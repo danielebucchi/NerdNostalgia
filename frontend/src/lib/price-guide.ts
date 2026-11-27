@@ -15,11 +15,19 @@ export interface GuideSet {
   updated_at: string | null;
 }
 
-export interface GuideAvailable {
+export interface GuideCopy {
   id: number;
   title: string;
   price: number;
   image: string | null;
+  /** Solo per le carte della collezione (scanner). */
+  condition: Condizione | null;
+  language: string | null;
+}
+
+/** La copia piu' economica, e in copies tutte quelle che abbiamo. */
+export interface GuideAvailable extends GuideCopy {
+  copies?: GuideCopy[];
 }
 
 /** Prezzo di mercato e offerta per una lingua e una condizione. */

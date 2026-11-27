@@ -52,6 +52,7 @@ def _tcgdex(lingua: str, set_id: str) -> dict:
 # Le condizioni, dalla migliore alla peggiore, con la sigla usata nel sito.
 CONDIZIONI = [("NM", ("Mint", "Near Mint")), ("SP", ("Slightly Played",)), ("MP", ("Moderately Played",)),
               ("PL", ("Played",)), ("PO", ("Poor",))]
+SIGLA = {nome: sigla for sigla, nomi in CONDIZIONI for nome in nomi}
 LINGUE = ("it", "en")
 
 
@@ -346,25 +347,35 @@ def euro(centesimi: Optional[int]) -> Optional[float]:
 
 
 def disponibili(db: Session, blueprint_ids: List[int]) -> Dict[int, dict]:
-    """Le nostre carte in vendita sul sito per quei blueprint: {bp: articolo}.
-    Il blueprint CardTrader puo' stare sulla carta della collezione (scanner)
-    o direttamente sull'articolo (articoli creati a mano)."""
+    """Le nostre carte in vendita sul sito per quei blueprint: {bp: la piu'
+    economica, con "copies" tutte le copie (condizione e lingua se e' una
+    carta della collezione)}. Il blueprint CardTrader puo' stare sulla carta
+    della collezione (scanner) o direttamente sull'articolo (articoli creati
+    a mano)."""
     from models.db import Article, ArticleStatus, PersonalCard
     if not blueprint_ids:
         return {}
     in_vendita = (Article.status == ArticleStatus.PUBLISHED, Article.reserved_order_id.is_(None),
                   Article.quantity > 0)
-    righe = (db.query(PersonalCard.cardtrader_blueprint_id, Article)
+    righe = (db.query(PersonalCard.cardtrader_blueprint_id, Article, PersonalCard)
              .join(Article, Article.id == PersonalCard.article_id)
              .filter(PersonalCard.cardtrader_blueprint_id.in_(blueprint_ids), *in_vendita)
              .all())
-    righe += [(a.cardtrader_blueprint_id, a) for a in
+    righe += [(a.cardtrader_blueprint_id, a, None) for a in
               db.query(Article).filter(Article.cardtrader_blueprint_id.in_(blueprint_ids), *in_vendita).all()]
+    copie: Dict[int, Dict[int, dict]] = {}
+    for bp, a, carta in righe:
+        if a.id in copie.setdefault(bp, {}) and carta is None:
+            continue                                    # gia' vista con la sua carta
+        copie[bp][a.id] = {"id": a.id, "title": a.title, "price": float(a.price),
+                           "image": (a.images or [None])[0],
+                           "condition": SIGLA.get(carta.condition) if carta else None,
+                           "language": (carta.language or "").lower() or None if carta else None}
+    ordine = {sigla: i for i, (sigla, _) in enumerate(CONDIZIONI)}
     out: Dict[int, dict] = {}
-    for bp, a in righe:
-        if bp not in out or float(a.price) < out[bp]["price"]:
-            out[bp] = {"id": a.id, "title": a.title, "price": float(a.price),
-                       "image": (a.images or [None])[0]}
+    for bp, per_id in copie.items():
+        tutte = sorted(per_id.values(), key=lambda c: (c["price"], ordine.get(c["condition"], 99), c["id"]))
+        out[bp] = {**tutte[0], "copies": tutte}
     return out
 
 
