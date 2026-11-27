@@ -89,3 +89,20 @@ def test_removed_from_vinted_the_card_stays_on_the_site(client, admin_headers, d
     db_session.expire_all()
     art = db_session.get(Article, art_id)
     assert art.status == ArticleStatus.PUBLISHED and art.vinted_item_id is None
+
+
+def test_sold_on_the_site_is_sold_on_vinted_too(client, admin_headers, db_session, mondo_finto):
+    """Venduto sul sito: risulta venduto anche su Vinted, e la sync che
+    trova l'annuncio ancora online non lo rimette in vendita."""
+    _, art_id = _carta_sul_sito(client, admin_headers, db_session)
+    client.patch(f"/api/articles/{art_id}/vinted", headers=admin_headers, json={
+        "vinted_status": "LISTED", "vinted_url": "https://www.vinted.it/items/5123456790-pidgey"})
+
+    assert client.post(f"/api/articles/{art_id}/sell", headers=admin_headers).status_code == 200
+    db_session.expire_all()
+    assert db_session.get(Article, art_id).vinted_status == VintedStatus.SOLD
+
+    _sync(client, admin_headers, _annuncio(5123456790, "qualsiasi titolo"))
+    db_session.expire_all()
+    art = db_session.get(Article, art_id)
+    assert (art.status, art.vinted_status) == (ArticleStatus.SOLD, VintedStatus.SOLD)

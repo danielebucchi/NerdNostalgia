@@ -340,6 +340,10 @@ def _apply_item_to_article(
             VintedStatus.SOLD if (item.status or "").lower() == "sold"
             else VintedStatus.LISTED
         )
+        if existing.status == ArticleStatus.SOLD and existing.vinted_status == VintedStatus.SOLD:
+            # Venduto altrove e segnato venduto anche qui: l'annuncio ancora
+            # online su Vinted non lo rimette in vendita.
+            new_status = VintedStatus.SOLD
         if existing.vinted_status != new_status:
             existing.vinted_status = new_status
             changed = True

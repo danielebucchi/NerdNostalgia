@@ -194,7 +194,9 @@ def segna_articolo_venduto(db: Session, article: Article, piattaforma: str) -> L
             LOGGER.warning("Articolo %s venduto su %s ma non ritirato da %s: %s", article.id, piattaforma, nome, exc)
             rimasti.append(nome)
     if article.vinted_status == VintedStatus.LISTED:
-        rimasti.append("vinted")  # niente API: va tolto a mano
+        rimasti.append("vinted")  # niente API: l'annuncio va tolto a mano
+        article.vinted_status = VintedStatus.SOLD
+        db.commit()
     return rimasti
 
 

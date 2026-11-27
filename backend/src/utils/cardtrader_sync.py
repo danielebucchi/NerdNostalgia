@@ -445,9 +445,18 @@ def collega_prodotti(db, prodotti: Optional[List[dict]] = None, venduto: Optiona
     return n
 
 
+def _venduto_anche_su_vinted(db, article: Article) -> None:
+    """Articolo collegato a Vinted e venduto: venduto anche li'."""
+    from models.db import VintedStatus
+    if article.vinted_status == VintedStatus.LISTED:
+        article.vinted_status = VintedStatus.SOLD
+        db.commit()
+
+
 def auto_unpublish_on_sold(db, article: Article, piattaforma: str = "sito") -> None:
     """Hook alla vendita: toglie la carta da CardTrader per non venderla
     due volte. Best-effort."""
+    _venduto_anche_su_vinted(db, article)
     try:
         if (not article.cardtrader_product_id and article.cardtrader_blueprint_id
                 and ct.is_configured()):
