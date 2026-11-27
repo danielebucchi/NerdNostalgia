@@ -447,7 +447,21 @@ function ArticleRow({
       </div>
       {(a.ebay_status === "LISTED" || a.cardtrader_product_id || a.vinted_url) && (
         <span className="hidden sm:inline-flex gap-1 text-[10px] font-semibold">
-          {a.vinted_url && <span className="chip chip-sky" title="Collegato a Vinted">Vinted</span>}
+          {a.vinted_url && (
+            // Dentro il link alla scheda: un bottone che apre l'annuncio senza aprire la scheda.
+            <button
+              type="button"
+              className="chip chip-sky hover:ring-2 hover:ring-sky-400"
+              title="Vai all'annuncio su Vinted"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(a.vinted_url!, "_blank", "noopener,noreferrer");
+              }}
+            >
+              Vinted ↗
+            </button>
+          )}
           {a.ebay_status === "LISTED" && <span className="chip chip-sky" title="In vendita su eBay">eBay</span>}
           {a.cardtrader_product_id && <span className="chip chip-sky" title="In vendita su CardTrader">CT</span>}
         </span>

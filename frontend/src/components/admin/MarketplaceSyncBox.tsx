@@ -261,14 +261,35 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
         <code>SOLD</code> anche nel catalogo.
       </p>
 
-      <a
-        href={config.newListingUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="btn btn-primary text-sm justify-center w-full mb-3"
-      >
-        {config.emoji} Apri {config.label} · Nuovo annuncio ↗
-      </a>
+      {current.url ? (
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <a
+            href={current.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary text-sm justify-center"
+          >
+            {config.emoji} Vai su {config.label} ↗
+          </a>
+          <a
+            href={config.newListingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost text-sm justify-center"
+          >
+            Nuovo annuncio ↗
+          </a>
+        </div>
+      ) : (
+        <a
+          href={config.newListingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-primary text-sm justify-center w-full mb-3"
+        >
+          {config.emoji} Apri {config.label} · Nuovo annuncio ↗
+        </a>
+      )}
 
       <div className="mb-4">
         <p className="text-[11px] uppercase tracking-wider text-ink-soft font-bold mb-1.5">
@@ -365,17 +386,30 @@ export function MarketplaceSyncBox({ article, marketplace, onUpdated }: Props) {
         <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">
           URL del listing {config.label}
         </span>
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder={
-            marketplace === "vinted"
-              ? "https://www.vinted.it/items/123456789-…"
-              : "https://www.ebay.it/itm/123456789"
-          }
-          className="input mt-1"
-        />
+        <span className="flex gap-2 mt-1">
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder={
+              marketplace === "vinted"
+                ? "https://www.vinted.it/items/123456789-…"
+                : "https://www.ebay.it/itm/123456789"
+            }
+            className="input"
+          />
+          {/^https?:\/\//.test(url.trim()) && (
+            <a
+              href={url.trim()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost text-sm whitespace-nowrap"
+              title={`Apri l'annuncio su ${config.label}`}
+            >
+              Vai ↗
+            </a>
+          )}
+        </span>
       </label>
 
       <label className="block mb-4">
