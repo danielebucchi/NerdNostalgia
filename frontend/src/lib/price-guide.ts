@@ -31,6 +31,13 @@ export interface GuideCell {
 }
 
 export type Lingua = "it" | "en";
+export type Versione = "normale" | "1ed" | "reverse";
+
+export const VERSIONI: { id: Versione; nome: string; spiegazione: string }[] = [
+  { id: "normale", nome: "Normale", spiegazione: "La carta come esce dalle buste, senza simboli particolari." },
+  { id: "1ed", nome: "1ª edizione", spiegazione: "Con il simbolo \"Edition 1\" (il cerchietto nero) a sinistra sotto l'illustrazione." },
+  { id: "reverse", nome: "Reverse holo", spiegazione: "Lucida su tutta la carta tranne l'illustrazione." },
+];
 export type Condizione = "NM" | "SP" | "MP" | "PL" | "PO";
 
 export const LINGUE: { id: Lingua; nome: string }[] = [
@@ -64,8 +71,8 @@ export interface GuideCard {
   buy_bulk: { era: string; eur_per_kg: number } | null;
   /** Energie sotto 0,50 €: non le compriamo. */
   buy_none: boolean;
-  /** Prezzo e offerta per lingua e condizione. */
-  prices: Partial<Record<Lingua, Partial<Record<Condizione, GuideCell>>>>;
+  /** Prezzo e offerta per versione, lingua e condizione. */
+  prices: Partial<Record<Versione, Partial<Record<Lingua, Partial<Record<Condizione, GuideCell>>>>>>;
 }
 
 /** L'offerta in una riga, per testi e oggetto della richiesta. */

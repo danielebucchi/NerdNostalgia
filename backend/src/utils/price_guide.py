@@ -29,7 +29,7 @@ LOGGER = logging.getLogger("price_guide")
 PAUSA = 1.0     # fra un'espansione e l'altra: CardTrader e TCGdex hanno limiti
 # Cambia quando cambia il modo di costruire i dati (nomi, indirizzi): al
 # riavvio il server rifa' la guida senza aspettare la domenica.
-VERSIONE = "3"
+VERSIONE = "4"
 CHIAVE_VERSIONE = "price_guide_version"
 
 
@@ -55,45 +55,71 @@ CONDIZIONI = [("NM", ("Mint", "Near Mint")), ("SP", ("Slightly Played",)), ("MP"
 LINGUE = ("it", "en")
 
 
-def tabella_prezzi(prodotti: List[dict]) -> Dict[str, Dict[str, int]]:
-    """Il prezzo piu' basso per lingua (italiana, inglese) e condizione.
-    Fuori le copie che non sono "la carta normale": gradate, firmate,
-    alterate, prima edizione, reverse. Una condizione peggiore non puo'
-    costare piu' di una migliore: se succede (un'offerta alta isolata) vale
-    il prezzo della migliore."""
+# Le versioni della stessa carta, che sul mercato valgono cifre diverse.
+VERSIONI = ("normale", "1ed", "reverse")
+
+
+def _versione(h: dict) -> str:
+    if h.get("pokemon_reverse"):
+        return "reverse"
+    if h.get("first_edition"):
+        return "1ed"
+    return "normale"
+
+
+def tabella_prezzi(prodotti: List[dict]) -> Dict[str, Dict[str, Dict[str, int]]]:
+    """Il prezzo piu' basso per versione (normale, prima edizione, reverse),
+    lingua (italiana, inglese) e condizione: {"normale": {"it": {"NM": 55128}}}.
+    Fuori le copie gradate, firmate o alterate. Una condizione peggiore non
+    puo' costare piu' di una migliore: se succede (un'offerta alta isolata)
+    vale il prezzo della migliore."""
     from utils import cardtrader_client as ct
     sigla = {nome: s for s, nomi in CONDIZIONI for nome in nomi}
-    grezzi: Dict[str, Dict[str, int]] = {l: {} for l in LINGUE}
+    grezzi: Dict[str, Dict[str, Dict[str, int]]] = {}
     for p in prodotti or []:
         h = p.get("properties_hash") or {}
-        if p.get("graded") or h.get("signed") or h.get("altered") or h.get("first_edition") or h.get("pokemon_reverse"):
+        if p.get("graded") or h.get("signed") or h.get("altered"):
             continue
         lingua, cond = h.get("pokemon_language"), sigla.get(h.get("condition"))
         cent = ct._price_to_cents(p.get("price"))
-        if lingua in grezzi and cond and cent:
-            grezzi[lingua][cond] = min(cent, grezzi[lingua].get(cond, cent))
-    tabella: Dict[str, Dict[str, int]] = {}
-    for lingua, valori in grezzi.items():
-        tetto, righe = None, {}
-        for s, _ in CONDIZIONI:
-            if s in valori:
-                righe[s] = valori[s] if tetto is None else min(valori[s], tetto)
-                tetto = righe[s]
-        if righe:
-            tabella[lingua] = righe
+        if lingua in LINGUE and cond and cent:
+            righe = grezzi.setdefault(_versione(h), {}).setdefault(lingua, {})
+            righe[cond] = min(cent, righe.get(cond, cent))
+    tabella: Dict[str, Dict[str, Dict[str, int]]] = {}
+    for versione in VERSIONI:
+        for lingua, valori in (grezzi.get(versione) or {}).items():
+            tetto, righe = None, {}
+            for s, _ in CONDIZIONI:
+                if s in valori:
+                    righe[s] = valori[s] if tetto is None else min(valori[s], tetto)
+                    tetto = righe[s]
+            if righe:
+                tabella.setdefault(versione, {})[lingua] = righe
     return tabella
 
 
-def prezzo_in_evidenza(tabella: Dict[str, Dict[str, int]]) -> Optional[int]:
-    """Il prezzo da mostrare in griglia: Near Mint italiana, se no inglese,
-    se no la condizione migliore che c'e'."""
-    for lingua in LINGUE:
-        if (tabella.get(lingua) or {}).get("NM"):
-            return tabella[lingua]["NM"]
-    for s, _ in CONDIZIONI:
+def per_versione(prezzi: Optional[dict]) -> Dict[str, Dict[str, Dict[str, int]]]:
+    """La tabella salvata, anche nel formato di prima (senza versioni)."""
+    if not prezzi:
+        return {}
+    if any(k in LINGUE for k in prezzi):
+        return {"normale": prezzi}
+    return prezzi
+
+
+def prezzo_in_evidenza(tabella: Dict[str, Dict[str, Dict[str, int]]]) -> Optional[int]:
+    """Il prezzo da mostrare in griglia: la versione normale (se c'e'), Near
+    Mint, italiana se no inglese, se no la condizione migliore che c'e'."""
+    tabella = per_versione(tabella)
+    for versione in VERSIONI:
+        lingue = tabella.get(versione) or {}
         for lingua in LINGUE:
-            if (tabella.get(lingua) or {}).get(s):
-                return tabella[lingua][s]
+            if (lingue.get(lingua) or {}).get("NM"):
+                return lingue[lingua]["NM"]
+        for s, _ in CONDIZIONI:
+            for lingua in LINGUE:
+                if (lingue.get(lingua) or {}).get(s):
+                    return lingue[lingua][s]
     return None
 
 

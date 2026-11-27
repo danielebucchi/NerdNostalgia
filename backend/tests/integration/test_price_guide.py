@@ -27,9 +27,10 @@ def fonti(monkeypatch):
         {"id": 11, "name": "Charizard", "fixed_properties": {"collector_number": "004/102"}},
         {"id": 12, "name": "Blastoise", "fixed_properties": {"collector_number": "002/102"}}])
     monkeypatch.setattr(price_guide, "_prezzi", lambda e: {
-        10: ({"it": {"NM": 70000}}, 3),
-        11: ({"it": {"NM": 55128, "SP": 40064, "PO": 13463}, "en": {"MP": 36867, "PO": 18564}}, 40),
-        12: ({"en": {"NM": 3951}}, 25)})
+        10: ({"normale": {"it": {"NM": 70000}}}, 3),
+        11: ({"normale": {"it": {"NM": 55128, "SP": 40064, "PO": 13463}, "en": {"MP": 36867, "PO": 18564}},
+              "1ed": {"it": {"PL": 90000}}}, 40),
+        12: ({"normale": {"en": {"NM": 3951}}}, 25)})
 
 
 def test_weekly_refresh_builds_sets_and_cards(db_session, fonti):
@@ -59,8 +60,10 @@ def test_public_pages_and_search(client, db_session, admin_user, fonti):
     assert [c["name"] for c in dettaglio["cards"]] == ["Blastoise", "Charizard"]
     carta = client.get("/api/price-guide/cards/set-base/4-charizard").json()
     assert carta["min_price"] == 551.28 and carta["available"]["id"] == a.id
-    assert carta["prices"]["it"]["PO"] == {"price": 134.63, "buy_offer": 80.7, "buy_bulk": None, "buy_none": False}
-    assert carta["prices"]["en"]["MP"]["price"] == 368.67
+    assert carta["prices"]["normale"]["it"]["PO"] == {"price": 134.63, "buy_offer": 80.7, "buy_bulk": None,
+                                                      "buy_none": False}
+    assert carta["prices"]["normale"]["en"]["MP"]["price"] == 368.67
+    assert carta["prices"]["1ed"]["it"]["PL"]["buy_offer"] == 540.0
     assert client.get("/api/price-guide/cards/set-base/nessuna").status_code == 404
     trovate = client.get("/api/price-guide/search?q=charizard base").json()
     assert [c["name"] for c in trovate] == ["Charizard"]
@@ -110,8 +113,11 @@ def test_condition_table_from_offers():
         p("Poor", "de", 12063),                       # tedesca: fuori
         p("Poor", "it", 13463), p("Played", "it", 15120), p("Near Mint", "it", 55128), p("Mint", "it", 90000),
         p("Slightly Played", "it", 60000),            # piu' cara della Near Mint: vale la Near Mint
-        p("Near Mint", "it", 20000, first_edition=True), p("Near Mint", "it", 10000, pokemon_reverse=True),
+        p("Near Mint", "it", 200000, first_edition=True), p("Played", "en", 9000, pokemon_reverse=True),
+        p("Near Mint", "it", 100, signed=True),       # firmata: fuori
         p("Moderately Played", "en", 36867)])
-    assert tabella == {"it": {"NM": 55128, "SP": 55128, "PL": 15120, "PO": 13463}, "en": {"MP": 36867}}
+    assert tabella == {"normale": {"it": {"NM": 55128, "SP": 55128, "PL": 15120, "PO": 13463}, "en": {"MP": 36867}},
+                       "1ed": {"it": {"NM": 200000}}, "reverse": {"en": {"PL": 9000}}}
     assert price_guide.prezzo_in_evidenza(tabella) == 55128
-    assert price_guide.prezzo_in_evidenza({"en": {"MP": 36867}}) == 36867
+    assert price_guide.prezzo_in_evidenza({"en": {"MP": 36867}}) == 36867          # formato di prima
+    assert price_guide.prezzo_in_evidenza({"1ed": {"it": {"NM": 7}}}) == 7

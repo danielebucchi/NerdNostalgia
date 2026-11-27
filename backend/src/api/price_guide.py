@@ -33,12 +33,15 @@ def _set(s: PriceGuideSet, carte: Optional[int] = None) -> dict:
 
 
 def _carta(c: PriceGuideCard, disponibile: Optional[dict] = None, regola: Optional[dict] = None) -> dict:
-    """min_price e buy_* sono per il prezzo in evidenza (Near Mint, italiana
-    se c'e'); prices ha il prezzo e l'offerta per lingua e condizione:
-    {"it": {"NM": {"price": 551.28, "buy_offer": ..., "buy_bulk": ..., "buy_none": ...}}}."""
+    """min_price e buy_* sono per il prezzo in evidenza (versione normale,
+    Near Mint, italiana se c'e'); prices ha prezzo e offerta per versione,
+    lingua e condizione: {"normale": {"it": {"NM": {"price": 551.28,
+    "buy_offer": ..., "buy_bulk": ..., "buy_none": ...}}}, "1ed": {...}}."""
     tabella = {}
-    for lingua, righe in (c.prices or {}).items():
-        tabella[lingua] = {s: {"price": pg.euro(cent), **_offerta(c, cent, regola)} for s, cent in righe.items()}
+    for versione, lingue in pg.per_versione(c.prices).items():
+        tabella[versione] = {lingua: {s: {"price": pg.euro(cent), **_offerta(c, cent, regola)}
+                                      for s, cent in righe.items()}
+                             for lingua, righe in lingue.items()}
     return {"slug": c.slug, "set_slug": c.set.slug, "set_name": c.set.nome, "number": c.number,
             "name": c.nome, "name_en": c.name_en, "image": c.image_url, "min_price": pg.euro(c.min_price_cents),
             "offers": c.offers, "available": disponibile, "prices": tabella,

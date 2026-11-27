@@ -67,12 +67,12 @@ export default async function CartaPage({ params }: Params) {
           </p>
 
           <div className="card p-5 mt-6">
-            <p className="text-sm text-ink-soft">Valore di mercato, Near Mint</p>
+            <p className="text-sm text-ink-soft">Valore di mercato, Near Mint{Object.keys(c.prices ?? {}).length > 1 ? " (versione normale)" : ""}</p>
             <p className="display text-4xl text-pink-deep">{euro(c.min_price)}</p>
             <div className="mt-4"><TabellaPrezzi carta={c} /></div>
             <p className="text-xs text-ink-soft mt-3">
               Per ogni lingua e condizione, l&apos;offerta più bassa su CardTrader ({c.offers} copie in vendita),
-              aggiornata il {formatDataBreve(c.updated_at)}. Escluse prima edizione, reverse e copie gradate.
+              aggiornata il {formatDataBreve(c.updated_at)}. Prima edizione e reverse a parte; escluse le copie gradate.
             </p>
           </div>
 
