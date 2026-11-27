@@ -29,7 +29,7 @@ LOGGER = logging.getLogger("price_guide")
 PAUSA = 1.0     # fra un'espansione e l'altra: CardTrader e TCGdex hanno limiti
 # Cambia quando cambia il modo di costruire i dati (nomi, indirizzi): al
 # riavvio il server rifa' la guida senza aspettare la domenica.
-VERSIONE = "6"
+VERSIONE = "7"
 CHIAVE_VERSIONE = "price_guide_version"
 
 
@@ -176,7 +176,8 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
         riga = PriceGuideSet(id=espansione["id"], slug=base if usato is None else f"{base}-{espansione['id']}")
         db.add(riga)
     riga.name_en = espansione["name"]
-    riga.name_it = nome_it
+    # Se TCGdex in italiano non risponde, i nomi italiani di prima restano.
+    riga.name_it = nome_it or riga.name_it
     riga.tcgdex_id = set_id if en else None
     riga.release_date = (en.get("releaseDate") or "")[:10] or None
     riga.card_count = (en.get("cardCount") or {}).get("official")
@@ -217,7 +218,7 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
         carta.name_en = (tcg.get("name") or bp.get("name") or "")[:200]
         if variante:
             carta.name_en = f"{carta.name_en} ({variante})"[:200]
-        carta.name_it = nomi_it.get(numero)
+        carta.name_it = nomi_it.get(numero) or (carta.name_it if not nomi_it else None)
         carta.image_url = f"{tcg['image']}/high.webp" if tcg.get("image") else _immagine_cardtrader(bp)
         tabella, offerte = prezzi.get(bp["id"], ({}, 0))
         carta.prices = tabella or None
@@ -386,7 +387,9 @@ LINGUE_ESCLUSE = {"jp", "jap", "jpn", "japanese", "giapponese", "kr", "kor", "ko
 
 
 def _parole(testo: str) -> List[str]:
-    testo = unicodedata.normalize("NFKD", testo or "").encode("ascii", "ignore").decode().lower()
+    # I simboli si leggono: "Seadra δ" e' "Seadra delta", "Jessie & James" e' "Jessie e James".
+    testo = (testo or "").replace("δ", " delta ").replace("Δ", " delta ").replace("&", " e ")
+    testo = unicodedata.normalize("NFKD", testo).encode("ascii", "ignore").decode().lower()
     return [p for p in re.split(r"[^a-z0-9]+", testo) if p]
 
 
@@ -436,7 +439,10 @@ class Indice:
         self.per_numero: Dict[str, list] = {}
         for c, s in db.query(PriceGuideCard, PriceGuideSet).join(PriceGuideSet):
             set_nomi = [n for n in (s.name_it, s.name_en) if n]
-            voce = (c.blueprint_id, [n for n in (c.name_it, c.name_en) if n], set_nomi, "(" in (c.name_en or ""), s.id)
+            # Lo "stesso set" e' il set TCGdex: CardTrader a volte ne ha due
+            # espansioni ("EX Holon Phantoms" e "Holon Phantoms").
+            voce = (c.blueprint_id, [n for n in (c.name_it, c.name_en) if n], set_nomi, "(" in (c.name_en or ""),
+                    s.tcgdex_id or s.id)
             self.per_numero.setdefault(_numero_carta(c.number), []).append(voce)
             # Le ristampe tengono la sigla del set originale: "BRS 123" si
             # trova anche come "123".

@@ -205,3 +205,26 @@ def test_title_matching_rules(titolo, atteso):
         "22": [(4, ["Light Dragonair"], ["Neo Destiny"], False, 4)],
     }
     assert (indice.abbina(titolo) is not None) is atteso
+
+
+def test_symbols_and_the_same_set_on_two_expansions():
+    indice = price_guide.Indice.__new__(price_guide.Indice)
+    indice.per_numero = {
+        "52": [(1, ["Rapidash"], ["EX Specie Delta", "EX Delta Species"], False, "ex7"),
+               (2, ["Seadra δ"], ["EX Fantasmi di Holon", "EX Holon Phantoms"], False, "ex13"),
+               (3, ["Seadra δ"], ["EX Fantasmi di Holon", "Holon Phantoms"], False, "ex13")],   # stesso set TCGdex
+        "58": [(4, ["Jessie & James"], ["Destino Sfuggente", "Hidden Fates"], False, "sm115")],
+    }
+    assert indice.abbina("Seadra specie delta 52 ex fantasmi di holon pokemon") == 2
+    assert indice.abbina("Seadra δ 52 holon phantoms") == 2
+    assert indice.abbina("Jessie e James 58 destino sfuggente pokemon") == 4
+    assert indice.abbina("Jessie & James 58 hidden fates") == 4
+
+
+def test_italian_names_survive_a_tcgdex_hiccup(db_session, fonti, monkeypatch):
+    price_guide.aggiorna(db_session, pausa=0)
+    tcg = {"tcgdex:en:base1": {"releaseDate": "1999-01-09", "cards": [{"localId": "4", "name": "Charizard"},
+                                                                       {"localId": "2", "name": "Blastoise"}]}}
+    monkeypatch.setattr(card_names_it, "_in_cache", lambda chiave, f: tcg.get(chiave))      # italiano non risponde
+    price_guide.aggiorna(db_session, pausa=0)
+    assert db_session.query(PriceGuideSet).one().name_it == "Set Base"
