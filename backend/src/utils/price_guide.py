@@ -416,6 +416,13 @@ def _numero_carta(numero: str) -> str:
     return f"{m.group(1)}{m.group(2)}" if m else (numero or "").lower()
 
 
+def _titolo(titolo: str) -> str:
+    """Il titolo con i nomi delle carte speciali in inglese, come nella guida
+    ("Arceus v astro" → "arceus vstar")."""
+    from utils.cardtrader_sync import in_inglese
+    return in_inglese(titolo)
+
+
 def _numeri(titolo: str) -> set:
     numeri = {_numero_carta(p) for p in _parole(titolo) if re.fullmatch(r"[a-z]*\d+", p)}
     numeri |= {_numero_carta(a) for a, _ in re.findall(r"(\d+)\s*/\s*(\d+)", titolo or "")}
@@ -429,13 +436,19 @@ class Indice:
         self.per_numero: Dict[str, list] = {}
         for c, s in db.query(PriceGuideCard, PriceGuideSet).join(PriceGuideSet):
             set_nomi = [n for n in (s.name_it, s.name_en) if n]
-            self.per_numero.setdefault(_numero_carta(c.number), []).append(
-                (c.blueprint_id, [n for n in (c.name_it, c.name_en) if n], set_nomi, "(" in (c.name_en or ""), s.id))
+            voce = (c.blueprint_id, [n for n in (c.name_it, c.name_en) if n], set_nomi, "(" in (c.name_en or ""), s.id)
+            self.per_numero.setdefault(_numero_carta(c.number), []).append(voce)
+            # Le ristampe tengono la sigla del set originale: "BRS 123" si
+            # trova anche come "123".
+            from utils.cardtrader_sync import numero_semplice
+            if numero_semplice(c.number):
+                self.per_numero.setdefault(numero_semplice(c.number), []).append(voce)
 
     def abbina(self, titolo: str) -> Optional[int]:
         """Il blueprint della carta del titolo, se ce n'e' uno solo sicuro:
         numero, nome della carta (italiano o inglese) e nome del set tutti
         nel titolo, un solo set possibile. Fra le varianti, la normale."""
+        titolo = _titolo(titolo)
         parole = _parole(titolo)
         if set(parole) & LINGUE_ESCLUSE:
             return None

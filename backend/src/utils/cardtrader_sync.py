@@ -50,6 +50,47 @@ def _tokens(s: Optional[str]) -> set:
     return set(re.findall(r"[a-z0-9]+", (s or "").lower()))
 
 
+# I nomi italiani delle carte speciali, come CardTrader le chiama in inglese.
+NOMI_ITALIANI = ((r"\bv[\s\-]*astro\b", "vstar"), (r"\bv[\s\-]*max\b", "vmax"),
+                 (r"\bv[\s\-]*union\b", "v-union"))
+
+
+def in_inglese(testo: str) -> str:
+    """"Arceus V astro" → "arceus vstar": cosi' lo trova il catalogo CardTrader."""
+    testo = (testo or "").lower()
+    for italiano, inglese in NOMI_ITALIANI:
+        testo = re.sub(italiano, inglese, testo)
+    return testo
+
+
+def numero_semplice(numero: Optional[str]) -> str:
+    """Le ristampe tengono la sigla del set originale: "BRS 123" → "123"."""
+    m = re.fullmatch(r"\s*[a-z]+\s+0*(\d+)\s*", str(numero or "").split("/")[0].lower())
+    return m.group(1) if m else ""
+
+
+def cerca_blueprint(blueprint: List[Dict[str, Any]], ricerca: str) -> List[Dict[str, Any]]:
+    """La ricerca a mano dentro un'espansione: per numero ("123" trova anche
+    "BRS 123") o per nome, parola per parola e con i nomi italiani delle
+    carte speciali ("arceus v astro" trova "Arceus VSTAR")."""
+    q = in_inglese(ricerca.strip())
+    parole = [p for p in re.findall(r"[a-z0-9\-]+", q) if p]
+
+    def numero(b):
+        return (b.get("fixed_properties") or {}).get("collector_number") or b.get("collector_number")
+
+    trovati = []
+    for b in blueprint:
+        nome = str(b.get("name", "")).lower()
+        n = numero(b)
+        per_numero = bool(n) and any(_norm_number(p) and _norm_number(p) in (_norm_number(n), numero_semplice(n))
+                                     for p in parole if p.isdigit() or re.fullmatch(r"[a-z]*\d+", p))
+        per_nome = bool(parole) and all(p in nome or p.isdigit() and per_numero for p in parole)
+        if q in nome or per_nome or (per_numero and all(p in nome for p in parole if not any(c.isdigit() for c in p))):
+            trovati.append(b)
+    return trovati
+
+
 def resolve_blueprints(
     collection: Optional[str],
     number: Optional[str],

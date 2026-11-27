@@ -123,17 +123,7 @@ def list_blueprints(
 ):
     items = _wrap(ct.blueprints, expansion_id)
     if search:
-        q = search.strip().lower()
-
-        def numero(b):
-            # CardTrader lo tiene in fixed_properties: "015" per il 15 del Base Set
-            return (b.get("fixed_properties") or {}).get("collector_number") or b.get("collector_number")
-
-        items = [
-            b for b in items
-            if q in str(b.get("name", "")).lower()
-            or (numero(b) and cts._norm_number(q) and cts._norm_number(q) == cts._norm_number(numero(b)))
-        ]
+        items = cts.cerca_blueprint(items, search)
     return items[:200]
 
 
