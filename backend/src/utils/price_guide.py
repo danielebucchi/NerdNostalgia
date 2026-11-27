@@ -29,7 +29,7 @@ LOGGER = logging.getLogger("price_guide")
 PAUSA = 1.0     # fra un'espansione e l'altra: CardTrader e TCGdex hanno limiti
 # Cambia quando cambia il modo di costruire i dati (nomi, indirizzi): al
 # riavvio il server rifa' la guida senza aspettare la domenica.
-VERSIONE = "7"
+VERSIONE = "8"
 CHIAVE_VERSIONE = "price_guide_version"
 
 
@@ -164,9 +164,13 @@ def aggiorna_set(db: Session, espansione: dict, set_id: str) -> int:
     carte_en = {(c.get("localId") or "").lstrip("0") or c.get("localId"): c for c in en.get("cards") or []}
     # Il set TCGdex e' quello giusto solo se le carte tornano per numero:
     # "Miscellaneous Promos" di CardTrader (promo sparse) ha lo stesso nome di
-    # un set TCGdex di una carta sola. Se no, di TCGdex non si usa niente.
+    # un set TCGdex di una carta sola. Basta che torni meta' delle carte
+    # CardTrader, oppure quasi tutte quelle di TCGdex: "Destino Sfuggente" su
+    # CardTrader ha anche le 94 carte della Shiny Vault, che TCGdex tiene a
+    # parte. Se no, di TCGdex non si usa niente.
     trovate = sum(1 for bp in blueprint if _numero(bp["fixed_properties"]) in carte_en)
-    if blueprint and trovate < len(blueprint) / 2:
+    quasi_tutte_tcgdex = len(carte_en) >= 10 and trovate >= 0.8 * len(carte_en)
+    if blueprint and trovate < len(blueprint) / 2 and not quasi_tutte_tcgdex:
         en, it, carte_en = {}, {}, {}
     riga = db.get(PriceGuideSet, espansione["id"])
     nome_it = it.get("name")

@@ -228,3 +228,21 @@ def test_italian_names_survive_a_tcgdex_hiccup(db_session, fonti, monkeypatch):
     monkeypatch.setattr(card_names_it, "_in_cache", lambda chiave, f: tcg.get(chiave))      # italiano non risponde
     price_guide.aggiorna(db_session, pausa=0)
     assert db_session.query(PriceGuideSet).one().name_it == "Set Base"
+
+
+def test_set_with_a_big_secret_section_keeps_tcgdex(db_session, fonti, monkeypatch):
+    """Come Destino Sfuggente: tutte le 10 carte di TCGdex ci sono, piu' 15
+    carte "SV" della Shiny Vault che TCGdex tiene a parte (10 su 25)."""
+    from utils import cardtrader_client as ct
+    carte = [{"id": i, "name": f"Carta {i}", "fixed_properties": {"collector_number": str(i)}} for i in range(1, 11)]
+    carte += [{"id": 100 + i, "name": f"Shiny {i}", "fixed_properties": {"collector_number": f"SV{i}"}}
+              for i in range(1, 16)]
+    monkeypatch.setattr(ct, "blueprints_cached", lambda e: carte)
+    monkeypatch.setattr(price_guide, "_prezzi", lambda e: {})
+    tcg = {"tcgdex:en:base1": {"releaseDate": "2019-08-23",
+                               "cards": [{"localId": str(i), "name": f"Carta {i}"} for i in range(1, 11)]},
+           "tcgdex:it:base1": {"name": "Destino Sfuggente"}}
+    monkeypatch.setattr(card_names_it, "_in_cache", lambda k, f: tcg.get(k))
+    price_guide.aggiorna(db_session, pausa=0)
+    s = db_session.query(PriceGuideSet).one()
+    assert (s.name_it, s.release_date) == ("Destino Sfuggente", "2019-08-23")
